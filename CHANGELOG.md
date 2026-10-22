@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0 (2026-10-22)
+
+
+### Features
+
+* import treestamp public source tree ([764f4e9](https://github.com/reponomics/treestamp/commit/764f4e9bd9e9630d628c86e90f4d813902a85e6e))
+* prepare release and production deployment automation ([#1](https://github.com/reponomics/treestamp/issues/1)) ([25722b8](https://github.com/reponomics/treestamp/commit/25722b884e29dd8a4ff65e22c782f4e11ea98922))
+
 ## 0.1.0 (Unreleased)
 
 - Create and curate README directory trees in the terminal or web editor.
