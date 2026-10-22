@@ -2,6 +2,8 @@
 VENV ?= venv
 PYTHON ?= python3
 NODE ?= node
+FLY ?= fly
+ACTIONLINT ?= actionlint
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 CLI := $(VENV)/bin/treestamp
@@ -11,16 +13,22 @@ GITHUB_API_URL ?= http://127.0.0.1:8100
 FAKE_PORT ?= 8100
 FAKE_FLAGS ?=
 FLY_CONFIG ?= web/fly.toml
+FLY_PRODUCTION_CONFIG ?= web/fly.production.toml
+FLY_DEPLOY_FLAGS ?=
+FLY_HA ?= false
+BUILD_COMMIT ?= $(shell git rev-parse HEAD)
 SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
-.PHONY: tls-check
+.PHONY: tls-check fly-production-deploy workflow-check
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 venv: ## Create the virtual environment
 	$(PYTHON) -m venv $(VENV)
 install: ## Install the package and development dependencies
+	# Python 3.11 seeds setuptools, which this Hatch-based project does not use.
+	$(PIP) uninstall -y setuptools
 	$(PIP) install -e '.[dev]'
 format: ## Format Python code
 	$(VENV)/bin/ruff format .
@@ -46,6 +54,8 @@ distribution-check: ## Verify clean wheel/sdist headless commands and editor wor
 	$(PY) scripts/distribution_check.py
 integration-check: ## Verify the repository's treestamped README
 	$(CLI) check README.md
+workflow-check: ## Validate GitHub Actions workflows (requires actionlint)
+	$(ACTIONLINT)
 hook-check: ## Exercise installed repository hooks at HEAD
 	$(PY) scripts/hook_check.py
 pre-commit-check: ## Run the repository development hooks
@@ -76,17 +86,19 @@ web-serve: ## Run the hosted preview locally against GITHUB_API_URL
 tls-check: ## Check Python TLS package versions and certificate trust stores
 	$(PY) web/scripts/check_tls.py
 web-image: ## Build the hosted preview container image
-	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$$(git rev-parse HEAD)" -t treestamp-web:local .
+	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
 fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
 	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
 	  { echo "usage: make fly-secrets GITHUB_APP_CLIENT_ID=... GITHUB_APP_INSTALLATION_ID=... GITHUB_APP_PRIVATE_KEY_FILE=path.pem"; exit 2; }
-	fly secrets set --config $(FLY_CONFIG) GITHUB_APP_CLIENT_ID="$(GITHUB_APP_CLIENT_ID)" \
+	$(FLY) secrets set --config $(FLY_CONFIG) GITHUB_APP_CLIENT_ID="$(GITHUB_APP_CLIENT_ID)" \
 	  GITHUB_APP_INSTALLATION_ID="$(GITHUB_APP_INSTALLATION_ID)" GITHUB_APP_PRIVATE_KEY="$$(cat $(GITHUB_APP_PRIVATE_KEY_FILE))"
-fly-deploy: ## Build on Fly's builders and deploy the app named in web/fly.toml
-	fly deploy --config $(FLY_CONFIG) --dockerfile web/Dockerfile --build-arg BUILD_COMMIT="$$(git rev-parse HEAD)"
+fly-deploy: ## Build and deploy the app selected by FLY_CONFIG (defaults to preview)
+	$(FLY) deploy --config $(FLY_CONFIG) --dockerfile web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" --ha=$(FLY_HA) $(FLY_DEPLOY_FLAGS)
+fly-production-deploy: ## Build and deploy the separate production app
+	$(MAKE) fly-deploy FLY_CONFIG=$(FLY_PRODUCTION_CONFIG) FLY_HA=true
 fly-status: ## Show the app's machines and health
-	fly status --config $(FLY_CONFIG)
+	$(FLY) status --config $(FLY_CONFIG)
 fly-logs: ## Stream the service's log lines from Fly
-	fly logs --config $(FLY_CONFIG)
+	$(FLY) logs --config $(FLY_CONFIG)
 fly-smoke: ## Run the smoke script against the deployed app (SMOKE_REPO, SMOKE_CHECKOUT)
 	$(PY) web/scripts/smoke.py $(SMOKE_URL) --repo $(SMOKE_REPO) --checkout $(SMOKE_CHECKOUT)

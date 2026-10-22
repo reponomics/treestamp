@@ -1,0 +1,78 @@
+name: OSV dependency scan
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "7 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: osv-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan resolved Python dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out the requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+      - name: Resolve core, hosted, and development dependencies
+        run: |
+          make venv
+          make install web-install
+          venv/bin/python -m pip install -e './web[browser]'
+          mkdir -p .tmp/osv
+          venv/bin/python -m pip freeze --all --exclude treestamp --exclude treestamp-web > .tmp/osv/requirements.txt
+          venv/bin/python - <<'PY'
+          from pathlib import Path
+
+          requirements = Path('.tmp/osv/requirements.txt').read_text().splitlines()
+          names = {line.split('==')[0].lower() for line in requirements}
+          required = {'textual', 'fastapi', 'httpx', 'certifi', 'pyjwt', 'uvicorn'}
+          assert required <= names, f'Missing resolved dependencies: {required - names}'
+          assert all('==' in line for line in requirements), 'Expected fully pinned dependencies'
+          print(f'Scanning {len(requirements)} resolved third-party packages.')
+          PY
+      - name: Scan the resolved dependency versions
+        # Scan the generated manifest explicitly: pyproject.toml alone does not
+        # provide the installed transitive versions. pip already resolved them;
+        # do not resolve them again against OSV's separate metadata source.
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --lockfile=.tmp/osv/requirements.txt
+            --no-resolve
+            --format=sarif
+            --output-file=osv-scanner.sarif
+      - name: Retain the report and resolved versions
+        if: ${{ !cancelled() && hashFiles('osv-scanner.sarif') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: osv-dependency-report
+          path: |
+            osv-scanner.sarif
+            .tmp/osv/requirements.txt
+          include-hidden-files: true
+          retention-days: 5
+      - name: Upload SARIF to code scanning
+        # Private repositories may not have GitHub Code Security enabled.
+        if: ${{ !cancelled() && !github.event.repository.private && hashFiles('osv-scanner.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: osv-scanner.sarif
+          category: python-dependencies

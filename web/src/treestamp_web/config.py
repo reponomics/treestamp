@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
+from functools import cached_property
+from ipaddress import IPv4Network, IPv6Network, ip_network
 from typing import TYPE_CHECKING
+
+from treestamp_web.routing import MAX_REPLAY_BODY, valid_machine_id
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -35,9 +39,48 @@ class Config:
     max_state_bytes: int = 262_144
     trust_proxy: bool = False
     client_ip_header: str = "X-Forwarded-For"
+    cloudflare_proxy_cidrs: str = ""
+    fly_session_routing: bool = False
+    fly_machine_id: str | None = None
     public_base_url: str | None = None
     log_level: str = "info"
     build_commit: str = "unknown"
+
+    @property
+    def session_machine_id(self) -> str | None:
+        if not self.fly_session_routing:
+            return None
+        machine = valid_machine_id(self.fly_machine_id)
+        if machine is None:
+            raise ConfigError("FLY_SESSION_ROUTING requires a valid FLY_MACHINE_ID")
+        if self.max_state_bytes > MAX_REPLAY_BODY:
+            raise ConfigError(
+                f"FLY_SESSION_ROUTING requires MAX_STATE_BYTES <= {MAX_REPLAY_BODY}"
+            )
+        return machine
+
+    @cached_property
+    def cloudflare_networks(self) -> tuple[IPv4Network | IPv6Network, ...]:
+        """Opt in to Cloudflare visitor headers behind Fly's trusted ingress."""
+        if not self.cloudflare_proxy_cidrs:
+            return ()
+        if not self.trust_proxy or self.client_ip_header.lower() != "fly-client-ip":
+            raise ConfigError(
+                "CLOUDFLARE_PROXY_CIDRS requires TRUST_PROXY=1 and "
+                "CLIENT_IP_HEADER=Fly-Client-IP"
+            )
+        try:
+            networks = tuple(
+                ip_network(value.strip())
+                for value in self.cloudflare_proxy_cidrs.split(",")
+            )
+        except ValueError as exc:
+            raise ConfigError(
+                "CLOUDFLARE_PROXY_CIDRS must contain valid CIDRs"
+            ) from exc
+        if any(network.prefixlen == 0 for network in networks):
+            raise ConfigError("CLOUDFLARE_PROXY_CIDRS must not trust every address")
+        return networks
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> Config:
@@ -53,6 +96,8 @@ class Config:
         return config
 
     def validate(self) -> None:
+        _ = self.cloudflare_networks
+        _ = self.session_machine_id
         for name in (
             "port",
             "github_rate_reserve",

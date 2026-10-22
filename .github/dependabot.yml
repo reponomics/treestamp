@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directories:
+      - /
+      - /web
+    schedule:
+      interval: weekly
+    groups:
+      python-minor-patch:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+      python-security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /web
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions-updates:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [major, minor, patch]
+      github-actions-security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]

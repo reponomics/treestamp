@@ -366,7 +366,12 @@ def test_failed_note_stays_modal_and_does_not_copy_stale_output(
     assert page.evaluate("window.copiedBlocks") == []
 
 
-def test_reopening_after_a_failed_edit_allows_copy(page: Page, service: str) -> None:
+@pytest.mark.parametrize(
+    ("status", "code"), [(503, "unavailable"), (410, "snapshot_unavailable")]
+)
+def test_reopening_after_a_failed_edit_allows_copy(
+    page: Page, service: str, status: int, code: str
+) -> None:
     page.add_init_script("""
         window.copiedBlocks = [];
         Object.defineProperty(navigator, "clipboard", {value: {
@@ -374,16 +379,19 @@ def test_reopening_after_a_failed_edit_allows_copy(page: Page, service: str) -> 
         }});
     """)
     open_editor(page, service)
+    original_region = page.locator("#region").text_content()
     page.route(
         "**/api/op",
         lambda route: route.fulfill(
-            status=503, json={"error": {"message": "Could not save the edit."}}
+            status=status,
+            json={"error": {"code": code, "message": "Could not save the edit."}},
         ),
     )
     page.locator('.row[data-path="docs"] .fold').click()
     expect(page.locator("#error")).to_be_visible()
     page.locator("#copy").click()
     expect(page.locator("#copy-status")).to_have_text("Copied previous draft")
+    assert page.evaluate("window.copiedBlocks") == [original_region]
     page.locator("#url").fill("fixture/reopened")
     page.locator("#submit").click()
     page.locator("#reload").click()

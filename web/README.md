@@ -34,4 +34,4 @@ make web-image
 
 Bundled welcome examples are offline fixtures. Their responses in `src/treestamp_web/static/example.js` and trees in `src/treestamp_web/data/examples.json` must stay consistent; `tests/test_examples.py` checks them against the API. Opening an example's live repository follows the same public default-branch policy as any other repository.
 
-See [MAINTENANCE.md](../MAINTENANCE.md) for manual preview deployment, smoke checks, and the planned production setup.
+See [MAINTENANCE.md](../MAINTENANCE.md) for promoting the existing app to production, the new preview app, deployment from `main`, and session recovery after cache loss.

@@ -1,0 +1,117 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Validate and build the released revision
+    # The public repository and explicit readiness flag are both required.
+    # Configure the pypi environment and Trusted Publisher before enabling it.
+    if: >-
+      github.repository == 'reponomics/treestamp' &&
+      github.event.repository.private == false &&
+      vars.PYPI_PUBLISH_ENABLED == 'true' &&
+      github.event.release.draft == false &&
+      github.event.release.prerelease == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the released commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+          check-latest: true
+      - name: Validate the release tag and aligned package versions
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ['RELEASE_TAG']
+          if not re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', tag):
+              raise SystemExit('Expected a stable release tag such as v0.1.0')
+          version = tag[1:]
+          for path in ('pyproject.toml', 'web/pyproject.toml'):
+              project = tomllib.loads(Path(path).read_text(encoding='utf-8'))['project']
+              if project['version'] != version:
+                  raise SystemExit(f'{path}: version does not match {tag}')
+          manifest = json.loads(Path('.github/.release-please-manifest.json').read_text())
+          if manifest.get('.') != version:
+              raise SystemExit('Release Please manifest does not match the release tag')
+
+          def revision(ref):
+              return subprocess.check_output(['git', 'rev-parse', ref], text=True).strip()
+
+          head = revision('HEAD')
+          if head != os.environ['GITHUB_SHA'] or revision(f'refs/tags/{tag}^{{commit}}') != head:
+              raise SystemExit('Checked-out commit differs from the published release tag')
+          subprocess.run(['git', 'merge-base', '--is-ancestor', head, 'origin/main'], check=True)
+          print(f'Validated {tag} at {head} on main')
+          PY
+      - name: Install the development environment
+        run: |
+          make venv
+          make install
+      - name: Run release checks and build fresh artifacts
+        run: |
+          make ci docs-check
+          make build metadata-check distribution-check
+      - name: Preserve the validated distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pypi-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish validated artifacts through Trusted Publishing
+    needs: build
+    if: >-
+      github.repository == 'reponomics/treestamp' &&
+      github.event.repository.private == false &&
+      vars.PYPI_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/treestamp/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # The publishing job does not check out or run the project's build code.
+      - name: Download this run's validated distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pypi-distributions
+          path: dist
+      - name: Publish distributions with attestations
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/
+          attestations: true
+          print-hash: true

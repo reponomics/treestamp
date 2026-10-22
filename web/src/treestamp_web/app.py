@@ -35,6 +35,8 @@ from treestamp_web.preview import (
     parse_preview_body,
     parse_request,
 )
+from treestamp_web.proxy import cloudflare_identity
+from treestamp_web.routing import bind_session, replay_response
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -112,6 +114,7 @@ def create_app(
     clock: Callable[[], float] = time.time,
 ) -> FastAPI:
     settings = config if config is not None else Config.from_env(os.environ)
+    machine = settings.session_machine_id
     logging.basicConfig(level=settings.log_level.upper(), format="%(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -141,7 +144,10 @@ def create_app(
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Any) -> Response:
-        response: Response = await call_next(request)
+        response = await _routing_response(request, machine, settings.max_state_bytes)
+        if response is None:
+            response = await call_next(request)
+        bind_session(request, response, machine)
         for name, value in SECURITY_HEADERS.items():
             # A route may set its own caching (the favicon does); others revalidate.
             if name == "Cache-Control" and name in response.headers:
@@ -301,6 +307,21 @@ def create_app(
     return app
 
 
+async def _routing_response(
+    request: Request, machine: str | None, limit: int
+) -> Response | None:
+    response = replay_response(request, machine)
+    if response is None or request.method != "POST":
+        return response
+    try:
+        # Fly cannot replay bodies over 1 MB. Enforce the smaller application
+        # limit even when the request would otherwise bypass the local route.
+        await _bounded_body(request, limit)
+    except PreviewError as exc:
+        return _error(exc.status, exc.code, str(exc))
+    return response
+
+
 async def _json_body(request: Request, limit: int, code: str) -> object:
     body = await _bounded_body(request, limit)
     try:
@@ -329,6 +350,8 @@ async def _bounded_body(request: Request, limit: int) -> bytes:
 
 
 def _client_identity(request: Request, config: Config) -> str:
+    if config.cloudflare_networks:
+        return cloudflare_identity(request, config.cloudflare_networks)
     if config.trust_proxy:
         forwarded = request.headers.get(config.client_ip_header)
         if forwarded:
