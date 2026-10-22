@@ -1,0 +1,92 @@
+.DEFAULT_GOAL := help
+VENV ?= venv
+PYTHON ?= python3
+NODE ?= node
+PY := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+CLI := $(VENV)/bin/treestamp
+
+.PHONY: help venv install format format-check lint typecheck test cov ci build distribution-check integration-check hook-check pre-commit-check tui clean web-install web-lint web-typecheck web-test web-cov web-ci web-fake web-serve web-image web-js-test web-browser-test fly-secrets fly-deploy fly-status fly-logs fly-smoke docs-check metadata-check
+GITHUB_API_URL ?= http://127.0.0.1:8100
+FAKE_PORT ?= 8100
+FAKE_FLAGS ?=
+FLY_CONFIG ?= web/fly.toml
+SMOKE_REPO ?= reponomics/treestamp
+SMOKE_URL ?= https://treestamp.reponomics.org
+SMOKE_CHECKOUT ?= .
+WEB_VENV := $(abspath $(VENV))
+.PHONY: tls-check
+help: ## Show available targets
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+venv: ## Create the virtual environment
+	$(PYTHON) -m venv $(VENV)
+install: ## Install the package and development dependencies
+	$(PIP) install -e '.[dev]'
+format: ## Format Python code
+	$(VENV)/bin/ruff format .
+format-check: ## Check Python formatting
+	$(VENV)/bin/ruff format --check .
+lint: ## Lint Python code
+	$(VENV)/bin/ruff check .
+typecheck: ## Check strict Python types
+	$(VENV)/bin/mypy
+test: ## Run the regression suite, including headless TUI journeys
+	$(PY) -m pytest
+cov: ## Run tests with branch coverage
+	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=90
+ci: format-check lint typecheck cov ## Run all local quality gates
+docs-check: ## Check retained local documentation links and packaged README URLs
+	$(PY) scripts/check_docs.py
+metadata-check: ## Check built metadata, README rendering, package contents, and hashes
+	$(PY) -m twine check --strict dist/*.whl dist/*.tar.gz
+	$(PY) scripts/release_check.py
+build: ## Build wheel and sdist
+	$(PY) -m build
+distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
+	$(PY) scripts/distribution_check.py
+integration-check: ## Verify the repository's treestamped README
+	$(CLI) check README.md
+hook-check: ## Exercise installed repository hooks at HEAD
+	$(PY) scripts/hook_check.py
+pre-commit-check: ## Run the repository development hooks
+	$(VENV)/bin/pre-commit run --all-files
+tui: ## Open the editor
+	$(CLI)
+clean: ## Remove generated build and coverage artifacts
+	rm -rf dist/ build/ .coverage htmlcov/
+web-install: ## Install the hosted preview project and its development dependencies
+	$(PIP) install -e '.' -e './web[dev]'
+web-lint: ## Lint the hosted preview project
+	$(VENV)/bin/ruff check web && $(VENV)/bin/ruff format --check web
+web-typecheck: ## Check strict types for the hosted preview project
+	cd web && $(WEB_VENV)/bin/mypy
+web-test: ## Run the hosted preview tests
+	cd web && $(WEB_VENV)/bin/python -m pytest
+web-cov: ## Run the hosted preview tests with branch coverage
+	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
+web-ci: web-lint web-typecheck web-cov web-js-test ## Run all hosted preview quality gates
+web-js-test: ## Run the page's pure-logic tests with Node's test runner
+	$(NODE) --test web/tests/js/*.test.mjs
+web-browser-test: ## Drive the page in a browser (needs `pip install -e './web[browser]'` and a browser)
+	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
+web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
+	$(PY) web/scripts/fake_github.py --repo . --port $(FAKE_PORT) $(FAKE_FLAGS)
+web-serve: ## Run the hosted preview locally against GITHUB_API_URL
+	GITHUB_API_URL=$(GITHUB_API_URL) GITHUB_RATE_RESERVE=0 $(VENV)/bin/uvicorn --factory treestamp_web.app:create_app --host 127.0.0.1 --port 8000 --reload
+tls-check: ## Check Python TLS package versions and certificate trust stores
+	$(PY) web/scripts/check_tls.py
+web-image: ## Build the hosted preview container image
+	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$$(git rev-parse HEAD)" -t treestamp-web:local .
+fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
+	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
+	  { echo "usage: make fly-secrets GITHUB_APP_CLIENT_ID=... GITHUB_APP_INSTALLATION_ID=... GITHUB_APP_PRIVATE_KEY_FILE=path.pem"; exit 2; }
+	fly secrets set --config $(FLY_CONFIG) GITHUB_APP_CLIENT_ID="$(GITHUB_APP_CLIENT_ID)" \
+	  GITHUB_APP_INSTALLATION_ID="$(GITHUB_APP_INSTALLATION_ID)" GITHUB_APP_PRIVATE_KEY="$$(cat $(GITHUB_APP_PRIVATE_KEY_FILE))"
+fly-deploy: ## Build on Fly's builders and deploy the app named in web/fly.toml
+	fly deploy --config $(FLY_CONFIG) --dockerfile web/Dockerfile --build-arg BUILD_COMMIT="$$(git rev-parse HEAD)"
+fly-status: ## Show the app's machines and health
+	fly status --config $(FLY_CONFIG)
+fly-logs: ## Stream the service's log lines from Fly
+	fly logs --config $(FLY_CONFIG)
+fly-smoke: ## Run the smoke script against the deployed app (SMOKE_REPO, SMOKE_CHECKOUT)
+	$(PY) web/scripts/smoke.py $(SMOKE_URL) --repo $(SMOKE_REPO) --checkout $(SMOKE_CHECKOUT)

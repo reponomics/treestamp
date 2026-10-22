@@ -1,0 +1,40 @@
+name: README tree check
+
+on:
+  workflow_dispatch:
+    # Select the branch in Run workflow so the check attaches to that revision.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    # No Markdown-only filter: source-only changes must also be checked.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: treestamp-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: README tree freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out the exact candidate revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+          check-latest: true
+      - name: Install Treestamp from this checkout
+        run: |
+          python -m venv "$RUNNER_TEMP/treestamp/venv"
+          "$RUNNER_TEMP/treestamp/venv/bin/python" -m pip install .
+      - name: Check the README without writing
+        run: '"$RUNNER_TEMP/treestamp/venv/bin/treestamp" check README.md'

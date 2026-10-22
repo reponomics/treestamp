@@ -1,0 +1,100 @@
+name: Update README tree
+
+on:
+  workflow_run:
+    workflows: [README tree check]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: Trusted branch whose README should be maintained
+        type: string
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: treestamp-update-${{ inputs.base_branch || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Refresh README tree PR
+    # Only a failed check of a trusted push to main may trigger automatic writes.
+    # PR checks, successful checks, and cancelled runs do not allocate a runner.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.conclusion == 'failure')
+    env:
+      BASE_BRANCH: ${{ inputs.base_branch || 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out the selected trusted branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Recheck current main, not an obsolete triggering SHA or PR checkout.
+          ref: ${{ env.BASE_BRANCH }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+          check-latest: true
+      - name: Install Treestamp from this checkout
+        run: |
+          python -m venv "$RUNNER_TEMP/treestamp/venv"
+          "$RUNNER_TEMP/treestamp/venv/bin/python" -m pip install .
+      - name: Recheck, update if stale, and validate
+        id: repair
+        shell: bash
+        run: |
+          status=0
+          "$RUNNER_TEMP/treestamp/venv/bin/treestamp" check README.md || status=$?
+          case "$status" in
+            0)
+              echo "needs_update=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            1) ;; # Drift: update must still validate bounds before publication.
+            *) exit "$status" ;; # Invalid input/environment is not a repair request.
+          esac
+          "$RUNNER_TEMP/treestamp/venv/bin/treestamp" update README.md
+          "$RUNNER_TEMP/treestamp/venv/bin/treestamp" check README.md
+          echo "needs_update=true" >> "$GITHUB_OUTPUT"
+      - name: Create or refresh one documentation PR
+        id: pr
+        if: steps.repair.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ github.token }}
+          base: ${{ env.BASE_BRANCH }}
+          branch: codex/treestamp/${{ env.BASE_BRANCH }}
+          add-paths: README.md
+          delete-branch: false
+          commit-message: 'docs: refresh README tree'
+          title: 'docs: refresh README tree'
+          body: |
+            Regenerates README.md from the selected base branch's Git index.
+            The updater runs a clean check before creating or refreshing this PR.
+            Review the generated diff before merging.
+          draft: true
+      - name: Report the outcome
+        env:
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+          OPERATION: ${{ steps.pr.outputs.pull-request-operation }}
+        run: |
+          if [ -n "$PR_URL" ]; then
+            printf 'PR: %s (%s)\n' "$PR_URL" "$OPERATION" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'No documentation PR is needed.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi

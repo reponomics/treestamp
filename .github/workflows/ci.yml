@@ -1,0 +1,169 @@
+name: Treestamp CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: treestamp-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Regression suite (Linux, Python ${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep the primary version aligned with .python-version.
+        python-version: ['3.11', '3.12']
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: true
+      - name: Install development environment
+        run: |
+          make venv
+          make install
+      - name: Run quality checks and regression tests on the primary version
+        if: matrix.python-version == '3.11'
+        run: make ci
+      - name: Run regression tests on the compatibility version
+        if: matrix.python-version != '3.11'
+        run: make test
+      - name: Check the treestamped README
+        run: make integration-check
+      - name: Build distributions
+        run: make build
+      - name: Check documentation and distribution metadata
+        if: matrix.python-version == '3.11'
+        run: make docs-check metadata-check
+      - name: Verify clean headless installations
+        if: matrix.python-version == '3.11'
+        run: make distribution-check
+      - name: Verify installed pre-commit hooks
+        if: matrix.python-version == '3.11'
+        run: make hook-check
+
+  windows:
+    name: Regression suite (Windows, Python ${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        # Git Bash, so the steps read the same as the Linux ones. The Makefile
+        # is not reused: its targets hard-code the POSIX `venv/bin` layout.
+        shell: bash
+    steps:
+      - name: Check out the requested commit
+        # Left on the runner's `core.autocrlf`, which Git for Windows sets to
+        # true, so the working tree this job checks is a genuine CRLF checkout.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: true
+      - name: Install the package and its development dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Report the line-ending facts this platform decides
+        # Recorded rather than asserted: the suite pins treestamp's own bytes, and
+        # these say which platform behaviour it is pinning them against.
+        run: |
+          echo "core.autocrlf: $(git config --get core.autocrlf || echo unset)"
+          python -c "import os; print('os.linesep:', repr(os.linesep))"
+          python -c "print('probe')" > probe.txt
+          python -c "print('print() redirected:', repr(open('probe.txt','rb').read()))"
+          python -c "import sys; sys.stdout.write('x\n')" > probe.txt
+          python -c "print('stdout.write redirected:', repr(open('probe.txt','rb').read()))"
+          python -c "print('README on disk:', repr(open('README.md','rb').read()[:40]))"
+          rm -f probe.txt
+      - name: Run the regression suite
+        run: python -m pytest
+      - name: Check the treestamped README against a CRLF working tree
+        run: python -m treestamp check README.md
+      - name: Build distributions
+        run: python -m build
+      - name: Verify clean headless installations
+        run: python scripts/distribution_check.py
+
+  hosted:
+    name: Hosted preview (Linux, Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install both projects
+        run: |
+          make venv
+          make install web-install
+      - name: Install the browser suite
+        run: |
+          venv/bin/pip install -e './web[browser]'
+          venv/bin/playwright install --with-deps chromium
+      - name: Run the quality gates and the browser suite concurrently
+        # The browser suite runs in its own process against its own service on
+        # free ports, so it overlaps the other gates instead of following them.
+        run: |
+          # The shell runs with -e; guard each command so both statuses are
+          # collected and the browser log is always printed before failing.
+          make web-browser-test > browser-suite.log 2>&1 &
+          browser=$!
+          gates=0
+          make web-ci || gates=$?
+          browser_status=0
+          wait "$browser" || browser_status=$?
+          echo "::group::Browser suite (exit $browser_status)"
+          cat browser-suite.log
+          echo "::endgroup::"
+          echo "quality gates exit $gates; browser suite exit $browser_status"
+          test "$gates" -eq 0 && test "$browser_status" -eq 0
+      - name: Build the container image
+        run: make web-image
+      - name: Start the container and probe health
+        run: |
+          docker run -d --name treestamp-web -p 8000:8000 \
+            -e GITHUB_RATE_RESERVE=0 -e GITHUB_API_URL=http://127.0.0.1:9 treestamp-web:local
+          for _attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8000/healthz; then echo; exit 0; fi
+            sleep 1
+          done
+          docker logs treestamp-web
+          exit 1
+      - name: Stop and remove the container
+        if: always()
+        run: docker rm -f treestamp-web || true

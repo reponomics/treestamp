@@ -135,3 +135,11 @@ temp/
 INTERNAL
 
 sync-from-*
+
+# Treestamp tooling and local working material
+.stamps/
+.mypy_cache/
+.ruff_cache/
+.playwright-cli/
+output/
+__INTERNAL__/

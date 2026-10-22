@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The treestamp mark: a stamp ring around a folder tree. No text; it must read at 16 pixels. -->
+  <circle cx="32" cy="32" r="29" fill="#F5EFE6" stroke="#1B2A41" stroke-width="5"/>
+  <g fill="#1B2A41">
+    <path d="M9 22h6l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 37z"/>
+    <path d="M37 13h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+    <path d="M37 27h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+    <path d="M37 41h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+  </g>
+  <g fill="none" stroke="#1B2A41" stroke-width="2.6" stroke-linecap="square">
+    <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
+  </g>
+</svg>

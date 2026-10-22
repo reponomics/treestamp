@@ -1,0 +1,690 @@
+/* treestamp: an ink-and-paper workspace for a small piece of documentation. */
+
+@font-face {
+  font-family: "Reponomics Inter";
+  src: url("./fonts/Inter-Black-wordmark.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./fonts/IBMPlexSans-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("./fonts/IBMPlexMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("./fonts/IBMPlexMono-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+:root {
+  /* Type. 16px is the floor: nothing on this page is set smaller than body text. */
+  --t-base: 1rem;
+  --t-md: 1.25rem;
+  --t-lg: 1.75rem;
+  --weight-body: 400;
+  --weight-strong: 600;
+
+  /* Space on a 4px base. */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+  --s8: 4rem;
+
+  /* Controls are tighter than the surfaces holding them. */
+  --r-sm: 2px;
+  --r: 4px;
+  --r-lg: 6px;
+
+  /* Light mode reverses the forest surface scale: paper is the brightest layer. */
+  --paper: #fbfdf8;
+  --card: #e0ead9;
+  --well: #e5edde;
+  --ink: #233526;
+  /* Supporting text stays readable, including on a highlighted tree row. */
+  --ink-secondary: #4b6048;
+  --rule: #b5c7a8;
+  --rule-strong: #6c8264;
+  --accent: #326838;
+  --accent-hover: #26552c;
+  --accent-ink: #ffffff;
+  --accent-soft: #ccdcbc;
+  --masthead-surface: #e9f1e3;
+  --controls-surface: #f0f6eb;
+  --workspace-surface: #eef4e8;
+  --document-surface: var(--paper);
+  --example-surface: var(--paper);
+  --row-hover: var(--accent-soft);
+  --warn-bg: #fff7e8;
+  --warn-line: #aa6b20;
+  --warn-ink: #744005;
+  --error-bg: #fff1f2;
+  --error-line: #b94a56;
+  --error-ink: #932727;
+  --ok: #166534;
+  --stale: #864006;
+  --lift: 0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px -14px rgba(17, 24, 39, 0.18);
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --frame: 100rem;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  /* Forest surfaces and warm ink; bright green belongs to interaction. */
+  --paper: #040703;
+  --card: #121e10;
+  --well: #101a10;
+  --ink: #fffef0;
+  --ink-secondary: #9eb29b;
+  --rule: #2c3e2b;
+  --rule-strong: #63845d;
+  --accent: #7bcf7e;
+  --accent-hover: #a1e5a2;
+  --accent-ink: #000000;
+  --accent-soft: #2b332a;
+
+  /* The reading canvas sits deepest; controls and dialogs rise around it. */
+  --masthead-surface: #0c1609;
+  --controls-surface: #061103;
+  --workspace-surface: #051301;
+  --document-surface: var(--paper);
+  --example-surface: var(--paper);
+  --focus-ring: #00ff88;
+  --backdrop: rgba(1, 5, 1, 0.65);
+  --warn-bg: #30271a;
+  --warn-line: #b28a47;
+  --warn-ink: #ffdaa0;
+  --error-bg: #331e26;
+  --error-line: #c67383;
+  --error-ink: #ffc4c9;
+  --ok: #8dddaf;
+  --stale: #ffdaa0;
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--sans);
+  font-size: var(--t-base);
+  font-weight: var(--weight-body);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+main { flex: 1; }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: inherit; }
+h1, h2, h3 { margin: 0; font-weight: var(--weight-strong); line-height: 1.2; }
+p { margin: 0; }
+
+/* One measure for the header and the workspace. */
+.masthead-inner, .workspace {
+  width: 100%;
+  max-width: var(--frame);
+  margin: 0 auto;
+  padding-inline: var(--s4);
+}
+@media (min-width: 40rem) {
+  .masthead-inner, .workspace { padding-inline: var(--s6); }
+}
+
+/* ---------- masthead */
+
+.masthead { border-bottom: 1px solid var(--rule); background: var(--masthead-surface, var(--card)); }
+.masthead-inner { display: flex; align-items: center; gap: var(--s4); padding-block: var(--s3); }
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin-right: auto;
+  color: var(--ink);
+  text-decoration: none;
+}
+.wordmark h1 { font-size: var(--t-lg); letter-spacing: -0.035em; }
+.wordmark .mark { width: 36px; height: 36px; flex: none; align-self: center; color: var(--accent); }
+.attribution { display: none; color: var(--ink-secondary); white-space: nowrap; }
+.reponomics-wordmark { font-family: "Reponomics Inter", var(--sans); font-weight: 900; letter-spacing: -0.055em; font-feature-settings: "ss01"; }
+.brand-period { color: var(--accent); }
+@media (min-width: 64rem) { .attribution { display: inline; } }
+.control-icon { width: 1.125rem; height: 1.125rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.2em; }
+.github-icon { fill: currentColor; stroke: none; }
+.github-link { display: inline-flex; align-items: center; gap: var(--s2); vertical-align: middle; }
+@media (max-width: 47.999rem) {
+  .masthead-inner { flex-wrap: wrap; gap: var(--s1); padding-block: var(--s2); }
+  .masthead .utility { padding-inline: var(--s1); }
+  .masthead .docs { padding-inline: var(--s2); }
+}
+
+/* ---------- workspace: stacked on a narrow window; two panes that fill the window from 64rem */
+
+.workspace {
+  padding-block: var(--s4) var(--s6);
+  display: grid;
+  gap: var(--s4);
+  align-items: start;
+  align-content: start;
+}
+.controls, .stage {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+.controls { padding: var(--s4); background: var(--controls-surface, var(--card)); }
+@media (min-width: 64rem) {
+  body { height: 100dvh; }
+  .workspace {
+    min-height: 0;
+    padding-block: var(--s5);
+    gap: var(--s5);
+    grid-template-columns: 24rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .controls { min-height: 0; overflow-y: auto; }
+  .stage { display: flex; flex-direction: column; }
+  .stage-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tree-scroll, .region { flex: 1; min-height: 0; overflow: auto; }
+}
+/* Project information stays available even before a repository can be opened. */
+body.no-tree #editor-panel, body.no-tree #stamp-panel,
+body.no-tree #copy, body.no-tree .settings-open { display: none; }
+
+/* ---------- the opener */
+
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
+.field-head label { font-size: var(--t-md); font-weight: var(--weight-strong); line-height: 1.2; }
+.field-head .github-link { margin-left: auto; white-space: nowrap; }
+.repo-row { display: flex; flex-direction: column; gap: var(--s2); }
+.repo-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--s2); }
+.repo-links { position: relative; display: flex; align-items: center; gap: var(--s1); flex: none; margin-left: auto; }
+.repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; padding: 0; }
+.repo-tooltip { position: absolute; z-index: 5; top: 100%; right: 0; width: min(22rem, calc(100vw - 4rem)); padding: var(--s3); border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--card); color: var(--ink); box-shadow: var(--lift); overflow-wrap: anywhere; }
+.repo-tooltip p + p, .repo-info-dialog > p + p { margin-top: var(--s2); }
+.repo-info-dialog { max-width: 30rem; overflow-wrap: anywhere; }
+@media (max-width: 23rem) {
+  .field-head { flex-wrap: wrap; }
+  .repo-actions { gap: var(--s1); }
+  .repo-actions button { padding-inline: var(--s2); }
+}
+.examples { margin-top: var(--s3); }
+.examples > p { display: none; font-weight: var(--weight-strong); margin-bottom: var(--s2); }
+.examples > summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+  font-weight: var(--weight-strong);
+}
+.examples > summary::-webkit-details-marker { display: none; }
+.examples > summary:hover { color: var(--accent); }
+.examples:not([open]) .examples-hide, .examples[open] .examples-show { display: none; }
+.examples[open] > summary { margin-bottom: var(--s2); }
+@media (min-width: 64rem) {
+  .examples > summary { display: none; }
+  .examples > p { display: block; }
+}
+.example-options { display: grid; border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.example-options button { background: var(--example-surface, var(--well)); border: 0; border-radius: 0; padding: var(--s2) var(--s3); text-align: left; white-space: normal; overflow-wrap: anywhere; font-weight: var(--weight-body); }
+.example-options button + button { border-top: 1px solid var(--rule); }
+.example-options button:enabled:hover { background: var(--accent-soft); }
+.example-options button:focus-visible { outline-offset: -3px; }
+.status:not(:empty) { margin-top: var(--s3); }
+.status.busy::before {
+  content: "";
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: var(--s1);
+  border: 2px solid var(--rule-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  vertical-align: -0.05rem;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .status.busy::before { animation: none; border-color: var(--accent); }
+}
+
+/* ---------- inputs and buttons */
+
+input[type="text"], input[type="number"], select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r);
+  padding: var(--s2) var(--s3);
+  min-width: 0;
+  width: 100%;
+}
+input:disabled, select:disabled { background: var(--well); border-style: dashed; }
+input::placeholder { color: var(--ink-secondary); opacity: 1; }
+input[type="text"]:focus, input[type="number"]:focus, select:focus,
+button:focus-visible, summary:focus-visible, a:focus-visible, .info-sheet:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+button, .button-link {
+  font: inherit;
+  font-weight: var(--weight-strong);
+  min-height: 2.25rem;
+  cursor: pointer;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--well);
+  color: var(--ink);
+  padding: var(--s1) var(--s3);
+  white-space: nowrap;
+  text-decoration: none;
+}
+/* Keep touch controls and icon-only actions easy to hit. */
+@media (pointer: coarse), (max-width: 47.999rem) {
+  button, .button-link { min-height: 2.75rem; }
+  .repo-links .icon-button { width: 2.75rem; }
+}
+.docs { min-height: 2.75rem; }
+.button-link { display: inline-flex; align-items: center; gap: var(--s2); }
+button:where(:enabled):hover, .button-link:hover { border-color: var(--accent); color: var(--accent); }
+button.utility { background: transparent; border-color: transparent; color: var(--ink-secondary); }
+button.utility:enabled:hover { background: var(--well); border-color: var(--rule); color: var(--ink); }
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--weight-strong);
+}
+button.primary:enabled:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
+button:disabled { cursor: default; background: var(--well); border-color: var(--rule-strong); color: var(--ink-secondary); }
+button.link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  white-space: normal;
+}
+
+.hint { color: inherit; margin-top: var(--s2); }
+.group-note, .counts, .quiet { color: var(--ink-secondary); }
+
+/* ---------- panels */
+
+.controls > .panel { margin-top: var(--s4); }
+.panel { border: 1px solid var(--rule); border-radius: var(--r); padding: var(--s3) var(--s4); }
+.warning { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+.error { background: var(--error-bg); border-color: var(--error-line); color: var(--error-ink); }
+#error { position: relative; padding-right: calc(var(--s4) + 2.75rem); }
+#error-dismiss { position: absolute; top: var(--s2); right: var(--s2); display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; color: inherit; }
+
+/* ---------- settings
+
+   Below 64rem the settings are a sheet opened from the editor's header (a native
+   popover, so nothing is scripted). From 64rem they sit under the repository field. */
+
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s4); }
+.settings h2 { font-size: var(--t-md); }
+@media (min-width: 64rem) {
+  .settings {
+    display: block;
+    position: static;
+    inset: auto;
+    width: auto;
+    height: auto;
+    margin: var(--s2) 0 0;
+    padding: var(--s3) 0 0;
+    border: 0;
+    border-top: 1px solid var(--rule);
+    overflow: visible;
+    color: inherit;
+    background: none;
+  }
+  .settings-head button, .settings-open { display: none; }
+}
+@media (max-width: 63.999rem) {
+  .settings:popover-open {
+    position: fixed;
+    inset: 0;
+    width: min(100% - 2rem, 40rem);
+    max-height: 85dvh;
+    margin: auto;
+    padding: var(--s4);
+    overflow: auto;
+    border: 1px solid var(--rule);
+    border-radius: var(--r-lg);
+    color: var(--ink);
+    background: var(--card);
+    box-shadow: var(--lift);
+  }
+  .settings::backdrop { background: var(--backdrop, rgba(22, 35, 60, 0.3)); }
+}
+.settings-body {
+  display: grid;
+  gap: var(--s5);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  align-items: start;
+}
+.dialog {
+  width: min(100% - 2rem, 36rem);
+  max-height: 85dvh;
+  padding: var(--s5);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--lift);
+}
+.dialog::backdrop { background: var(--backdrop, rgba(22, 35, 60, 0.3)); }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s4); }
+.dialog h2 { font-size: var(--t-md); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s5); }
+.dialog-error { color: var(--error-ink); margin-top: var(--s3); }
+.dialog-path { font-family: var(--mono); overflow-wrap: anywhere; margin-bottom: var(--s3); }
+.dialog-hint { margin-top: var(--s2); }
+.keymap-heading { margin-top: var(--s5); font-size: var(--t-base); }
+.keymap { margin: var(--s2) 0 0; }
+.keymap > div { display: grid; grid-template-columns: minmax(9rem, 2fr) 3fr; align-items: baseline; gap: var(--s3); padding-block: var(--s2); border-bottom: 1px solid var(--rule); }
+.keymap dt { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s1); }
+.keymap dd { margin: 0; }
+kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: var(--r-sm); padding-inline: var(--s1); white-space: nowrap; }
+@media (max-width: 29.999rem) {
+  .dialog { padding: var(--s4); }
+  .keymap > div { grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
+}
+.settings-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.settings-group legend { padding: 0; margin-bottom: var(--s1); font-weight: var(--weight-strong); }
+.group-note { grid-column: 1 / -1; }
+.field { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.field-wide { grid-column: 1 / -1; }
+.field > label:not(.check), .field > span, .output-toolbar label { font-weight: var(--weight-strong); }
+#reload-settings .field { align-self: end; }
+.check-row { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); }
+.check { display: flex; align-items: center; gap: var(--s2); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+#loaded-note { margin-top: var(--s2); color: var(--ink-secondary); }
+#show-all { align-self: flex-start; margin-top: var(--s1); }
+.meta-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
+
+/* ---------- stage: document views and project information */
+
+.stage { position: relative; background: var(--workspace-surface, var(--card)); box-shadow: var(--lift); }
+/* From tablet width the tabs and the copy button stay at the top of the window while
+   a long tree scrolls; on a phone they would take too much of it. */
+.stage-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s3) var(--s4);
+  background: var(--card);
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--r) var(--r) 0 0;
+}
+.settings-open .control-icon { display: none; }
+.tabs { display: flex; gap: var(--s3); margin-right: auto; }
+.tabs [role="tab"] {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+  padding: var(--s2) var(--s1);
+}
+.tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.load-tabs { margin-bottom: var(--s4); border-bottom: 1px solid var(--rule); }
+.load-tabs [role="tab"] { font-weight: var(--weight-body); }
+#copy { min-width: 11rem; display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); }
+#copy:enabled, #submit:enabled { background: var(--accent-soft); color: var(--ink); border-color: var(--rule); }
+#copy:enabled:hover, #submit:enabled:hover { color: var(--accent); border-color: var(--accent); }
+#copy-status { flex-basis: 100%; }
+#copy-status:empty { display: none; }
+/* Confirmation changes the label and edge without a solid color flash. */
+#copy.copied:enabled { color: var(--ok); border-color: var(--ok); }
+.stage-status { padding: var(--s2) var(--s4) 0; color: var(--ink-secondary); }
+.stage-status:empty { display: none; }
+#editor-panel, #stamp-panel, #info-panel { padding: var(--s4); }
+.stage[data-view="info"] #copy,
+.stage[data-view="info"] #copy-status,
+.stage[data-view="info"] .settings-open,
+.stage[data-view="info"] .stage-status { display: none; }
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-bottom: var(--s3); }
+.canvas-caption { flex: 1 1 auto; min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.tree-tools { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.tree-tools button { padding-inline: var(--s2); }
+#tui-mode[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+#tree-document { font-family: var(--mono); color: var(--ink); }
+.output-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); margin-bottom: var(--s3); }
+.output-toolbar select { width: auto; min-width: 11rem; }
+.notice { padding: var(--s3) var(--s4) 0; }
+.notice .link { white-space: nowrap; }
+
+pre {
+  font-family: var(--mono);
+  font-size: var(--t-base);
+  line-height: 1.6;
+  margin: 0;
+  padding: var(--s4);
+  background: var(--document-surface, var(--well));
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  overflow: auto;
+  white-space: pre;
+  tab-size: 4;
+}
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .stage-head { position: sticky; top: 0; z-index: 1; }
+}
+@media (max-width: 47.999rem) {
+  /* Share rows before reducing type sizes or tap targets. */
+  .workspace { padding-top: var(--s3); gap: var(--s3); }
+  #form { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2); }
+  #form .field-head { grid-column: 1 / -1; margin-bottom: 0; }
+  .repo-row { display: contents; }
+  #url { grid-column: 1 / -1; }
+  .repo-actions { grid-column: 1; }
+  .examples { grid-column: 2; margin-top: 0; align-self: start; }
+  .examples[open] { grid-column: 1 / -1; }
+  #status { grid-column: 1 / -1; margin-top: 0; }
+  #status:empty { display: none; }
+  .stage-head { gap: var(--s2); padding: var(--s2) var(--s3); }
+  .tabs { gap: var(--s2); }
+  .stage-head > #copy, .stage-head > .settings-open {
+    flex: none;
+    min-width: 2.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .settings-open .control-icon { display: inline; }
+  #copy-label, .settings-open .control-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  #editor-panel, #stamp-panel, #info-panel { padding: var(--s3); }
+  .editor-toolbar { margin-bottom: var(--s2); }
+  .canvas-caption:not(.no-document) .caption-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+/* ---------- project information: one reading surface, with headings beside the copy
+   when the pane itself has room. On smaller screens the sections read top to bottom. */
+
+#info-panel { container-type: inline-size; }
+.info-sheet {
+  background: var(--document-surface, var(--well));
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+.info-content { max-width: 54rem; margin-inline: auto; padding: var(--s5); }
+.info-section { display: grid; gap: var(--s3); }
+.info-section + .info-section { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--rule); }
+.info-section h2 { font-size: var(--t-md); }
+.info-section h3 { font-size: var(--t-base); line-height: 1.5; }
+.info-section p { max-width: 65ch; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.info-steps { margin: 0; padding-left: var(--s5); }
+.info-steps li { padding-left: var(--s1); }
+.info-steps li + li { margin-top: var(--s4); }
+.info-steps li::marker { color: var(--accent); font-weight: var(--weight-strong); }
+.info-steps p { margin-top: var(--s1); }
+@container (min-width: 40rem) {
+  .info-content { padding: var(--s6); }
+  .info-section { grid-template-columns: 11rem minmax(0, 1fr); gap: var(--s5); }
+}
+@media (min-width: 64rem) {
+  .info-sheet { flex: 1; min-height: 0; overflow-y: auto; }
+}
+
+/* ---------- the tree
+
+   The whole tree is on the page; the page scrolls, not a box inside it. The list is as
+   wide as its widest row so every row's actions line up at the right; long rows scroll
+   sideways. */
+.tree-scroll {
+  overflow-x: auto;
+  container-type: inline-size;
+  padding-block: var(--s3);
+  background: var(--document-surface, var(--well));
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+.rows {
+  --tree-step: 4ch;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--mono);
+  line-height: 2;
+  width: max-content;
+  min-width: 100%;
+}
+.row { display: flex; align-items: center; gap: var(--s1); padding: 0 var(--s4); white-space: nowrap; }
+.row.dir:not([data-path=""]) { cursor: pointer; }
+.row:hover, .row:focus-within { background: var(--row-hover); }
+.row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+.row.hidden-row .name, .row.hidden-row .counts { text-decoration: line-through; }
+/* Match terminal tree geometry: four character cells per level. The vertical
+   stroke sits in the first cell; the horizontal arm ends after the third,
+   leaving one character of space before the name. Account for the flex gap. */
+.indent {
+  position: relative;
+  align-self: stretch;
+  width: calc(var(--tree-step) - var(--s1));
+  flex: none;
+  pointer-events: none;
+}
+.indent.trunk::before, .indent.branch::before {
+  content: "";
+  position: absolute;
+  left: 0.5ch;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--ink);
+}
+.indent.branch.last::before { bottom: 50%; }
+.indent.branch::after {
+  content: "";
+  position: absolute;
+  left: 0.5ch;
+  right: calc(1ch - var(--s1));
+  top: 50%;
+  border-top: 1px solid var(--ink);
+}
+.fold {
+  min-height: 0;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  text-align: left;
+  border-radius: var(--r-sm);
+  line-height: inherit;
+}
+.fold:hover { color: var(--ink); background: none; }
+.name { cursor: default; }
+.row.dir .name { cursor: inherit; font-weight: var(--weight-strong); }
+.row.dir .name:hover { color: var(--ink); }
+/* One ink for the document; weight and geometry carry its hierarchy. */
+.rows .counts, .rows .note { color: var(--ink); }
+.note { margin-left: var(--s1); }
+/* Row actions keep their place but appear only on the row under the pointer or
+   holding focus, so at rest the tree is only the tree. A row takes focus when it is
+   clicked or tapped, which is what offers the actions where there is no pointer to
+   hover; hover is then an enhancement that costs nothing where it does not apply. */
+.row-actions {
+  cursor: default;
+  position: sticky;
+  right: 0;
+  margin-left: auto;
+  display: flex;
+  gap: var(--s2);
+  padding-left: var(--s3);
+  background: var(--document-surface, var(--well));
+  opacity: 0;
+}
+.row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; background: var(--row-hover); }
+.row-actions button {
+  font-family: var(--sans);
+  min-height: 1.75rem;
+  padding: 0 var(--s2);
+  border-radius: var(--r-sm);
+  line-height: 1.7;
+}
+.row-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.row-actions button:disabled { opacity: 0.5; }
+/* A focused row is offering its actions, not asking to be read as a text selection. */
+.row:focus { outline: none; }
+.row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }

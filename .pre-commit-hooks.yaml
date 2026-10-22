@@ -1,0 +1,14 @@
+- id: treestamp
+  name: treestamp update
+  description: Maintain the README tree from staged Git paths
+  entry: treestamp update
+  language: python
+  pass_filenames: false
+  always_run: true
+- id: treestamp-check
+  name: treestamp check
+  description: Fail if the README tree needs maintenance
+  entry: treestamp check
+  language: python
+  pass_filenames: false
+  always_run: true

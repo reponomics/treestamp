@@ -1,0 +1,51 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        exclude: ^assets/TREESTAMP_BANNER\.png$
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.7
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (project environment)
+        entry: make typecheck
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: web-typecheck
+        name: mypy (hosted preview)
+        entry: make web-typecheck
+        language: system
+        files: ^web/
+        types: [python]
+        pass_filenames: false
+      - id: pytest
+        name: pytest (package, changed files)
+        entry: venv/bin/python scripts/changed_tests.py package
+        language: system
+        files: ^(src/|tests/|pyproject\.toml|Makefile)
+        pass_filenames: true
+      - id: web-test
+        name: pytest (hosted preview, changed files)
+        entry: venv/bin/python scripts/changed_tests.py web
+        language: system
+        files: ^(web/src/|web/tests/|web/pyproject\.toml|src/)
+        pass_filenames: true
+      - id: treestamp-check
+        name: treestamp check (this repository's README)
+        entry: make integration-check
+        language: system
+        pass_filenames: false
+        always_run: true

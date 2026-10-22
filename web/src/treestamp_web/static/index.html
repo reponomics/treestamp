@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>treestamp</title>
+  <meta name="description" content="Create a treestamp for your documentation from any public GitHub repository, then keep it accurate as the project grows.">
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/icon-512.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+  <script src="/static/theme.js"></script>
+  <link rel="preload" href="/static/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body class="no-tree">
+  <header class="masthead">
+    <div class="masthead-inner">
+      <a class="wordmark" href="/">
+        <svg class="mark" viewBox="0 0 64 64" width="30" height="30" aria-hidden="true" focusable="false">
+          <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="5"/>
+          <g fill="currentColor">
+            <path d="M9 22h6l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 37z"/>
+            <path d="M37 13h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+            <path d="M37 27h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+            <path d="M37 41h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+          </g>
+          <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square">
+            <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
+          </g>
+        </svg>
+        <h1>treestamp</h1>
+        <span class="attribution">by <span class="reponomics-wordmark">reponomics<span class="brand-period">.</span></span></span>
+      </a>
+      <button id="theme-toggle" class="utility" type="button">Dark mode</button>
+      <a class="docs button-link" href="https://github.com/reponomics/treestamp" target="_blank" rel="noopener" aria-label="treestamp on GitHub (opens in a new tab)" title="treestamp on GitHub (opens in a new tab)">
+        <svg class="control-icon github-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>
+        <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7m0-7L10 14m0-10H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="controls">
+      <form id="form" autocomplete="off">
+        <div class="field-head">
+          <label for="url">GitHub repository</label>
+          <div class="repo-links">
+            <button id="repo-info" class="icon-button" type="button" aria-label="Repository information" aria-haspopup="dialog" aria-controls="repo-info-dialog" aria-describedby="repo-tooltip" disabled>
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.5"/></svg>
+            </button>
+            <div id="repo-tooltip" class="repo-tooltip" role="tooltip" hidden>
+              <p>Branch: <span data-repo-branch></span></p>
+              <p>Commit: <code data-repo-commit></code></p>
+            </div>
+            <a id="visit-repo" class="github-link button-link" href="#" target="_blank" rel="noopener" title="Visit repo (opens in a new tab)" hidden>Visit repo
+            <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7m0-7L10 14m0-10H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="repo-row">
+          <input id="url" name="url" type="text" required spellcheck="false" placeholder="owner/repo or a GitHub link">
+          <div class="repo-actions">
+            <button id="submit" type="submit">Load repo</button>
+          </div>
+        </div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <details id="examples" class="examples">
+          <summary><span class="examples-show">Show examples</span><span class="examples-hide">Hide examples</span></summary>
+          <p id="examples-label">Load an example:</p>
+          <div class="example-options" role="group" aria-label="Example repositories">
+            <button type="button" data-example="reponomics-dashboard">reponomics-dashboard</button>
+            <button type="button" data-example="reponomics-dashboard-action">reponomics-dashboard-action</button>
+            <button type="button" data-example="PolicyChecks">PolicyChecks</button>
+          </div>
+        </details>
+      </form>
+
+      <section id="error" class="panel error" hidden role="alert">
+        <button id="error-dismiss" type="button" aria-label="Dismiss error" title="Dismiss error">
+          <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+        <p id="error-message"></p>
+        <p id="error-hint" class="hint"></p>
+      </section>
+
+      <section id="settings" class="settings" popover aria-labelledby="settings-title">
+        <div class="settings-head">
+          <h2 id="settings-title">Settings</h2>
+          <button type="button" popovertarget="settings" popovertargetaction="hide">Done</button>
+        </div>
+        <div class="settings-body">
+          <fieldset class="settings-group" aria-labelledby="settings-title">
+            <div class="field field-wide">
+              <label class="check"><input id="show_counts" name="show_counts" type="checkbox" checked> Show counts</label>
+            </div>
+            <div class="field field-wide">
+              <label class="check" id="reveal-toggle"><input id="reveal" type="checkbox"> <span id="reveal-label">Reveal hidden entries</span></label>
+              <button id="show-all" type="button" disabled>Unhide all</button>
+            </div>
+          </fieldset>
+          <p id="loaded-note" hidden></p>
+        </div>
+      </section>
+    </aside>
+
+    <section id="result" class="stage">
+      <div class="stage-head">
+        <div class="tabs" role="tablist" aria-label="View">
+          <button id="tab-editor" type="button" role="tab" aria-selected="true" aria-controls="editor-panel">Tree</button>
+          <button id="tab-stamp" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="stamp-panel">Markdown</button>
+          <button id="tab-info" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="info-panel">Info</button>
+        </div>
+        <button type="button" class="settings-open" popovertarget="settings" title="Settings">
+          <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-.5 2-2 .9-1.9-.6-2 3.4 1.5 1.4v2.3l-1.5 1.4 2 3.4 1.9-.6 2 .9L9 20h4l.5-2.1 2-.9 1.9.6 2-3.4-1.5-1.4v-2.3l1.5-1.4-2-3.4-1.9.6-2-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
+          <span class="control-label">Settings</span>
+        </button>
+        <button id="copy" type="button" title="Copy treestamp">
+          <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+          <span id="copy-label">Copy treestamp</span>
+        </button>
+        <span id="copy-status" role="status" aria-live="polite"></span>
+      </div>
+
+      <p id="notice" class="notice" role="status" hidden><span id="notice-text"></span> <button id="notice-undo" type="button" class="link">Undo</button></p>
+
+      <p id="stage-status" class="stage-status" role="status" aria-live="polite">Loading…</p>
+
+      <div id="editor-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-editor">
+        <div class="editor-toolbar">
+          <p class="canvas-caption"><span class="caption-label">treestamp for </span><span id="tree-document">README.md</span></p>
+          <div class="tree-tools" role="group" aria-label="Tree keyboard controls">
+            <button id="tui-mode" type="button" aria-pressed="false">TUI-mode</button>
+            <button id="tui-help" type="button" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-controls="keymap-dialog">Keys</button>
+          </div>
+        </div>
+        <div class="tree-scroll"><ul id="rows" class="rows" aria-label="Directory tree"></ul></div>
+      </div>
+
+      <div id="stamp-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-stamp" hidden>
+        <div class="output-toolbar">
+          <label for="style">Format</label>
+          <select id="style" name="style">
+            <option value="unicode" selected>Unicode ├─</option>
+            <option value="ascii">ASCII +--</option>
+            <option value="list">Markdown list</option>
+          </select>
+        </div>
+        <pre id="region" class="region"></pre>
+      </div>
+
+      <div id="info-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-info" hidden>
+        <div class="info-sheet" tabindex="0" role="region" aria-label="Project information">
+          <div class="info-content">
+            <section class="info-section" aria-labelledby="info-about">
+              <h2 id="info-about">About treestamp</h2>
+              <p>Treestamp turns a Git repository into a curated directory tree for your Markdown documentation. Keep the useful structure, fold the detail, and add short notes.</p>
+            </section>
+            <section class="info-section" aria-labelledby="info-usage">
+              <h2 id="info-usage">Usage guide</h2>
+              <ol class="info-steps">
+                <li>
+                  <h3>Load a repository</h3>
+                  <p>Enter a public GitHub repository URL to capture its default-branch HEAD, or try a bundled offline example. Choose a subtree or open an existing treestamp document. Paths start at the repository root.</p>
+                </li>
+                <li>
+                  <h3>Curate your tree</h3>
+                  <p>Expand or fold folders, hide entries, and add single-line notes. Your session uses a frozen snapshot. A failed load or edit keeps your previous draft.</p>
+                </li>
+                <li>
+                  <h3>Copy into your docs</h3>
+                  <p>Copy the treestamp block into Markdown. Install the treestamp command locally to refresh it as your repository changes, including with local or unpublished commits.</p>
+                </li>
+              </ol>
+            </section>
+            <section class="info-section" aria-labelledby="info-privacy">
+              <h2 id="info-privacy">Privacy notice</h2>
+              <p>Repository data is cached temporarily. Traffic data is used only for security and basic service operations, and is not sold or shared. There is no additional third-party tracking, and visitors' GitHub account information is not accessed.</p>
+            </section>
+            <section class="info-section" aria-labelledby="info-contributing">
+              <h2 id="info-contributing">Contributing</h2>
+              <p>Report bugs or propose changes on <a href="https://github.com/reponomics/treestamp">GitHub</a>. Report security issues through <a href="https://github.com/reponomics/treestamp/security/advisories/new">private vulnerability reporting</a>, and conduct concerns to <a href="mailto:conduct@reponomics.org">conduct@reponomics.org</a>.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="note-dialog" class="dialog" aria-labelledby="note-title" aria-describedby="note-path note-hint">
+    <form id="note-form">
+      <div class="dialog-head">
+        <h2 id="note-title">Note</h2>
+      </div>
+      <p id="note-path" class="dialog-path"></p>
+      <div class="field">
+        <label for="note-text">Note</label>
+        <input id="note-text" name="note" type="text" autocomplete="off" aria-describedby="note-hint">
+      </div>
+      <p id="note-hint" class="group-note dialog-hint">Enter to apply. Esc to cancel.</p>
+      <p id="note-error" class="dialog-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button id="note-cancel" type="button">Cancel</button>
+        <button id="note-save" class="primary" type="submit">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="keymap-dialog" class="dialog" aria-labelledby="keymap-title" aria-describedby="keymap-hint">
+    <div class="dialog-head">
+      <h2 id="keymap-title">Keyboard shortcuts</h2>
+      <form method="dialog"><button>Close</button></form>
+    </div>
+    <p id="keymap-hint" class="group-note">Enable TUI-mode and focus a tree row to use these keys. Shortcuts pause while you type in a field or use a dialog.</p>
+    <h3 class="keymap-heading">Navigation</h3>
+    <dl class="keymap">
+      <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Previous / next visible row</dd></div>
+      <div><dt><kbd>←</kbd></dt><dd>Collapse folder or go to parent</dd></div>
+      <div><dt><kbd>→</kbd></dt><dd>Expand folder or go to first child</dd></div>
+      <div><dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>First / last visible row</dd></div>
+      <div><dt><kbd>Page Up</kbd> <kbd>Page Down</kbd></dt><dd>Move up / down one page</dd></div>
+      <div><dt><kbd>Space</kbd></dt><dd>Expand / collapse folder</dd></div>
+    </dl>
+    <h3 class="keymap-heading">Editing and settings</h3>
+    <dl class="keymap">
+      <div><dt><kbd>a</kbd></dt><dd>Open Note</dd></div>
+      <div><dt><kbd>h</kbd></dt><dd>Hide / show selected entry</dd></div>
+      <div><dt><kbd>Shift</kbd> + <kbd>H</kbd></dt><dd>Toggle Reveal hidden entries</dd></div>
+      <div><dt><kbd>Shift</kbd> + <kbd>S</kbd></dt><dd>Unhide all entries in the treestamp</dd></div>
+      <div><dt><kbd>f</kbd></dt><dd>Toggle counts on or off</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Open this key map</dd></div>
+    </dl>
+    <p class="group-note dialog-hint">In Note, press Enter to apply or Esc to cancel. All actions are also available through the buttons and settings.</p>
+  </dialog>
+
+  <dialog id="repo-info-dialog" class="dialog repo-info-dialog" aria-labelledby="repo-info-title">
+    <div class="dialog-head">
+      <h2 id="repo-info-title">Repository information</h2>
+      <form method="dialog"><button>Close</button></form>
+    </div>
+    <p>Branch: <span data-repo-branch></span></p>
+    <p>Commit: <code data-repo-commit></code></p>
+  </dialog>
+
+  <dialog id="reload-settings" class="dialog" aria-labelledby="reload-title">
+    <div class="dialog-head">
+      <h2 id="reload-title">Load repo</h2>
+    </div>
+    <p id="load-target" class="dialog-path"></p>
+    <div class="tabs load-tabs" role="tablist" aria-label="Document source">
+      <button id="load-tab-new" type="button" role="tab" aria-selected="true" aria-controls="load-panel-new">New document</button>
+      <button id="load-tab-document" type="button" role="tab" aria-selected="false" aria-controls="load-panel-document" tabindex="-1">Load document</button>
+    </div>
+    <div id="load-panel-new" class="settings-group" role="tabpanel" aria-labelledby="load-tab-new">
+      <div class="field field-wide">
+        <label for="root">Tree root</label>
+        <input id="root" name="root" type="text" value="." spellcheck="false" aria-describedby="root-hint">
+        <p id="root-hint" class="group-note">Relative to the repository root. Use . for the whole project.</p>
+      </div>
+    </div>
+    <div id="load-panel-document" class="settings-group" role="tabpanel" aria-labelledby="load-tab-document" hidden>
+      <p id="reload-hint" class="group-note">Opening an existing treestamp will show any updates based on the current project state.</p>
+      <div class="field field-wide">
+        <label for="document">Document</label>
+        <input id="document" name="document" type="text" value="" placeholder="e.g. README.md" spellcheck="false" required aria-describedby="document-hint">
+        <p id="document-hint" class="group-note">Path to an existing document containing a treestamp.</p>
+      </div>
+    </div>
+    <p id="reload-error" class="dialog-error" role="alert" hidden></p>
+    <p class="dialog-hint">Current changes in the editor will be discarded.</p>
+    <div class="dialog-actions">
+      <form method="dialog"><button>Cancel</button></form>
+      <button id="reload" type="button">Create treestamp</button>
+    </div>
+  </dialog>
+
+
+
+</body>
+</html>
