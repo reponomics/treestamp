@@ -35,7 +35,7 @@ Use `main` as the default branch and require pull requests and signed commits. A
 - `README tree freshness`
 - `Validate PR title`
 
-Production deployment, Release Please, and PyPI publication do not run on ordinary PRs and should not be required PR checks. Enable immutable GitHub Releases before the first release. CodeQL and Scorecard are configured to run only when the repository is public; OSV scans resolved Python dependencies while private, retaining its report in Actions without uploading it to code scanning.
+Production deployment, Release Please, and PyPI publication do not run on ordinary PRs and should not be required PR checks. Enable immutable GitHub Releases before the first release. CodeQL uses GitHub's default setup with the extended query suite for Python, JavaScript/TypeScript, and GitHub Actions, managed in the repository's code scanning settings. Do not enable an advanced CodeQL workflow alongside default setup: GitHub rejects its analysis uploads. Scorecard runs only when the repository is public; OSV scans resolved Python dependencies while private, retaining its report in Actions without uploading it to code scanning.
 
 Release Please manages the core and hosted versions together, updates `CHANGELOG.md`, and creates version tags and GitHub Releases after its release PR is merged. The published-release event runs the PyPI workflow, which validates the tag, versions, and commit on `main`, builds and tests fresh distributions, and publishes them with attestations through Trusted Publishing. Website deployment has its own trigger and does not wait for a package release.
 
