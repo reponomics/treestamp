@@ -15,15 +15,16 @@ GITHUB_API_URL ?= http://127.0.0.1:8100
 FAKE_PORT ?= 8100
 FAKE_FLAGS ?=
 FLY_CONFIG ?= web/fly.toml
-FLY_PRODUCTION_CONFIG ?= web/fly.production.toml
+FLY_PRODUCTION_CONFIG ?= web/fly.toml
+FLY_PREVIEW_CONFIG ?= web/fly.preview.toml
 FLY_DEPLOY_FLAGS ?=
-FLY_HA ?= false
+FLY_HA ?= true
 BUILD_COMMIT ?= $(shell git rev-parse HEAD)
 SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
-.PHONY: tls-check fly-production-deploy workflow-check lock-check lock-update web-browser-install uv-check
+.PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -75,36 +76,38 @@ clean: ## Remove generated build and coverage artifacts
 	rm -rf dist/ build/ .coverage htmlcov/
 web-install: install ## Sync the locked workspace, including hosted development dependencies
 web-browser-install: install ## Sync the locked browser test dependencies (install Chromium separately)
-web-lint: ## Lint the hosted preview project
+web-lint: ## Lint the web editor project
 	$(VENV)/bin/ruff check web && $(VENV)/bin/ruff format --check web
-web-typecheck: ## Check strict types for the hosted preview project
+web-typecheck: ## Check strict types for the web editor project
 	cd web && $(WEB_VENV)/bin/mypy
-web-test: ## Run the hosted preview tests
+web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
-web-cov: ## Run the hosted preview tests with branch coverage
+web-cov: ## Run the web editor tests with branch coverage
 	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
-web-ci: web-lint web-typecheck web-cov web-js-test ## Run all hosted preview quality gates
+web-ci: web-lint web-typecheck web-cov web-js-test ## Run all web editor quality gates
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs
 web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
 	$(PY) web/scripts/fake_github.py --repo . --port $(FAKE_PORT) $(FAKE_FLAGS)
-web-serve: ## Run the hosted preview locally against GITHUB_API_URL
+web-serve: ## Run the web editor locally against GITHUB_API_URL
 	GITHUB_API_URL=$(GITHUB_API_URL) GITHUB_RATE_RESERVE=0 $(VENV)/bin/uvicorn --factory treestamp_web.app:create_app --host 127.0.0.1 --port 8000 --reload
 tls-check: ## Check Python TLS package versions and certificate trust stores
 	$(PY) web/scripts/check_tls.py
-web-image: ## Build the hosted preview container image
+web-image: ## Build the web editor container image
 	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
 fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
 	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
 	  { echo "usage: make fly-secrets GITHUB_APP_CLIENT_ID=... GITHUB_APP_INSTALLATION_ID=... GITHUB_APP_PRIVATE_KEY_FILE=path.pem"; exit 2; }
 	$(FLY) secrets set --config $(FLY_CONFIG) GITHUB_APP_CLIENT_ID="$(GITHUB_APP_CLIENT_ID)" \
 	  GITHUB_APP_INSTALLATION_ID="$(GITHUB_APP_INSTALLATION_ID)" GITHUB_APP_PRIVATE_KEY="$$(cat $(GITHUB_APP_PRIVATE_KEY_FILE))"
-fly-deploy: ## Build and deploy the app selected by FLY_CONFIG (defaults to preview)
+fly-deploy: ## Build and deploy the app selected by FLY_CONFIG (defaults to production)
 	$(FLY) deploy --config $(FLY_CONFIG) --dockerfile web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" --ha=$(FLY_HA) $(FLY_DEPLOY_FLAGS)
-fly-production-deploy: ## Build and deploy the separate production app
+fly-production-deploy: ## Build and deploy the production editor
 	$(MAKE) fly-deploy FLY_CONFIG=$(FLY_PRODUCTION_CONFIG) FLY_HA=true
+fly-preview-deploy: ## Build and deploy the separate test editor
+	$(MAKE) fly-deploy FLY_CONFIG=$(FLY_PREVIEW_CONFIG) FLY_HA=false
 fly-status: ## Show the app's machines and health
 	$(FLY) status --config $(FLY_CONFIG)
 fly-logs: ## Stream the service's log lines from Fly

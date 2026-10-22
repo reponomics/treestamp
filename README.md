@@ -6,96 +6,123 @@
 
 # treestamp
 
-Treestamp is an editor for creating and maintaining directory trees for project documentation. It can be accessed locally from the terminal, or online via the web editor. Easily select which files and folders to include, add brief annotations to tree entries, and produce an output in a variety of Markdown-friendly formats. The application preserves the structure of existing treestamps, and it can also be integrated into a project's automation, making it easier to keep repository documentation up to date.
+Turn your repository into a directory tree for your README. Choose what to show, add short notes, and copy the result—from your terminal or browser.
 
-## Install and edit
+## Quickstart
 
-Requires Python 3.11+ and Git. Install from a source checkout with `python -m pip install .`. PyPI installation will be available after the initial release. You can also try the [preview web editor](https://treestamp-preview.fly.dev/).
+### 1. Generate a treestamp
+
+**In your browser:** [Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL, and choose **Load repo → Create treestamp**. Nothing to install.
+
+**In your terminal:** Requires Python 3.11+ and Git. Until the first PyPI release, install from a checkout of this repository:
 
 ```bash
-treestamp                         # open the editor in the current repository
-treestamp /path/to/repository      # open another repository
-treestamp --document README.md     # prefill the Load document path
-treestamp --print                  # print the prepared treestamp and exit
+python -m pip install .
 ```
 
-Choose **New document** to start a tree or **Load document** to open an existing one. New asks for a tree root, defaulting to `.`; Load reads the root from the document. Opening an existing tree prepares updates in memory. Edit the draft, then Write to save it. A failed load keeps your current draft; Refresh replaces it only after the replacement loads and parses successfully.
+Then open the repository you want to document:
 
-Local snapshots use the Git index, so stage source changes before opening. Untracked source paths do not participate, although the document itself may be untracked. Editing stays on the captured snapshot until you reload. Treestamp never stages or commits files.
+```bash
+cd /path/to/your/project
+treestamp
+```
 
-Document paths and stored tree paths are relative to the selected repository root, even when launched from a nested directory or displaying a subtree. Absolute document paths, `..` traversal, symlinks, and paths crossing into another repository or submodule are rejected. Use the positional repository argument to select another repository. Shell redirection of Print output is controlled by your shell.
+Choose **New document** and accept `.` for the repository root. The terminal editor uses staged files, so stage your source changes before opening it.
 
-The web editor loads public GitHub repositories at their default-branch HEAD and edits a frozen snapshot. It exports content for you to copy; it never writes to your GitHub repository. Cached snapshots and their links are temporary. An unavailable snapshot must be loaded again; the editor does not silently switch an existing draft to a different commit. See [privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md).
+### 2. Edit the tree
 
-## Editor controls
+Expand the useful parts, hide the noise, and add a note. Both editors show you the tree as you work.
 
-| Key | Action |
-|---|---|
-| Arrow keys | Navigate and expand or collapse directories |
-| `h` / `H` | Hide a child / inspect hidden entries |
-| `a` | Add or edit a single-line annotation |
-| `c` / `s` | Toggle counts / change tree style |
-| `N` / `l` | Start a new document / load a document |
-| `n` / `w` | Write a new file / write into an existing document |
-| `y` / `p` | Copy / print the complete treestamp; Print exits the terminal editor |
-| `q` / `?` | Quit / show keyboard help |
+**Terminal — hide, annotate, preview.**
 
-The web editor provides the corresponding load, edit, and copy controls. Local file writing is available in the terminal editor.
+![Terminal editor: hide a directory, annotate the entry point, and preview the finished tree.](https://raw.githubusercontent.com/reponomics/treestamp/main/assets/demos/terminal.gif)
 
-New trees show the root and its immediate tracked children. Child directories start collapsed. Updates add non-hidden immediate children beneath expanded directories, keep collapsed directories collapsed, and preserve surviving annotations. Counts include hidden children. Symlinks and submodules appear as leaves and are not traversed. Unicode, ASCII, and Markdown list styles are available.
+**Web — click to edit, then copy the Markdown.**
 
-## Write into a README
+![Web editor: expand source files, hide tooling, add a note, and copy the complete treestamp.](https://raw.githubusercontent.com/reponomics/treestamp/main/assets/demos/web.gif)
 
-Add these markers where the tree belongs, then use Write:
+### 3. Add it to your README
+
+Choose **Copy** in the terminal editor or **Copy treestamp** on the web, then paste into your README. The copied block already includes the Markdown fence and Treestamp markers—keep the whole block so you can reopen it later.
+
+````markdown
+<!-- treestamp:start -->
+```sh
+./
+├── docs/ (2 files)
+├── src/  # Application code
+│   ├── app.py
+│   ├── search.py
+│   └── storage.py
+├── LICENSE
+└── README.md
+```
+<!-- treestamp:end -->
+````
+
+Hidden entries also produce a small configuration comment; keep that with the copied tree. The web editor exports to your clipboard and never writes to GitHub.
+
+<details>
+<summary>Write directly from the terminal editor</summary>
+
+Add these empty markers to your README, starting in column one:
 
 ```html
 <!-- treestamp:start -->
 <!-- treestamp:end -->
 ```
 
-Markers must start in column one. Write preserves the marker lines and surrounding prose; creating a new document refuses to overwrite an existing file. Copy and Print include the whole managed region, including its metadata.
+Choose **Write to existing** in the terminal editor and enter `README.md`. Treestamp fills the region and preserves the surrounding text. **Write new file** creates a separate document instead.
 
-You can edit annotations directly in the printed tree using exactly `  # ` (two spaces, hash, space), followed by a single-line comment. Use an editor for tree structure and configuration changes. The optional `treestamp:config` block records the tree root, hidden paths, and generated entries for names that need disambiguation; style, expansion, annotations, and count visibility come from the printed tree.
+</details>
 
-Some Git filenames and symlink targets cannot be represented by the format. Loading checks the entire selected subtree, including hidden and collapsed descendants, and reports unsupported entries. Failed loads or invalid annotations retain the accepted draft. Output is validated before it is written or exported.
+## Check your README automatically
 
-## Check and update
+`treestamp check README.md` checks whether the tree matches the repository. It never writes to the document and exits with code `1` when the tree needs attention. Open the document in an editor to review it.
 
-```bash
-treestamp check README.md          # would updating change this document?
-treestamp update README.md         # update and write the document
-treestamp check --target HEAD
-treestamp update --compare HEAD
-treestamp update --target HEAD --compare HEAD~1
+**GitHub Actions:** after checking out your repository and setting up Python 3.11+, add this step:
+
+```yaml
+- name: Check the README tree
+  run: |
+    python -m pip install "git+https://github.com/reponomics/treestamp.git@25722b884e29dd8a4ff65e22c782f4e11ea98922"
+    treestamp check README.md
 ```
 
-These commands default to `README.md` and the Git index. Check never writes. Update refreshes the tree and counts while preserving curation for surviving paths. Repeating Update against the same snapshot leaves the document unchanged. Run the commands inside the repository that owns the document.
-
-`--target` selects a locally available commit instead of the index, including historical or unpublished commits. `--compare` supplies a reference for supported file-move detection and annotation transfer. These options apply to Check and Update, not editor startup.
-
-Exit codes are `0` for success or a current document, `1` when Check finds a change, `2` for invalid input or usage, `3` for unavailable Git or filesystem information, and `130` for interruption. Failed operations do not partially write output.
-
-## Automation
-
-The pre-commit hooks are `treestamp-check` (check only) and `treestamp` (update). After the public repository is available, add this to `.pre-commit-config.yaml`, replacing the revision with a reviewed full commit SHA:
+**Local pre-commit:** add this to `.pre-commit-config.yaml`, then run `pre-commit install`:
 
 ```yaml
 repos:
   - repo: https://github.com/reponomics/treestamp
-    rev: REPLACE_WITH_A_REVIEWED_PUBLIC_COMMIT
+    rev: 25722b884e29dd8a4ff65e22c782f4e11ea98922
     hooks:
       - id: treestamp-check
 ```
 
-Choose `id: treestamp` to update instead. Review and stage the changed README before retrying the commit. Both hooks run even when only source files change.
+Both examples pin a reviewed source revision until the first package release. Run the check for source changes too, not just changes to Markdown.
 
-In GitHub Actions, install a chosen released version or reviewed public commit, then run `treestamp check README.md`. For this project's own source checkout, the [README check workflow](https://github.com/reponomics/treestamp/blob/main/.github/workflows/treestamp-check.yml) installs the checked-out package. The separate [update workflow](https://github.com/reponomics/treestamp/blob/main/.github/workflows/treestamp-update.yml) can open a draft README update PR. Headless printing and maintenance do not import Textual.
+<details>
+<summary>Snapshots, paths, and existing documents</summary>
 
-## Windows
+Choose **Load document** in either editor to reopen a treestamped README. The terminal editor reads the selected local repository's Git index; the web editor reads a public GitHub repository's default-branch HEAD. Both keep a frozen snapshot for the editing session. A failed load keeps your accepted draft.
 
-Treestamp emits UTF-8 output; Print uses LF line endings, while updates preserve the existing document's line endings. Use a terminal and font that display Unicode tree characters, or choose ASCII style. Windows filesystem restrictions still apply to local paths. Contributor setup commands for Windows are in [CONTRIBUTING](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md).
+Document paths are relative to the selected repository root, even when displaying a subtree. The terminal accepts another checkout with `treestamp /path/to/repository`. Paths outside that repository, symlink document paths, and paths crossing into submodules are not supported. Treestamp never stages or commits files.
 
-## Project tree
+New trees start with immediate children and collapsed directories. Counts include hidden children. Symlinks and submodules appear as leaves. Choose Unicode, ASCII, or Markdown-list output in the editor. Annotations are single-line notes; unsupported filenames or annotations are rejected before output is written or copied.
+
+Web snapshots are cached temporarily; load the repository again if one is no longer available. See [privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md).
+
+</details>
+
+<details>
+<summary>Windows</summary>
+
+Use a terminal and font that display Unicode tree characters, or choose ASCII output. Treestamp emits UTF-8; printed output uses LF line endings, while writing into an existing document preserves its line endings. Windows filesystem restrictions still apply. See [CONTRIBUTING](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) for development setup.
+
+</details>
+
+<details>
+<summary>This repository's own treestamp</summary>
 
 <!-- treestamp:start -->
 <!-- treestamp:config
@@ -104,7 +131,7 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ```sh
 ./
 ├── .github/ (7 files, 2 folders)
-├── assets/ (1 file)
+├── assets/ (1 file, 1 folder)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -135,8 +162,12 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ```
 <!-- treestamp:end -->
 
+</details>
+
 ## Development and support
 
-See [CONTRIBUTING](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) for setup and checks, [MAINTENANCE](https://github.com/reponomics/treestamp/blob/main/MAINTENANCE.md) for builds and deployment, and [CHANGELOG](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) for release changes. Before `1.0`, interfaces and the document format may change between releases. MIT licensed.
+[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/MAINTENANCE.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
 
-Report ordinary bugs through [GitHub issues](https://github.com/reponomics/treestamp/issues), vulnerabilities through [private security reporting](https://github.com/reponomics/treestamp/security/advisories/new), and conduct concerns to [conduct@reponomics.org](mailto:conduct@reponomics.org).
+Report bugs through [GitHub issues](https://github.com/reponomics/treestamp/issues), vulnerabilities through [private security reporting](https://github.com/reponomics/treestamp/security/advisories/new), and conduct concerns to [conduct@reponomics.org](mailto:conduct@reponomics.org).
+
+MIT licensed. Before `1.0`, interfaces and the document format may change between releases.

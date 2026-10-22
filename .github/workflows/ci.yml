@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: treestamp-ci-${{ github.event.pull_request.number || github.ref }}
-  # A new PR revision supersedes its checks; do not interrupt a live rollout.
+  # A new PR revision supersedes its checks; let main-branch checks finish.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -183,83 +183,3 @@ jobs:
       - name: Stop and remove the container
         if: always()
         run: docker rm -f treestamp-web || true
-
-  deploy:
-    name: Deploy production editor
-    needs: [regression, windows, hosted]
-    if: >-
-      github.repository == 'reponomics/treestamp' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      vars.FLY_DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    environment:
-      name: production
-      url: https://treestamp.reponomics.org
-    concurrency:
-      group: fly-production
-      cancel-in-progress: false
-    steps:
-      - name: Check out the tested commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Check that this commit is still current on main
-        id: current
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --include "repos/$GITHUB_REPOSITORY/git/ref/heads/main" > "$RUNNER_TEMP/main-ref.txt"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          response = (Path(os.environ['RUNNER_TEMP']) / 'main-ref.txt').read_text()
-          headers, body = response.split('\n\n', 1)
-          for header in headers.splitlines():
-              if header.lower().startswith('x-ratelimit-remaining:'):
-                  print(header)
-          current = json.loads(body)['object']['sha'] == os.environ['GITHUB_SHA']
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'deploy={str(current).lower()}\n')
-          if not current:
-              print('A newer commit is on main; its successful CI run will deploy it.')
-          PY
-      - name: Set up Fly CLI
-        if: steps.current.outputs.deploy == 'true'
-        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
-        with:
-          version: '0.4.120'
-      - name: Build and deploy the tested revision
-        if: steps.current.outputs.deploy == 'true'
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: make fly-production-deploy FLY_DEPLOY_FLAGS=--remote-only BUILD_COMMIT="$GITHUB_SHA"
-      - name: Verify the deployed revision through the public domain
-        if: steps.current.outputs.deploy == 'true'
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import time
-          from urllib.error import URLError
-          from urllib.request import Request, urlopen
-
-          url = 'https://treestamp.reponomics.org/healthz'
-          for attempt in range(12):
-              try:
-                  request = Request(url, headers={'Cache-Control': 'no-cache'})
-                  with urlopen(request, timeout=10) as response:
-                      health = json.load(response)
-                  if health.get('build_commit') == os.environ['GITHUB_SHA']:
-                      print(f'Production is serving {health["build_commit"]}')
-                      break
-              except (URLError, TimeoutError, ValueError) as error:
-                  print(f'Health check {attempt + 1}: {error}')
-              time.sleep(5)
-          else:
-              raise SystemExit('Production did not serve the tested revision')
-          PY
