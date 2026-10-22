@@ -1,12 +1,14 @@
-# Existing preview app configuration; see MAINTENANCE.md.
+# Dedicated preview app configuration; see MAINTENANCE.md.
 # Deploy from the repository root so both projects are in the build context:
 #   fly deploy --config web/fly.toml --dockerfile web/Dockerfile
-app = "treestamp-preview"
+app = "reponomics-treestamp-preview"
 primary_region = "ewr"
 
 [env]
   PORT = "8000"
+  PUBLIC_BASE_URL = "https://reponomics-treestamp-preview.fly.dev"
   TRUST_PROXY = "1"
+  FLY_SESSION_ROUTING = "true"
   CLIENT_IP_HEADER = "Fly-Client-IP"
   CACHE_MAX_ENTRIES = "300000"
 

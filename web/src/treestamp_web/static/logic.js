@@ -181,7 +181,7 @@ export function opBody(editor, settings, reveal, type, path, text) {
 // ---------- messages
 
 export function hintFor(code, status) {
-  if (code === "snapshot_unavailable") return "This temporary snapshot has expired or was evicted. Load the repository URL again to open its current public HEAD.";
+  if (code === "snapshot_unavailable") return "This temporary snapshot is no longer available. Copy any open draft before reloading. Load the repository URL again to open its current public HEAD.";
   if (code === "curation") return "Your previous draft is unchanged. Check the reported entry or choose another subtree.";
   if (status === 400 && code === "invalid_link") return ACCEPTED;
   if (code === "state_too_large") return "This tree has more folds, hidden entries, and notes than the editor can send at once.";

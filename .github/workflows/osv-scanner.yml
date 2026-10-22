@@ -1,0 +1,78 @@
+name: OSV dependency scan
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "7 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: osv-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan resolved Python dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out the requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
+      - name: Validate the committed workspace lock
+        run: |
+          uv lock --check
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          packages = tomllib.loads(Path('uv.lock').read_text())['package']
+          registry = [package for package in packages if 'registry' in package.get('source', {})]
+          names = {package['name'].lower() for package in registry}
+          required = {'textual', 'fastapi', 'httpx', 'certifi', 'pyjwt', 'uvicorn'}
+          assert required <= names, f'Missing resolved dependencies: {required - names}'
+          assert all(package.get('version') for package in registry), 'Expected pinned versions'
+          print(f'Scanning {len(registry)} locked third-party package versions across platforms.')
+          PY
+      - name: Scan the resolved dependency versions
+        # The workspace lock covers core, hosted, build, and development
+        # dependencies, including entries for other supported platforms.
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --lockfile=uv.lock
+            --no-resolve
+            --format=sarif
+            --output-file=osv-scanner.sarif
+      - name: Retain the report and resolved versions
+        if: ${{ !cancelled() && hashFiles('osv-scanner.sarif') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: osv-dependency-report
+          path: |
+            osv-scanner.sarif
+            uv.lock
+          retention-days: 5
+      - name: Upload SARIF to code scanning
+        # Private repositories may not have GitHub Code Security enabled.
+        if: ${{ !cancelled() && !github.event.repository.private && hashFiles('osv-scanner.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: osv-scanner.sarif
+          category: python-dependencies

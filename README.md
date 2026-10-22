@@ -6,7 +6,7 @@
 
 # treestamp
 
-Curate a directory tree for your README in the terminal or web editor. Save which directories are expanded, which paths are hidden, and your annotations, then update the tree as your repository changes.
+Treestamp is an editor for creating and maintaining directory trees for project documentation. It can be accessed locally from the terminal, or online via the web editor. Easily select which files and folders to include, add brief annotations to tree entries, and produce an output in a variety of Markdown-friendly formats. The application preserves the structure of existing treestamps, and it can also be integrated into a project's automation, making it easier to keep repository documentation up to date.
 
 ## Install and edit
 
@@ -103,7 +103,7 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 -->
 ```sh
 ./
-├── .github/ (4 files, 2 folders)
+├── .github/ (7 files, 2 folders)
 ├── assets/ (1 file)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
@@ -121,15 +121,17 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 │       ├── tui.py
 │       └── tui_dialogs.py
 ├── tests/ (16 files)  # Contract and integration tests
-├── web/ (5 files, 3 folders)  # Hosted editor: a FastAPI adapter over the same package
+├── web/ (6 files, 3 folders)  # Hosted editor: a FastAPI adapter over the same package
 ├── .nvmrc
+├── .tool-versions
 ├── CHANGELOG.md
 ├── LICENSE
 ├── MAINTENANCE.md
 ├── Makefile
 ├── PRIVACY.md
 ├── README.md
-└── pyproject.toml
+├── pyproject.toml
+└── uv.lock
 ```
 <!-- treestamp:end -->
 

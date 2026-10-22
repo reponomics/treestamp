@@ -1,6 +1,8 @@
 name: Treestamp CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -10,7 +12,8 @@ permissions:
 
 concurrency:
   group: treestamp-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A new PR revision supersedes its checks; do not interrupt a live rollout.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   regression:
@@ -31,14 +34,17 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           check-latest: true
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
+          python-version: ${{ matrix.python-version }}
       - name: Install development environment
-        run: |
-          make venv
-          make install
+        run: make install
       - name: Run quality checks and regression tests on the primary version
         if: matrix.python-version == '3.11'
         run: make ci
@@ -67,6 +73,8 @@ jobs:
         python-version: ['3.11', '3.12']
     runs-on: windows-latest
     timeout-minutes: 25
+    env:
+      UV_PROJECT_ENVIRONMENT: venv
     defaults:
       run:
         # Git Bash, so the steps read the same as the Linux ones. The Makefile
@@ -80,12 +88,20 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           check-latest: true
-      - name: Install the package and its development dependencies
-        run: python -m pip install -e '.[dev]'
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
+          python-version: ${{ matrix.python-version }}
+      - name: Install the locked workspace and build tools
+        run: |
+          uv sync --locked --all-packages --all-extras --no-install-workspace --no-build
+          uv sync --locked --all-packages --all-extras --no-build-isolation
+          python -c "from pathlib import Path; print(Path('venv/Scripts').resolve())" >> "$GITHUB_PATH"
       - name: Report the line-ending facts this platform decides
         # Recorded rather than asserted: the suite pins treestamp's own bytes, and
         # these say which platform behaviour it is pinning them against.
@@ -103,12 +119,12 @@ jobs:
       - name: Check the treestamped README against a CRLF working tree
         run: python -m treestamp check README.md
       - name: Build distributions
-        run: python -m build
+        run: python -m build --no-isolation
       - name: Verify clean headless installations
         run: python scripts/distribution_check.py
 
   hosted:
-    name: Hosted preview (Linux, Python 3.11)
+    name: Hosted editor (Linux, Python 3.11)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -120,21 +136,21 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version-file: .python-version
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
       - name: Install both projects
-        run: |
-          make venv
-          make install web-install
-      - name: Install the browser suite
-        run: |
-          venv/bin/pip install -e './web[browser]'
-          venv/bin/playwright install --with-deps chromium
+        run: make install
+      - name: Install the browser
+        run: venv/bin/playwright install --with-deps chromium
       - name: Run the quality gates and the browser suite concurrently
         # The browser suite runs in its own process against its own service on
         # free ports, so it overlaps the other gates instead of following them.
@@ -167,3 +183,83 @@ jobs:
       - name: Stop and remove the container
         if: always()
         run: docker rm -f treestamp-web || true
+
+  deploy:
+    name: Deploy production editor
+    needs: [regression, windows, hosted]
+    if: >-
+      github.repository == 'reponomics/treestamp' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.FLY_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://treestamp.reponomics.org
+    concurrency:
+      group: fly-production
+      cancel-in-progress: false
+    steps:
+      - name: Check out the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check that this commit is still current on main
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --include "repos/$GITHUB_REPOSITORY/git/ref/heads/main" > "$RUNNER_TEMP/main-ref.txt"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          response = (Path(os.environ['RUNNER_TEMP']) / 'main-ref.txt').read_text()
+          headers, body = response.split('\n\n', 1)
+          for header in headers.splitlines():
+              if header.lower().startswith('x-ratelimit-remaining:'):
+                  print(header)
+          current = json.loads(body)['object']['sha'] == os.environ['GITHUB_SHA']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'deploy={str(current).lower()}\n')
+          if not current:
+              print('A newer commit is on main; its successful CI run will deploy it.')
+          PY
+      - name: Set up Fly CLI
+        if: steps.current.outputs.deploy == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
+        with:
+          version: '0.4.120'
+      - name: Build and deploy the tested revision
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: make fly-production-deploy FLY_DEPLOY_FLAGS=--remote-only BUILD_COMMIT="$GITHUB_SHA"
+      - name: Verify the deployed revision through the public domain
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import URLError
+          from urllib.request import Request, urlopen
+
+          url = 'https://treestamp.reponomics.org/healthz'
+          for attempt in range(12):
+              try:
+                  request = Request(url, headers={'Cache-Control': 'no-cache'})
+                  with urlopen(request, timeout=10) as response:
+                      health = json.load(response)
+                  if health.get('build_commit') == os.environ['GITHUB_SHA']:
+                      print(f'Production is serving {health["build_commit"]}')
+                      break
+              except (URLError, TimeoutError, ValueError) as error:
+                  print(f'Health check {attempt + 1}: {error}')
+              time.sleep(5)
+          else:
+              raise SystemExit('Production did not serve the tested revision')
+          PY

@@ -1,7 +1,11 @@
 .DEFAULT_GOAL := help
 VENV ?= venv
 PYTHON ?= python3
+UV ?= uv
+UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
+FLY ?= fly
+ACTIONLINT ?= actionlint
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 CLI := $(VENV)/bin/treestamp
@@ -11,17 +15,30 @@ GITHUB_API_URL ?= http://127.0.0.1:8100
 FAKE_PORT ?= 8100
 FAKE_FLAGS ?=
 FLY_CONFIG ?= web/fly.toml
+FLY_PRODUCTION_CONFIG ?= web/fly.production.toml
+FLY_DEPLOY_FLAGS ?=
+FLY_HA ?= false
+BUILD_COMMIT ?= $(shell git rev-parse HEAD)
 SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
-.PHONY: tls-check
+.PHONY: tls-check fly-production-deploy workflow-check lock-check lock-update web-browser-install uv-check
+export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-venv: ## Create the virtual environment
-	$(PYTHON) -m venv $(VENV)
-install: ## Install the package and development dependencies
-	$(PIP) install -e '.[dev]'
+uv-check: ## Check that uv matches the pinned development tool version
+	@test "$$($(UV) --version | awk '{print $$2}')" = "$(UV_VERSION)" || \
+	  { echo "Install uv $(UV_VERSION), as pinned in .tool-versions."; exit 1; }
+venv: uv-check ## Create the virtual environment
+	@test -d "$(VENV)" || $(UV) venv --python $(PYTHON) $(VENV)
+lock-check: uv-check ## Reject dependency declarations that differ from the lock
+	$(UV) lock --check
+lock-update: uv-check ## Resolve intentional dependency upgrades into uv.lock
+	$(UV) lock --upgrade
+install: uv-check ## Sync locked core, hosted, build, and test dependencies into venv
+	$(UV) sync --locked --all-packages --all-extras --no-install-workspace --no-build
+	$(UV) sync --locked --all-packages --all-extras --no-build-isolation
 format: ## Format Python code
 	$(VENV)/bin/ruff format .
 format-check: ## Check Python formatting
@@ -40,12 +57,14 @@ docs-check: ## Check retained local documentation links and packaged README URLs
 metadata-check: ## Check built metadata, README rendering, package contents, and hashes
 	$(PY) -m twine check --strict dist/*.whl dist/*.tar.gz
 	$(PY) scripts/release_check.py
-build: ## Build wheel and sdist
-	$(PY) -m build
+build: install ## Sync locked build tools and build wheel and sdist without isolation
+	$(PY) -m build --no-isolation
 distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
 	$(PY) scripts/distribution_check.py
 integration-check: ## Verify the repository's treestamped README
 	$(CLI) check README.md
+workflow-check: ## Validate GitHub Actions workflows (requires actionlint)
+	$(ACTIONLINT)
 hook-check: ## Exercise installed repository hooks at HEAD
 	$(PY) scripts/hook_check.py
 pre-commit-check: ## Run the repository development hooks
@@ -54,8 +73,8 @@ tui: ## Open the editor
 	$(CLI)
 clean: ## Remove generated build and coverage artifacts
 	rm -rf dist/ build/ .coverage htmlcov/
-web-install: ## Install the hosted preview project and its development dependencies
-	$(PIP) install -e '.' -e './web[dev]'
+web-install: install ## Sync the locked workspace, including hosted development dependencies
+web-browser-install: install ## Sync the locked browser test dependencies (install Chromium separately)
 web-lint: ## Lint the hosted preview project
 	$(VENV)/bin/ruff check web && $(VENV)/bin/ruff format --check web
 web-typecheck: ## Check strict types for the hosted preview project
@@ -67,7 +86,7 @@ web-cov: ## Run the hosted preview tests with branch coverage
 web-ci: web-lint web-typecheck web-cov web-js-test ## Run all hosted preview quality gates
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs
-web-browser-test: ## Drive the page in a browser (needs `pip install -e './web[browser]'` and a browser)
+web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
 	$(PY) web/scripts/fake_github.py --repo . --port $(FAKE_PORT) $(FAKE_FLAGS)
@@ -76,17 +95,19 @@ web-serve: ## Run the hosted preview locally against GITHUB_API_URL
 tls-check: ## Check Python TLS package versions and certificate trust stores
 	$(PY) web/scripts/check_tls.py
 web-image: ## Build the hosted preview container image
-	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$$(git rev-parse HEAD)" -t treestamp-web:local .
+	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
 fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
 	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
 	  { echo "usage: make fly-secrets GITHUB_APP_CLIENT_ID=... GITHUB_APP_INSTALLATION_ID=... GITHUB_APP_PRIVATE_KEY_FILE=path.pem"; exit 2; }
-	fly secrets set --config $(FLY_CONFIG) GITHUB_APP_CLIENT_ID="$(GITHUB_APP_CLIENT_ID)" \
+	$(FLY) secrets set --config $(FLY_CONFIG) GITHUB_APP_CLIENT_ID="$(GITHUB_APP_CLIENT_ID)" \
 	  GITHUB_APP_INSTALLATION_ID="$(GITHUB_APP_INSTALLATION_ID)" GITHUB_APP_PRIVATE_KEY="$$(cat $(GITHUB_APP_PRIVATE_KEY_FILE))"
-fly-deploy: ## Build on Fly's builders and deploy the app named in web/fly.toml
-	fly deploy --config $(FLY_CONFIG) --dockerfile web/Dockerfile --build-arg BUILD_COMMIT="$$(git rev-parse HEAD)"
+fly-deploy: ## Build and deploy the app selected by FLY_CONFIG (defaults to preview)
+	$(FLY) deploy --config $(FLY_CONFIG) --dockerfile web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" --ha=$(FLY_HA) $(FLY_DEPLOY_FLAGS)
+fly-production-deploy: ## Build and deploy the separate production app
+	$(MAKE) fly-deploy FLY_CONFIG=$(FLY_PRODUCTION_CONFIG) FLY_HA=true
 fly-status: ## Show the app's machines and health
-	fly status --config $(FLY_CONFIG)
+	$(FLY) status --config $(FLY_CONFIG)
 fly-logs: ## Stream the service's log lines from Fly
-	fly logs --config $(FLY_CONFIG)
+	$(FLY) logs --config $(FLY_CONFIG)
 fly-smoke: ## Run the smoke script against the deployed app (SMOKE_REPO, SMOKE_CHECKOUT)
 	$(PY) web/scripts/smoke.py $(SMOKE_URL) --repo $(SMOKE_REPO) --checkout $(SMOKE_CHECKOUT)

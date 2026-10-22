@@ -1,0 +1,42 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Prepare release PR or GitHub release
+    if: >-
+      github.repository == 'reponomics/treestamp' &&
+      github.ref == 'refs/heads/main' &&
+      vars.RELEASE_APP_CLIENT_ID != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # An App token lets the release PR run CI and its published release
+      # trigger publish.yml. Events created with GITHUB_TOKEN do not do that.
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+      - name: Create release PR or GitHub release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          target-branch: main
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
