@@ -36,6 +36,10 @@ jobs:
         with:
           python-version-file: .python-version
           check-latest: true
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
       - name: Validate the release tag and aligned package versions
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -70,9 +74,7 @@ jobs:
           print(f'Validated {tag} at {head} on main')
           PY
       - name: Install the development environment
-        run: |
-          make venv
-          make install
+        run: make install
       - name: Run release checks and build fresh artifacts
         run: |
           make ci docs-check

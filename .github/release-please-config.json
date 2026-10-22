@@ -14,6 +14,11 @@
           "type": "toml",
           "path": "web/pyproject.toml",
           "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name.value == 'treestamp' || @.name.value == 'treestamp-web')].version"
         }
       ]
     }

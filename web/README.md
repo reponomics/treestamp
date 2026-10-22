@@ -10,7 +10,7 @@ From the repository root:
 
 ```bash
 make venv
-make install web-install
+make install
 nvm install
 nvm use
 make web-fake
@@ -24,7 +24,6 @@ To use real GitHub, set `GITHUB_TOKEN` or all three GitHub App variables: `GITHU
 
 ```bash
 make web-ci
-venv/bin/python -m pip install -e './web[browser]'
 venv/bin/playwright install chromium
 make web-browser-test
 make web-image

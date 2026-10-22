@@ -123,13 +123,15 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ├── tests/ (16 files)  # Contract and integration tests
 ├── web/ (6 files, 3 folders)  # Hosted editor: a FastAPI adapter over the same package
 ├── .nvmrc
+├── .tool-versions
 ├── CHANGELOG.md
 ├── LICENSE
 ├── MAINTENANCE.md
 ├── Makefile
 ├── PRIVACY.md
 ├── README.md
-└── pyproject.toml
+├── pyproject.toml
+└── uv.lock
 ```
 <!-- treestamp:end -->
 

@@ -15,6 +15,14 @@ Browser checks require the separate browser dependencies described in [the web R
 
 Build release artifacts from a clean, reviewed revision. Inspect the archive contents before publication; internal notes and unrelated products do not belong in either distribution. Remove or archive older files from `dist/` before a release build so checks and uploads cannot select stale artifacts.
 
+## Dependency and installer maintenance
+
+The core and hosted projects share `uv.lock`. `make install` installs locked dependencies and build tools into `venv`, then builds the local editable packages without isolated dependency resolution. `make build` synchronizes that locked toolchain before building. Docker selects only the hosted runtime dependencies and operational TLS tools from the same lock, builds both local wheels with the locked build group, and installs those wheels offline. Third-party dependencies must have compatible wheels; the controlled install fails rather than resolving unpinned build dependencies for a source archive.
+
+The uv version is pinned in `.tool-versions`, checked by the Makefile, and read by CI. Docker uses the matching version and image digest. Update those together, including when Dependabot proposes an update to the Docker image; Dependabot does not maintain the `.tool-versions` pin. Keep pip at least `26.2.2`, certifi at least `2026.10.19`, and uv at least `0.13.4` for the eMudhra certificate incident. Continue updating the pinned Python base image and checking its system certificate store; the Python dependency lock does not manage operating-system certificates.
+
+Dependabot proposes uv dependency updates. Review lock changes with their declarations, run the quality gates and container checks, and commit both together. Release Please also updates the two local package versions in the lock. The clean-distribution checks intentionally use pip to resolve the published dependency ranges outside the workspace; they test consumer compatibility separately from the locked development environment. Revert a dependency change by reverting its declarations and lock together, then synchronizing the environment again.
+
 ## Repository and release setup
 
 Use `main` as the default branch and require pull requests and signed commits. After the checks have run in the repository, select these required PR check names:

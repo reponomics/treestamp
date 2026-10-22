@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -26,6 +26,9 @@ dev = [
     "mypy>=1.14",
 ]
 browser = ["pytest-playwright>=0.5"]
+
+[tool.uv.sources]
+treestamp = { workspace = true }
 
 [project.urls]
 Homepage = "https://treestamp.reponomics.org"

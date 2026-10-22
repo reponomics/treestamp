@@ -4,27 +4,28 @@ Discuss ordinary bugs and proposed changes in [reponomics/treestamp issues](http
 
 ## Set up
 
-Use Python 3.11+ and a virtual environment named `venv`. JavaScript checks use the Node version in `.nvmrc`, selected through nvm. The frontend has no npm installation or bundling step.
+Use Python 3.11+ and the uv version pinned in `.tool-versions` to manage a virtual environment named `venv`. Install uv through its official standalone installer or your system package manager; do not bootstrap it through an outdated pip. JavaScript checks use the Node version in `.nvmrc`, selected through nvm. The frontend has no npm installation or bundling step.
 
 ```bash
 make venv
-make install web-install
+make install
 nvm install
 nvm use
 make ci web-ci docs-check
 ```
 
-`make install` installs the core package and development dependencies. `make web-install` adds the hosted package and its development dependencies; both are needed for the repository's complete checks. Browser tests also require Chromium or an installed Chrome:
+`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. Browser tests also require Chromium or an installed Chrome:
 
 ```bash
-venv/bin/python -m pip install -e './web[browser]'
 venv/bin/playwright install chromium
 make web-browser-test
 ```
 
 To use Chrome, pass `BROWSER_FLAGS="--browser-channel chrome"`. On Linux, Playwright's `install --with-deps chromium` can install the required system dependencies. See [web/README.md](../web/README.md) to run the application locally.
 
-The Makefile uses POSIX paths. On Windows, create `venv` with `py -3.11 -m venv venv`, activate it, and install with `python -m pip install -e '.[dev]' -e './web[dev,browser]'`. Invoke Python tools directly; the [CI workflow](workflows/ci.yml) contains the Windows regression and installed-package commands.
+The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, then run `uv sync --locked --all-packages --all-extras --no-install-workspace --no-build` followed by `uv sync --locked --all-packages --all-extras --no-build-isolation`. Activate `venv` and invoke Python tools directly; the [CI workflow](workflows/ci.yml) contains the Windows regression and installed-package commands.
+
+For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
 
 ## Check changes
 

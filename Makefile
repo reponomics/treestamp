@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 VENV ?= venv
 PYTHON ?= python3
+UV ?= uv
+UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
 FLY ?= fly
 ACTIONLINT ?= actionlint
@@ -21,15 +23,22 @@ SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
-.PHONY: tls-check fly-production-deploy workflow-check
+.PHONY: tls-check fly-production-deploy workflow-check lock-check lock-update web-browser-install uv-check
+export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-venv: ## Create the virtual environment
-	$(PYTHON) -m venv $(VENV)
-install: ## Install the package and development dependencies
-	# Python 3.11 seeds setuptools, which this Hatch-based project does not use.
-	$(PIP) uninstall -y setuptools
-	$(PIP) install -e '.[dev]'
+uv-check: ## Check that uv matches the pinned development tool version
+	@test "$$($(UV) --version | awk '{print $$2}')" = "$(UV_VERSION)" || \
+	  { echo "Install uv $(UV_VERSION), as pinned in .tool-versions."; exit 1; }
+venv: uv-check ## Create the virtual environment
+	@test -d "$(VENV)" || $(UV) venv --python $(PYTHON) $(VENV)
+lock-check: uv-check ## Reject dependency declarations that differ from the lock
+	$(UV) lock --check
+lock-update: uv-check ## Resolve intentional dependency upgrades into uv.lock
+	$(UV) lock --upgrade
+install: uv-check ## Sync locked core, hosted, build, and test dependencies into venv
+	$(UV) sync --locked --all-packages --all-extras --no-install-workspace --no-build
+	$(UV) sync --locked --all-packages --all-extras --no-build-isolation
 format: ## Format Python code
 	$(VENV)/bin/ruff format .
 format-check: ## Check Python formatting
@@ -48,8 +57,8 @@ docs-check: ## Check retained local documentation links and packaged README URLs
 metadata-check: ## Check built metadata, README rendering, package contents, and hashes
 	$(PY) -m twine check --strict dist/*.whl dist/*.tar.gz
 	$(PY) scripts/release_check.py
-build: ## Build wheel and sdist
-	$(PY) -m build
+build: install ## Sync locked build tools and build wheel and sdist without isolation
+	$(PY) -m build --no-isolation
 distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
 	$(PY) scripts/distribution_check.py
 integration-check: ## Verify the repository's treestamped README
@@ -64,8 +73,8 @@ tui: ## Open the editor
 	$(CLI)
 clean: ## Remove generated build and coverage artifacts
 	rm -rf dist/ build/ .coverage htmlcov/
-web-install: ## Install the hosted preview project and its development dependencies
-	$(PIP) install -e '.' -e './web[dev]'
+web-install: install ## Sync the locked workspace, including hosted development dependencies
+web-browser-install: install ## Sync the locked browser test dependencies (install Chromium separately)
 web-lint: ## Lint the hosted preview project
 	$(VENV)/bin/ruff check web && $(VENV)/bin/ruff format --check web
 web-typecheck: ## Check strict types for the hosted preview project
@@ -77,7 +86,7 @@ web-cov: ## Run the hosted preview tests with branch coverage
 web-ci: web-lint web-typecheck web-cov web-js-test ## Run all hosted preview quality gates
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs
-web-browser-test: ## Drive the page in a browser (needs `pip install -e './web[browser]'` and a browser)
+web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
 	$(PY) web/scripts/fake_github.py --repo . --port $(FAKE_PORT) $(FAKE_FLAGS)

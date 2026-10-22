@@ -31,31 +31,32 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version-file: .python-version
-      - name: Resolve core, hosted, and development dependencies
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
+      - name: Validate the committed workspace lock
         run: |
-          make venv
-          make install web-install
-          venv/bin/python -m pip install -e './web[browser]'
-          mkdir -p .tmp/osv
-          venv/bin/python -m pip freeze --all --exclude treestamp --exclude treestamp-web > .tmp/osv/requirements.txt
-          venv/bin/python - <<'PY'
+          uv lock --check
+          python - <<'PY'
+          import tomllib
           from pathlib import Path
 
-          requirements = Path('.tmp/osv/requirements.txt').read_text().splitlines()
-          names = {line.split('==')[0].lower() for line in requirements}
+          packages = tomllib.loads(Path('uv.lock').read_text())['package']
+          registry = [package for package in packages if 'registry' in package.get('source', {})]
+          names = {package['name'].lower() for package in registry}
           required = {'textual', 'fastapi', 'httpx', 'certifi', 'pyjwt', 'uvicorn'}
           assert required <= names, f'Missing resolved dependencies: {required - names}'
-          assert all('==' in line for line in requirements), 'Expected fully pinned dependencies'
-          print(f'Scanning {len(requirements)} resolved third-party packages.')
+          assert all(package.get('version') for package in registry), 'Expected pinned versions'
+          print(f'Scanning {len(registry)} locked third-party package versions across platforms.')
           PY
       - name: Scan the resolved dependency versions
-        # Scan the generated manifest explicitly: pyproject.toml alone does not
-        # provide the installed transitive versions. pip already resolved them;
-        # do not resolve them again against OSV's separate metadata source.
+        # The workspace lock covers core, hosted, build, and development
+        # dependencies, including entries for other supported platforms.
         uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
         with:
           scan-args: |-
-            --lockfile=.tmp/osv/requirements.txt
+            --lockfile=uv.lock
             --no-resolve
             --format=sarif
             --output-file=osv-scanner.sarif
@@ -66,8 +67,7 @@ jobs:
           name: osv-dependency-report
           path: |
             osv-scanner.sarif
-            .tmp/osv/requirements.txt
-          include-hidden-files: true
+            uv.lock
           retention-days: 5
       - name: Upload SARIF to code scanning
         # Private repositories may not have GitHub Code Security enabled.
