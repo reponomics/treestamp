@@ -35,7 +35,7 @@ Use `main` as the default branch and require pull requests and signed commits. A
 - `README tree freshness`
 - `Validate PR title`
 
-Production deployment, Release Please, and PyPI publication do not run on ordinary PRs and should not be required PR checks. Enable immutable GitHub Releases before the first release. CodeQL and Scorecard are configured to run only when the repository is public; OSV scans resolved Python dependencies while private, retaining its report in Actions without uploading it to code scanning.
+Production deployment, Release Please, and PyPI publication do not run on ordinary PRs and should not be required PR checks. Enable immutable GitHub Releases before the first release. CodeQL uses GitHub's default setup with the extended query suite for Python, JavaScript/TypeScript, and GitHub Actions, managed in the repository's code scanning settings. Do not enable an advanced CodeQL workflow alongside default setup: GitHub rejects its analysis uploads. Scorecard runs only when the repository is public; OSV scans resolved Python dependencies while private, retaining its report in Actions without uploading it to code scanning.
 
 Release Please manages the core and hosted versions together, updates `CHANGELOG.md`, and creates version tags and GitHub Releases after its release PR is merged. The published-release event runs the PyPI workflow, which validates the tag, versions, and commit on `main`, builds and tests fresh distributions, and publishes them with attestations through Trusted Publishing. Website deployment has its own trigger and does not wait for a package release.
 
@@ -47,7 +47,7 @@ Configure these GitHub settings before enabling publication or production deploy
 | `RELEASE_APP_PRIVATE_KEY` | Repository secret | Private key for that App |
 | `PYPI_PUBLISH_ENABLED=true` | Repository variable | Enables PyPI publication once the repository is public |
 | `pypi` | GitHub environment | Publication approvals and PyPI's trusted identity |
-| `FLY_DEPLOY_ENABLED=true` | Repository variable | Enables production deployment after CI on pushes to `main` |
+| `FLY_DEPLOY_ENABLED=true` | Repository variable | Enables independent production deployment on pushes to `main` |
 | `FLY_API_TOKEN` | Secret in the `production` environment | Deploy token scoped to the production Fly app |
 
 Install the release App on the selected `reponomics/treestamp` repository with write access to contents, issues, and pull requests. Its token lets release PRs trigger CI and GitHub Releases trigger publication. The App does not need organization-wide repository access. The `pypi` environment exists; review its protections and those of `production` against the maintainers' approval policy. Publication runs from release tags, while deployment runs from `main`.
@@ -69,18 +69,18 @@ Published versions are immutable. Correct a released package through a later rel
 
 ## Production deployment
 
-[`web/fly.production.toml`](https://github.com/reponomics/treestamp/blob/main/web/fly.production.toml) promotes the existing `treestamp-preview` Fly app to production at `https://treestamp.reponomics.org`. Future previews use the separate `reponomics-treestamp-preview` app. Leave `FLY_DEPLOY_ENABLED` unset until production deployment, session routing, and custom-domain checks succeed.
+[`web/fly.toml`](https://github.com/reponomics/treestamp/blob/main/web/fly.toml) promotes the existing `treestamp-preview` Fly app to production at `https://treestamp.reponomics.org`. Future previews use the separate `reponomics-treestamp-preview` app. Leave `FLY_DEPLOY_ENABLED` unset until production deployment, session routing, and custom-domain checks succeed.
 
-Keep the production app's GitHub API credentials in Fly secrets: either `GITHUB_TOKEN` or `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY`. To install or rotate the App credentials, `make fly-secrets` accepts `FLY_CONFIG=web/fly.production.toml` and reads the key from `GITHUB_APP_PRIVATE_KEY_FILE`. These service credentials are separate from the App used by Release Please.
+Keep the production app's GitHub API credentials in Fly secrets: either `GITHUB_TOKEN` or `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY`. To install or rotate the App credentials, `make fly-secrets` accepts `FLY_CONFIG=web/fly.toml` and reads the key from `GITHUB_APP_PRIVATE_KEY_FILE`. These service credentials are separate from the App used by Release Please.
 
 Deploy a clean, reviewed commit on `main` manually for the initial setup:
 
 ```bash
 make fly-production-deploy FLY_DEPLOY_FLAGS=--remote-only
-make fly-status FLY_CONFIG=web/fly.production.toml
+make fly-status FLY_CONFIG=web/fly.toml
 ```
 
-Production keeps two Machines running; the production target enables Fly's high-availability provisioning. With `FLY_SESSION_ROUTING=true`, a browser-session cookie uses Fly's `FLY_MACHINE_ID` to route an active editing session to its cached snapshot. Sessions are temporary. A Machine failure, restart, or deployment can require a fresh URL load; the existing browser draft stays copyable and is replaced only after a successful load. Snapshots and quotas remain process-local, so changing the Machine count changes aggregate capacity and limits.
+Production keeps two Machines running; the production target enables Fly's high-availability provisioning. Rolling deployment replaces at most one Machine at a time and checks `/healthz` during rollout. A build failure stops before rollout. A failed health check can halt rollout, but it is not a guarantee against application bugs or interrupted editing sessions. With `FLY_SESSION_ROUTING=true`, a browser-session cookie uses Fly's `FLY_MACHINE_ID` to route an active editing session to its cached snapshot. Sessions are temporary. A Machine failure, restart, or deployment can require a fresh URL load; the existing browser draft stays copyable and is replaced only after a successful load. Snapshots and quotas remain process-local, so changing the Machine count changes aggregate capacity and limits.
 
 The custom domain is attached to `treestamp-preview` in Fly. These records are saved in Cloudflare for the `reponomics.org` zone, with proxying disabled. Fly reports the certificate as Ready, with active RSA and ECDSA certificates and successful validations:
 
@@ -101,18 +101,20 @@ make fly-smoke SMOKE_URL=https://treestamp.reponomics.org \
     SMOKE_REPO=OWNER/REPOSITORY SMOKE_CHECKOUT=/path/to/checkout
 ```
 
-Store an app-scoped Fly deploy token as `FLY_API_TOKEN` in the GitHub `production` environment, then enable `FLY_DEPLOY_ENABLED`. Pushes to `main`, including merged PRs, deploy only after all Linux, Windows, and hosted CI jobs succeed. Deployments are serialized, and a queued run checks that its tested commit is still current on `main` before deploying. The final health probe verifies that the public domain serves that commit.
+Store an app-scoped Fly deploy token as `FLY_API_TOKEN` in the GitHub `production` environment, then enable `FLY_DEPLOY_ENABLED`. The separate [`deploy.yml`](https://github.com/reponomics/treestamp/blob/main/.github/workflows/deploy.yml) workflow deploys pushes to `main`, including merged PRs. Required PR checks are the merge gate; deployment does not wait for post-merge CI, and a failure in the separate CI workflow does not cancel it. Deployment never runs on PR events. No repository connection or auto-deploy setting in Fly is needed; leave Fly-native auto-deployment disabled to avoid duplicate rollouts. Cloudflare supplies DNS and proxying, while GitHub Actions invokes Fly to build and deploy the application.
+
+Deployments are serialized without cancelling an active rollout. A queued run skips an obsolete commit if a newer commit is already on `main`. The build receives the pushed commit identifier, and the final health probe verifies that the public domain serves that commit. A failed final probe reports deployment failure; it does not automatically roll back. No separate release command or blue-green deployment is configured.
 
 For rollback, prefer a reviewed revert on `main` through the same checks. An urgent manual rollback should use a previously verified image with current certificate stores; verify its build identifier and smoke test afterward, and reconcile `main` before the next automatic deployment.
 
 ## Preview deployment
 
-The checked-in `web/fly.toml` targets `reponomics-treestamp-preview`. This app has been created but has not been deployed. Install its GitHub API credentials separately before its first deployment, using `make fly-secrets` with the default preview configuration if using a GitHub App. Preview deployment is manual and defaults to one Machine that may stop when idle:
+The separate `web/fly.preview.toml` targets `reponomics-treestamp-preview`. Here, preview means a test deployment of the web editor. This app has been created but has not been deployed. Install its GitHub API credentials separately before its first deployment, using `make fly-secrets FLY_CONFIG=web/fly.preview.toml` if using a GitHub App. Preview deployment is manual and defaults to one Machine that may stop when idle:
 
 ```bash
 make web-image
-make fly-deploy
-make fly-status
+make fly-preview-deploy
+make fly-status FLY_CONFIG=web/fly.preview.toml
 ```
 
 Deploy a clean, committed candidate so that identifier describes the deployed files. The Docker build checks certificate stores; `make tls-check` performs the corresponding check in the local Python environment. Credentials belong in the host's secret store, not in Git.

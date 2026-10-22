@@ -2,7 +2,7 @@
 
 The web editor loads public GitHub repositories at their default-branch HEAD, edits a frozen snapshot, and exports a treestamp for you to copy into a document. It never writes to a GitHub repository. Failed loads preserve the existing draft. Cached snapshots and their links are temporary; an unavailable snapshot is not silently replaced with another commit.
 
-The service is a FastAPI application using the core Treestamp package. It ships in the hosted container and is not part of the core PyPI distribution. The current deployment is the [preview](https://treestamp-preview.fly.dev/); see [PRIVACY.md](../PRIVACY.md).
+The service is a FastAPI application using the core Treestamp package. It ships in the hosted container and is not part of the core PyPI distribution. The public web editor uses [treestamp.reponomics.org](https://treestamp.reponomics.org/); see [PRIVACY.md](../PRIVACY.md).
 
 ## Run locally
 
@@ -33,4 +33,4 @@ make web-image
 
 Bundled welcome examples are offline fixtures. Their responses in `src/treestamp_web/static/example.js` and trees in `src/treestamp_web/data/examples.json` must stay consistent; `tests/test_examples.py` checks them against the API. Opening an example's live repository follows the same public default-branch policy as any other repository.
 
-See [MAINTENANCE.md](../MAINTENANCE.md) for promoting the existing app to production, the new preview app, deployment from `main`, and session recovery after cache loss.
+See [MAINTENANCE.md](../MAINTENANCE.md) for promoting the existing app to production, the separate test deployment, deployment from `main`, and session recovery after cache loss.

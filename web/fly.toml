@@ -1,23 +1,30 @@
-# Dedicated preview app configuration; see MAINTENANCE.md.
-# Deploy from the repository root so both projects are in the build context:
-#   fly deploy --config web/fly.toml --dockerfile web/Dockerfile
-app = "reponomics-treestamp-preview"
+# Production editor. The app retains its original name and service credentials.
+# For the separate test deployment, use web/fly.preview.toml.
+# Session routing keeps healthy drafts on the Machine holding their snapshot.
+app = "treestamp-preview"
 primary_region = "ewr"
 
 [env]
   PORT = "8000"
-  PUBLIC_BASE_URL = "https://reponomics-treestamp-preview.fly.dev"
+  PUBLIC_BASE_URL = "https://treestamp.reponomics.org"
   TRUST_PROXY = "1"
   FLY_SESSION_ROUTING = "true"
   CLIENT_IP_HEADER = "Fly-Client-IP"
   CACHE_MAX_ENTRIES = "300000"
+  # Cloudflare's published ranges, verified 2026-10-22. Review on updates:
+  # https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
+  CLOUDFLARE_PROXY_CIDRS = "173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32"
+
+[deploy]
+  strategy = "rolling"
+  max_unavailable = 1
 
 [http_service]
   internal_port = 8000
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 2
 
   [[http_service.checks]]
     interval = "10s"
