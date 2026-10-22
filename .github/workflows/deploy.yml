@@ -1,0 +1,92 @@
+name: Deploy production editor
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Required PR checks gate merges. Deployment runs independently after a push
+  # to main; it is not a PR check or a dependency of the CI workflow.
+  deploy:
+    name: Deploy production editor
+    if: >-
+      github.repository == 'reponomics/treestamp' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.FLY_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      DEPLOY_COMMIT: ${{ github.sha }}
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://treestamp.reponomics.org
+    concurrency:
+      group: fly-production
+      cancel-in-progress: false
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOY_COMMIT }}
+          persist-credentials: false
+      - name: Check that this commit is still current on main
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --include "repos/$GITHUB_REPOSITORY/git/ref/heads/main" > "$RUNNER_TEMP/main-ref.txt"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          response = (Path(os.environ['RUNNER_TEMP']) / 'main-ref.txt').read_text()
+          headers, body = response.split('\n\n', 1)
+          for header in headers.splitlines():
+              if header.lower().startswith('x-ratelimit-remaining:'):
+                  print(header)
+          current = json.loads(body)['object']['sha'] == os.environ['DEPLOY_COMMIT']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'deploy={str(current).lower()}\n')
+          if not current:
+              print('A newer commit is on main; its deployment run will deploy it.')
+          PY
+      - name: Set up Fly CLI
+        if: steps.current.outputs.deploy == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
+        with:
+          version: '0.4.120'
+      - name: Build and deploy the pushed revision
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: make fly-production-deploy FLY_DEPLOY_FLAGS=--remote-only BUILD_COMMIT="$DEPLOY_COMMIT"
+      - name: Verify the deployed revision through the public domain
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import URLError
+          from urllib.request import Request, urlopen
+
+          url = 'https://treestamp.reponomics.org/healthz'
+          for attempt in range(12):
+              try:
+                  request = Request(url, headers={'Cache-Control': 'no-cache'})
+                  with urlopen(request, timeout=10) as response:
+                      health = json.load(response)
+                  if health.get('build_commit') == os.environ['DEPLOY_COMMIT']:
+                      print(f'Production is serving {health["build_commit"]}')
+                      break
+              except (URLError, TimeoutError, ValueError) as error:
+                  print(f'Health check {attempt + 1}: {error}')
+              time.sleep(5)
+          else:
+              raise SystemExit('Production did not serve the pushed revision')
+          PY
