@@ -131,7 +131,7 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ```sh
 ./
 ├── .github/ (7 files, 2 folders)
-├── assets/ (1 file, 1 folder)
+├── assets/ (2 files, 1 folder)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
