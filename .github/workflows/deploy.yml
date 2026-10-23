@@ -3,23 +3,28 @@ name: Deploy production editor
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: 'Branch, tag, or commit to deploy (from this repository)'
+        required: true
+        default: main
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   # Required PR checks gate merges. Deployment runs independently after a push
-  # to main; it is not a PR check or a dependency of the CI workflow.
+  # to main or a manual dispatch; it is not a PR check or a CI dependency.
   deploy:
     name: Deploy production editor
     if: >-
       github.repository == 'reponomics/treestamp' &&
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/main' &&
       vars.FLY_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    env:
-      DEPLOY_COMMIT: ${{ github.sha }}
     timeout-minutes: 20
     environment:
       name: production
@@ -28,12 +33,18 @@ jobs:
       group: fly-production
       cancel-in-progress: false
     steps:
-      - name: Check out the pushed commit
+      - name: Check out the selected commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.DEPLOY_COMMIT }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.revision || github.sha }}
           persist-credentials: false
+      - name: Record the resolved deployment commit
+        run: |
+          deploy_commit=$(git rev-parse HEAD)
+          printf 'DEPLOY_COMMIT=%s\n' "$deploy_commit" >> "$GITHUB_ENV"
+          printf 'Deploying commit %s\n' "$deploy_commit" >> "$GITHUB_STEP_SUMMARY"
       - name: Check that this commit is still current on main
+        if: github.event_name == 'push'
         id: current
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,17 +67,17 @@ jobs:
               print('A newer commit is on main; its deployment run will deploy it.')
           PY
       - name: Set up Fly CLI
-        if: steps.current.outputs.deploy == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.current.outputs.deploy == 'true'
         uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
         with:
           version: '0.4.120'
-      - name: Build and deploy the pushed revision
-        if: steps.current.outputs.deploy == 'true'
+      - name: Build and deploy the selected revision
+        if: github.event_name == 'workflow_dispatch' || steps.current.outputs.deploy == 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: make fly-production-deploy FLY_DEPLOY_FLAGS=--remote-only BUILD_COMMIT="$DEPLOY_COMMIT"
       - name: Verify the deployed revision through the public domain
-        if: steps.current.outputs.deploy == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.current.outputs.deploy == 'true'
         run: |
           python3 - <<'PY'
           import json
@@ -88,5 +99,5 @@ jobs:
                   print(f'Health check {attempt + 1}: {error}')
               time.sleep(5)
           else:
-              raise SystemExit('Production did not serve the pushed revision')
+              raise SystemExit('Production did not serve the selected revision')
           PY
