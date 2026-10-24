@@ -170,4 +170,4 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 
 Report bugs through [GitHub issues](https://github.com/reponomics/treestamp/issues), vulnerabilities through [private security reporting](https://github.com/reponomics/treestamp/security/advisories/new), and conduct concerns to [conduct@reponomics.org](mailto:conduct@reponomics.org).
 
-MIT licensed. Before `1.0`, interfaces and the document format may change between releases.
+[MIT licensed](https://github.com/reponomics/treestamp/blob/main/LICENSE). Before `1.0`, interfaces and the document format may change between releases.
