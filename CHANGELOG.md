@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/reponomics/treestamp/compare/v0.1.0...v0.1.1) (2026-10-24)
+
+
+### Documentation
+
+* update license link in README ([#6](https://github.com/reponomics/treestamp/issues/6)) ([b6d3c7c](https://github.com/reponomics/treestamp/commit/b6d3c7cacd4777efa8a1b60638a1c7053889b620))
+
 ## 0.1.0 (2026-10-22)
 
 
