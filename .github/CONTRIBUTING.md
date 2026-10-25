@@ -25,6 +25,14 @@ To use Chrome, pass `BROWSER_FLAGS="--browser-channel chrome"`. On Linux, Playwr
 
 The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, then run `uv sync --locked --all-packages --all-extras --no-install-workspace --no-build` followed by `uv sync --locked --all-packages --all-extras --no-build-isolation`. Activate `venv` and invoke Python tools directly; the [CI workflow](workflows/ci.yml) contains the Windows regression and installed-package commands.
 
+## Dependencies
+
+Keep runtime dependencies few. The core package depends only on Textual; the hosted editor adds FastAPI, Uvicorn, HTTPX, PyJWT, and certifi. Prefer the standard library or an existing dependency. Propose a new dependency in the pull request that needs it, explaining why. It should be actively maintained and widely used, published on PyPI with wheels for the supported platforms, and licensed compatibly with MIT. The frontend uses no npm packages.
+
+Dependencies are obtained from PyPI with uv. Direct dependencies and their compatible ranges are declared in `pyproject.toml` and `web/pyproject.toml`; `uv.lock` records the exact versions and hashes used for development, CI, release builds, and the container image. GitHub Actions are pinned to commit SHAs, and the container base image is pinned by digest.
+
+Dependabot proposes weekly updates for Python packages, GitHub Actions, and the container image, and opens security updates when advisories are published. The OSV scanner workflow checks the locked Python dependencies on each push to `main` and weekly. [MAINTENANCE.md](../MAINTENANCE.md#dependency-and-installer-maintenance) describes how updates are reviewed.
+
 For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
 
 ## Check changes
