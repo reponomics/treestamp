@@ -152,6 +152,7 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ├── .nvmrc
 ├── .tool-versions
 ├── CHANGELOG.md
+├── GOVERNANCE.md
 ├── LICENSE
 ├── MAINTENANCE.md
 ├── Makefile
