@@ -132,6 +132,7 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ./
 ├── .github/ (7 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
+├── docs/ (2 files)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -152,6 +153,7 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 ├── .nvmrc
 ├── .tool-versions
 ├── CHANGELOG.md
+├── GOVERNANCE.md
 ├── LICENSE
 ├── MAINTENANCE.md
 ├── Makefile
