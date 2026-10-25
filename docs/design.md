@@ -69,7 +69,7 @@ The terminal editor starts with no source and asks for New document (a tree root
 
 When session routing is enabled, a successful load sets the `__Host-treestamp-machine` cookie to the serving Machine's id. Later API requests that arrive at another Machine receive a `Fly-Replay` response directing Fly to the owning Machine, with fallback to local handling. If the snapshot is gone (expiry, restart, or deployment), the service returns `410 snapshot_unavailable` and the page keeps the current draft copyable.
 
-The service writes one JSON log line per load, operation, or rejection, containing the repository, commit, root, operation type, status, GitHub call count, and duration. These records do not include the client address. See [PRIVACY.md](../PRIVACY.md).
+The service writes one JSON log line per load, operation, or rejection, containing the repository, commit, root, operation type, status, GitHub call count, and duration. These records do not include the client address; Uvicorn's access log, which is enabled, records request lines and the connection's peer address. See [PRIVACY.md](../PRIVACY.md).
 
 ## Delivery pipeline
 
@@ -92,6 +92,6 @@ All third-party actions are pinned to commit SHAs, and checkouts do not persist 
 - Repository content is input. File names, symlink targets, and document text are validated, escaped onto a single line, and parsed back before any output is written or copied. Entries that cannot be represented exactly cause the load or write to fail rather than produce altered output.
 - The local process runs with the user's privileges and acts only on the selected repository. Document paths are checked against the repository root, symbolic links, nested repositories, and submodules before each write.
 - Everything the browser sends, including the session envelope and URL fragment, is untrusted. The service accepts editing operations only for snapshots it acquired from GitHub under the public default-branch policy, or for bundled examples.
-- GitHub responses are checked for type, identifier format, size, and truncation. Redirects are not followed; a moved repository is reported as not found.
+- GitHub responses are checked for type, size, and truncation, and commit and tree identifiers for format. Redirects are not followed; a moved repository is reported as not found.
 - Client addresses for rate limiting come from the socket peer unless proxy trust is configured. `CF-Connecting-IP` is accepted only when Fly's peer address is in the configured Cloudflare ranges.
 - Pull-request workflows run with read-only tokens. Credentials that can publish or deploy are confined to `main`, release events, and protected environments.
