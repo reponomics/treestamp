@@ -78,7 +78,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 4. Each edit sends the state envelope and one operation to the service, which validates both, applies the operation, and returns the new state. Requests for a snapshot that is no longer cached fail with `410` rather than reading a newer commit.
 5. The visitor copies the result to the clipboard.
 
-The service authenticates to GitHub with a token or GitHub App credentials. It logs structured events containing the repository name, commit, result, and request budget, not document contents.
+In production, the service authenticates to GitHub as a GitHub App, using the App's private key to obtain installation tokens; [web/README.md](../web/README.md) lists the options for local development. It logs structured events containing the repository name, commit, result, and request budget, not document contents.
 
 ## Build and release
 
