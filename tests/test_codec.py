@@ -599,6 +599,13 @@ def test_special_identity_search_limit_is_an_explicit_error(
         )
 
 
+def test_special_path_limit_precedes_row_parsing() -> None:
+    # The ceiling is per tree, even when registrations have different parents.
+    paths = frozenset(f"dir{i}/file  # suffix" for i in range(101))
+    with pytest.raises(MarkerError, match="special_paths supports at most 100 entries"):
+        parse_tree("invalid tree", special_paths=paths)
+
+
 def test_filename_and_annotation_overlap_cannot_duplicate_registered_identity() -> None:
     tree = Node(
         ".",

@@ -120,6 +120,8 @@ The [README](../README.md#3-add-it-to-your-readme) shows a complete region and d
 
 The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
+A document supports at most 100 `special_paths` entries across its displayed tree. Loading or rendering a tree that exceeds this limit fails with an explicit error. Ordinary filenames do not count toward the limit; hide entries, collapse directories, or select a smaller subtree to reduce the number of displayed special names.
+
 ### Pre-commit hooks
 
 `.pre-commit-hooks.yaml` defines `treestamp` (runs `treestamp update`) and `treestamp-check` (runs `treestamp check`). Both run on every commit and receive no filenames.

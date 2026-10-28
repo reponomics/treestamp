@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 SYMLINK_ARROW = "->"
 GITLINK_TAG = "[gitlink]"
 MAX_IDENTITY_BRANCHES = 4096
+MAX_SPECIAL_PATHS = 100
 
 # A row is one line, so control characters print as C escapes, and a byte that
 # is not UTF-8 (a surrogate, from decoding with "surrogateescape") prints as its
@@ -338,6 +339,8 @@ def _registered_candidates(
 
 
 def _registrations(paths: frozenset[str], root: str) -> frozenset[str]:
+    if len(paths) > MAX_SPECIAL_PATHS:
+        raise MarkerError(f"special_paths supports at most {MAX_SPECIAL_PATHS} entries")
     registered = frozenset(tree_path(path, root) for path in paths)
     if any(ANNOTATION_DELIMITER not in path.rsplit("/", 1)[-1] for path in registered):
         raise MarkerError(

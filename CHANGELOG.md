@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- Limit documents to 100 displayed entries whose names contain the annotation delimiter (`  # `), bounding the number of special-path registrations considered during parsing. Loading or rendering a document above this limit now fails explicitly; use fewer displayed special names or a smaller subtree.
+
 ## [0.1.2](https://github.com/reponomics/treestamp/compare/v0.1.1...v0.1.2) (2026-10-28)
 
 

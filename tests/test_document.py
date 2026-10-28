@@ -1,5 +1,6 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -422,6 +423,35 @@ def test_root_only_style_and_count_inference(style: str) -> None:
     loaded = parse_document(render_region(document).encode())
     assert loaded.settings.style == ("list" if style == "list" else "unicode")
     assert loaded.settings.show_counts is True
+
+
+@pytest.mark.parametrize("count", [100, 101])
+def test_special_path_limit_applies_to_document_loading_and_rendering(
+    count: int,
+) -> None:
+    names = [f"file{i:03d}  # suffix" for i in range(count)]
+    # Ordinary entries do not count toward the special-path ceiling.
+    tree = build_tree([Entry(name) for name in [*names, "ordinary.txt"]])
+    document = Document(tree)
+    content = (
+        "<!-- treestamp:start -->\n<!-- treestamp:config\nspecial_paths = "
+        + json.dumps(names)
+        + "\n-->\n```\n./\n"
+        + "".join(f"├── {name}\n" for name in names)
+        + "└── ordinary.txt\n```\n<!-- treestamp:end -->\n"
+    ).encode()
+    if count == 100:
+        assert parse_document(content) == document
+        assert parse_document(render_region(document).encode()) == document
+    else:
+        with pytest.raises(
+            MarkerError, match="special_paths supports at most 100 entries"
+        ):
+            parse_document(content)
+        with pytest.raises(
+            MarkerError, match="special_paths supports at most 100 entries"
+        ):
+            render_region(document)
 
 
 def test_count_visibility_inferred_without_config() -> None:
