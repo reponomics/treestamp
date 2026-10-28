@@ -21,7 +21,7 @@ This document describes the actors, the actions each performs, and the external 
 | GitHub REST API | Supplies public repository metadata, trees, and blobs to the hosted service |
 | Cloudflare and Fly.io | Provide DNS, TLS, and request routing in front of the hosted service |
 | Contributor | Opens issues and pull requests; pull-request code runs in CI without secrets |
-| Maintainer | Reviews and merges changes; see [GOVERNANCE.md](../GOVERNANCE.md) |
+| Maintainer | Reviews and merges changes; see [GOVERNANCE.md](./GOVERNANCE.md) |
 | Dependabot | Opens dependency update pull requests |
 | Release Please | A GitHub App that opens release pull requests and, once they are merged, creates tags and GitHub Releases |
 | GitHub Actions | Runs CI, scanning, Release Please, PyPI publication, and production deployment |
@@ -82,7 +82,7 @@ In production, the service authenticates to GitHub as a GitHub App, using the Ap
 
 ## Build and release
 
-[MAINTENANCE.md](../MAINTENANCE.md) describes CI, releases, PyPI publication, and deployment of the hosted editor.
+[MAINTENANCE.md](./MAINTENANCE.md) describes CI, releases, PyPI publication, and deployment of the hosted editor.
 
 ## External interfaces
 

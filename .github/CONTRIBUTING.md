@@ -31,11 +31,11 @@ Prefer the standard library and existing dependencies. Propose a new dependency 
 
 Dependencies are obtained from PyPI through uv. For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
 
-[Dependabot](dependabot.yml) proposes updates and OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../MAINTENANCE.md#dependency-and-installer-maintenance) covers reviewing these updates and the pinned toolchain versions.
+[Dependabot](dependabot.yml) proposes updates and OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../docs/MAINTENANCE.md#dependency-and-installer-maintenance) covers reviewing these updates and the pinned toolchain versions.
 
 ## Check changes
 
-Run focused tests during implementation and the relevant complete checks before review: `make ci`, `make web-ci`, `make web-browser-test`, and `make docs-check`. For distribution changes, also run `make build metadata-check distribution-check`. See [MAINTENANCE.md](../MAINTENANCE.md) for release and deployment checks.
+Run focused tests during implementation and the relevant complete checks before review: `make ci`, `make web-ci`, `make web-browser-test`, and `make docs-check`. For distribution changes, also run `make build metadata-check distribution-check`. See [MAINTENANCE.md](../docs/MAINTENANCE.md) for release and deployment checks.
 
 Install development hooks with `venv/bin/pre-commit install`. They run lint and formatting, strict type checks, Python tests selected from changed files, and the README tree check. `make pre-commit-check` runs them over all files and may apply formatting fixes. A change affecting shared behavior still needs the relevant complete suite.
 

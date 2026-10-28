@@ -15,12 +15,12 @@ No other person has access to these resources.
 The maintainer:
 
 - reviews and merges pull requests, and sets the project's direction and scope
-- triages issues, discussions, and private vulnerability reports according to [SECURITY.md](.github/SECURITY.md)
+- triages issues, discussions, and private vulnerability reports according to [SECURITY.md](../.github/SECURITY.md)
 - approves releases by merging Release Please pull requests, and oversees PyPI publication and deployment of the hosted editor
 - manages repository settings, rulesets, secrets, and credentials for the services listed above
 - maintains the project's documentation, including this file
 
-Contributors propose changes through issues and pull requests, following [CONTRIBUTING](.github/CONTRIBUTING.md) and the [code of conduct](.github/CODE_OF_CONDUCT.md). Contributing does not grant write access or access to sensitive resources. Other org members may be granted write access to the repository, but merge privileges are restricted to @hesreallyhim, per the [CODEOWNERS](.github/CODEOWNERS) file.
+Contributors propose changes through issues and pull requests, following [CONTRIBUTING](../.github/CONTRIBUTING.md) and the [code of conduct](../.github/CODE_OF_CONDUCT.md). Contributing does not grant write access or access to sensitive resources. Other org members may be granted write access to the repository, but merge privileges are restricted to @hesreallyhim, per the [CODEOWNERS](../.github/CODEOWNERS) file.
 
 ## Decisions and changes to access
 
