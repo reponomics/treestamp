@@ -6,7 +6,7 @@ Treestamp is owned by the [Reponomics](https://github.com/reponomics) GitHub org
 
 | Member | Role | Access to sensitive resources |
 | --- | --- | --- |
-| [@hesreallyhim](https://github.com/hesreallyhim) | Maintainer | Repository and organization administration, repository secrets and environments, the Release Please GitHub App, the PyPI project, the Fly.io apps, and the `reponomics.org` Cloudflare zone |
+| [@hesreallyhim](https://github.com/hesreallyhim) | Maintainer | Repository and organization administration, repository secrets and environments, the Release Please GitHub App, the hosted editor's GitHub API credentials (held as Fly.io secrets), the PyPI project, the Fly.io apps, and the `reponomics.org` Cloudflare zone |
 
 No other person has access to these resources. Organization membership alone grants read access to this public repository and confers no other privileges.
 

@@ -20,8 +20,11 @@ This document describes the actors, the actions each performs, and the external 
 | Hosted service | The FastAPI application, running on two Fly.io Machines |
 | GitHub REST API | Supplies public repository metadata, trees, and blobs to the hosted service |
 | Cloudflare and Fly.io | Provide DNS, TLS, and request routing in front of the hosted service |
-| Maintainer | Reviews changes, approves releases, and manages credentials (see [GOVERNANCE.md](../GOVERNANCE.md)) |
-| GitHub Actions | Runs CI, Release Please, PyPI publication, and production deployment |
+| Contributor | Opens issues and pull requests; pull-request code runs in CI without secrets |
+| Maintainer | Reviews and merges changes, approves releases, and manages credentials (see [GOVERNANCE.md](../GOVERNANCE.md)) |
+| Dependabot | Opens pull requests that update Python dependencies, the container base image, and GitHub Actions |
+| Release Please | A GitHub App that opens release pull requests and, once they are merged, creates tags and GitHub Releases |
+| GitHub Actions | Runs CI, scanning, Release Please, PyPI publication, and production deployment |
 | PyPI | Distributes the package; publication uses Trusted Publishing with attestations |
 
 ## Core package
@@ -43,8 +46,9 @@ The modules in `src/treestamp/` have narrow responsibilities:
 
 - **Snapshot.** Treestamp captures the Git index (or a ref given with `--target`) once. Every later action in that run or editing session uses the same snapshot, so files changing on disk do not alter the tree being edited.
 - **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them. Document paths must lie inside the repository; symlinked documents and paths into submodules are rejected.
-- **Curate.** The user expands, collapses, hides, and annotates entries in the terminal editor. Curation changes only in-memory state until the user writes or copies.
-- **Write.** `update` and the editor's **Write** actions render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document.
+- **Start or load.** In the terminal editor, **New document** starts a tree for a chosen subtree root, showing immediate children with directories collapsed. **Load document** reads an existing treestamped document and restores its tree, hidden entries, and settings against the current snapshot.
+- **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
+- **Write.** `update` and the editor's **Write to existing** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. **Write new file** creates a new document containing only the region and refuses a path that already exists.
 - **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
 - **Copy.** The editor sends the complete treestamp to a native clipboard command if one is on `PATH`, otherwise to the terminal through OSC 52.
 
@@ -111,6 +115,10 @@ Output is UTF-8. Exit codes:
 
 Errors are written to standard error, prefixed with `treestamp:`.
 
+### Terminal editor
+
+The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
+
 ### Document format
 
 A treestamped document contains exactly one region, with both markers starting in column one:
@@ -128,7 +136,7 @@ hidden = ["path/to/hidden"]
 <!-- treestamp:end -->
 ````
 
-The optional config comment holds TOML settings, including the paths of hidden entries. Rows use Unicode, ASCII, or Markdown-list drawing, with directory counts and single-line annotations after a fixed `  # ` delimiter. Text outside the region is preserved.
+The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Rows use Unicode, ASCII, or Markdown-list drawing, with directory counts and single-line annotations after a fixed `  # ` delimiter. Text outside the region is preserved.
 
 ### Pre-commit hooks
 
@@ -140,10 +148,22 @@ The browser application uses these endpoints. They exist to serve that applicati
 
 | Endpoint | Input | Output |
 | --- | --- | --- |
-| `GET /`, `GET /{owner}/{repo}` | None | The browser application |
+| `GET /` | None | The browser application |
+| `GET /{owner}/{repo}` | A repository owner and name in the path | The browser application, which then opens that repository |
 | `GET /api/preview` | Query parameters `url`, or `owner` and `repo`; optional `ref` (a commit id), `root`, `document` | A preview: repository, resolved commit and tree, settings, rendered tree and region, display rows, warnings, permalink, and state envelope |
 | `POST /api/preview` | The same fields as a JSON object | The same as `GET` |
 | `POST /api/op` | JSON with `owner`, `repo`, `ref` (a 40-character commit id), `root`, `document`, `state` (the envelope), `op` (`type` plus `path` or `text`), and `reveal` | An updated preview |
 | `GET /healthz` | None | Liveness, versions, build commit, credential type, last observed GitHub budget, and cache statistics |
 
-Operation types are `restore`, `present`, `toggle`, `expand`, `collapse`, `hide`, `unhide`, `unhide_all`, and `annotate`. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`. Responses carry `Content-Security-Policy: default-src 'self'`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: no-referrer`.
+The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the loaded document's original bytes, and a revision counter; the browser returns it unchanged with each operation. Operation types:
+
+| Type | Effect |
+| --- | --- |
+| `toggle`, `expand`, `collapse` | Change whether the directory at `path` is expanded |
+| `hide`, `unhide` | Hide or show the entry at `path` |
+| `unhide_all` | Show all hidden entries |
+| `annotate` | Set the annotation of `path` to `text`; empty text removes it |
+| `present` | Re-render with the settings in the state, such as drawing style or counts |
+| `restore` | Re-render the state without counting as an edit, for example after a page reload |
+
+`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`. Responses carry `Content-Security-Policy: default-src 'self'`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: no-referrer`.
