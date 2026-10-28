@@ -1,6 +1,6 @@
 # Governance
 
-Treestamp is owned by the [Reponomics](https://github.com/reponomics) GitHub organization and has one primary maintainer. Other members of Reponomics have the ability to review and approve Pull Requests. There is currently one additional member of the Reponomics organization with this role for this repository.
+Treestamp is owned by the [Reponomics](https://github.com/reponomics) GitHub organization and has one maintainer. One other member of the organization reviews pull requests.
 
 ## Members and access
 
@@ -20,7 +20,9 @@ The maintainer:
 - manages repository settings, rulesets, secrets, and credentials for the services listed above
 - maintains the project's documentation, including this file
 
-Contributors propose changes through issues and pull requests, following [CONTRIBUTING](../.github/CONTRIBUTING.md) and the [code of conduct](../.github/CODE_OF_CONDUCT.md). Contributing does not grant write access or access to sensitive resources. Other org members may be granted write access to the repository, but merge privileges are restricted to @hesreallyhim, per the [CODEOWNERS](../.github/CODEOWNERS) file.
+Reviewers are organization members with the Triage role. They review pull requests and help triage issues. Their reviews are advisory: merging does not require an approval. The Triage role cannot merge, push, run workflows, or create releases, and grants no access to the resources listed above.
+
+Contributors propose changes through issues and pull requests, following [CONTRIBUTING](../.github/CONTRIBUTING.md) and the [code of conduct](../.github/CODE_OF_CONDUCT.md). Contributing does not grant write access or access to sensitive resources. Only the maintainer can merge; [CODEOWNERS](../.github/CODEOWNERS) records the maintainer as owner of all code.
 
 ## Decisions and changes to access
 
