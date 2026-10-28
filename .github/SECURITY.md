@@ -12,6 +12,6 @@ Confirmed vulnerabilities are published as [GitHub security advisories](https://
 
 ## Supported versions
 
-Fixes are released for the latest version only, and the hosted editor is updated by redeployment. Reports should identify the exact affected version; this project does not provide long-term support for older versions.
+Each release is supported until the next release is published. Support covers bug fixes and security fixes, which are delivered in a new release; once a newer release exists, earlier releases receive no further updates, including security updates. The project does not provide long-term support for older versions. The hosted editor runs the current `main` and receives fixes when it is redeployed. Reports should identify the exact affected version.
 
 Repository snapshots are cached temporarily. See [PRIVACY.md](../PRIVACY.md) for the service's privacy notice.
