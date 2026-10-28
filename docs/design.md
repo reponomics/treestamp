@@ -122,6 +122,8 @@ The optional config comment holds TOML with three keys, each written only when n
 
 A document supports at most 100 `special_paths` entries across its displayed tree. Loading or rendering a tree that exceeds this limit fails with an explicit error. Ordinary filenames do not count toward the limit; hide entries, collapse directories, or select a smaller subtree to reduce the number of displayed special names.
 
+That ceiling does not prevent expensive identity-search backtracking with fewer registrations. [Resolve special filenames by row](special-path-resolution.md) documents the remaining problem and the recommended replacement format; it is not yet implemented. Manual tree edits are supported only for annotation text. Treestamp owns filenames, structure, and generated metadata.
+
 ### Pre-commit hooks
 
 `.pre-commit-hooks.yaml` defines `treestamp` (runs `treestamp update`) and `treestamp-check` (runs `treestamp check`). Both run on every commit and receive no filenames.
