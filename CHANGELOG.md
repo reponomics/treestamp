@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/reponomics/treestamp/compare/v0.1.1...v0.1.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* fix potential redos ([#14](https://github.com/reponomics/treestamp/issues/14)) ([407a9d5](https://github.com/reponomics/treestamp/commit/407a9d54f0e9dc623127e42ded4579fb14b09ca4))
+
+
+### Documentation
+
+* add governance, design, and security assessment documents ([#12](https://github.com/reponomics/treestamp/issues/12)) ([4819b7b](https://github.com/reponomics/treestamp/commit/4819b7b65f94c6e5679febe7326a4554ef4609dc))
+
 ## [0.1.1](https://github.com/reponomics/treestamp/compare/v0.1.0...v0.1.1) (2026-10-24)
 
 
