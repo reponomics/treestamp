@@ -21,11 +21,11 @@ This document describes the actors, the actions each performs, and the external 
 | GitHub REST API | Supplies public repository metadata, trees, and blobs to the hosted service |
 | Cloudflare and Fly.io | Provide DNS, TLS, and request routing in front of the hosted service |
 | Contributor | Opens issues and pull requests; pull-request code runs in CI without secrets |
-| Maintainer | Reviews and merges changes, approves releases, and manages credentials (see [GOVERNANCE.md](../GOVERNANCE.md)) |
-| Dependabot | Opens pull requests that update Python dependencies, the container base image, and GitHub Actions |
+| Maintainer | Reviews and merges changes; see [GOVERNANCE.md](../GOVERNANCE.md) |
+| Dependabot | Opens dependency update pull requests |
 | Release Please | A GitHub App that opens release pull requests and, once they are merged, creates tags and GitHub Releases |
 | GitHub Actions | Runs CI, scanning, Release Please, PyPI publication, and production deployment |
-| PyPI | Distributes the package; publication uses Trusted Publishing with attestations |
+| PyPI | Distributes the package |
 
 ## Core package
 
@@ -34,7 +34,7 @@ The modules in `src/treestamp/` have narrow responsibilities:
 | Module | Responsibility |
 | --- | --- |
 | `cli.py` | Parses arguments and dispatches to headless maintenance or the editor |
-| `gitio.py` | Runs `git` with an argument list (never a shell), a timeout, and an output size limit; captures an immutable snapshot of the index or a ref |
+| `gitio.py` | Runs `git` and captures an immutable snapshot of the index or a ref |
 | `sources.py` | Builds the same tree from GitHub Trees API records, without a checkout |
 | `model.py`, `session.py` | Immutable tree data and the curation state (expanded, hidden, annotated) |
 | `codec.py` | Renders and parses tree rows, and checks that parsing the output reproduces the authored tree |
@@ -45,14 +45,14 @@ The modules in `src/treestamp/` have narrow responsibilities:
 ### Local actions
 
 - **Snapshot.** Treestamp captures the Git index (or a ref given with `--target`) once. Every later action in that run or editing session uses the same snapshot, so files changing on disk do not alter the tree being edited.
-- **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them. Document paths must lie inside the repository; symlinked documents and paths into submodules are rejected.
-- **Start or load.** In the terminal editor, **New document** starts a tree for a chosen subtree root, showing immediate children with directories collapsed. **Load document** reads an existing treestamped document and restores its tree, hidden entries, and settings against the current snapshot.
+- **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
+- **Start or load.** In the terminal editor, **New document** starts a tree for a chosen subtree root. **Load document** reads an existing treestamped document and restores its tree, hidden entries, and settings against the current snapshot.
 - **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
 - **Write.** `update` and the editor's **Write to existing** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. **Write new file** creates a new document containing only the region and refuses a path that already exists.
 - **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
 - **Copy.** The editor sends the complete treestamp to a native clipboard command if one is on `PATH`, otherwise to the terminal through OSC 52.
 
-Treestamp never stages, commits, or pushes files, and the core package makes no network requests.
+The core package makes no network requests.
 
 ## Hosted editor
 
@@ -76,22 +76,17 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 2. The service fetches the blobs it needs: symlink targets in the selected subtree, up to a configured limit, and the selected document, up to 1 MiB.
 3. The service returns the rendered tree, display rows, and a session state envelope to the browser. The browser holds the curation state; the server keeps only the cached snapshot.
 4. Each edit sends the state envelope and one operation to the service, which validates both, applies the operation, and returns the new state. Requests for a snapshot that is no longer cached fail with `410` rather than reading a newer commit.
-5. The visitor copies the result to the clipboard. The service never writes to GitHub and has no access to visitors' GitHub accounts.
+5. The visitor copies the result to the clipboard.
 
-The service authenticates to GitHub with a token or GitHub App credentials held in Fly.io secrets. It logs structured events containing the repository name, commit, result, and request budget, not document contents.
+The service authenticates to GitHub with a token or GitHub App credentials. It logs structured events containing the repository name, commit, result, and request budget, not document contents.
 
 ## Build and release
 
-- Pull requests run the required CI checks: the regression suite on Linux and Windows, hosted-editor tests, README tree freshness, and PR-title validation. CodeQL default setup, OSV-Scanner, and OpenSSF Scorecard scan the repository separately.
-- Release Please, authenticated as a dedicated GitHub App, opens a release pull request that updates versions and `CHANGELOG.md`. When the maintainer merges it, Release Please creates the tag and GitHub Release.
-- The published release triggers `publish.yml`, which checks that the tag, package versions, and commit on `main` agree, builds and tests fresh distributions, and uploads them to PyPI through Trusted Publishing with attestations.
-- Pushes to `main` trigger `deploy.yml`, which builds the container and deploys it to Fly.io from the `production` environment.
-
-[MAINTENANCE.md](../MAINTENANCE.md) describes these procedures in detail.
+[MAINTENANCE.md](../MAINTENANCE.md) describes CI, releases, PyPI publication, and deployment of the hosted editor.
 
 ## External interfaces
 
-Before `1.0`, any of these interfaces may change between releases; the [changelog](../CHANGELOG.md) records changes that require users to act. The Python modules are not a supported library interface.
+The Python modules are not a supported library interface.
 
 ### Command line
 
@@ -121,22 +116,9 @@ The terminal editor is a keyboard-driven Textual application. Arrow keys, Space,
 
 ### Document format
 
-A treestamped document contains exactly one region, with both markers starting in column one:
+The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
-````markdown
-<!-- treestamp:start -->
-<!-- treestamp:config
-hidden = ["path/to/hidden"]
--->
-```sh
-./
-├── src/  # annotation
-└── README.md
-```
-<!-- treestamp:end -->
-````
-
-The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Rows use Unicode, ASCII, or Markdown-list drawing, with directory counts and single-line annotations after a fixed `  # ` delimiter. Text outside the region is preserved.
+The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
 ### Pre-commit hooks
 
@@ -166,4 +148,4 @@ The state envelope carries the curation (expanded and hidden paths, annotations,
 | `present` | Re-render with the settings in the state, such as drawing style or counts |
 | `restore` | Re-render the state without counting as an edit, for example after a page reload |
 
-`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`. Responses carry `Content-Security-Policy: default-src 'self'`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: no-referrer`.
+`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`.

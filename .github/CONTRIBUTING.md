@@ -27,11 +27,11 @@ The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, th
 
 ## Dependencies
 
-Prefer the standard library and existing dependencies. Propose a new dependency in the pull request that adds it, explaining why it is needed. It must have an OSI-approved license, be actively maintained, and publish wheels for the supported Python versions and platforms: the controlled installs refuse to build third-party source archives. Declare the core package's runtime dependencies in `pyproject.toml`, the hosted editor's in `web/pyproject.toml`, and development tools in the `dev` extras.
+Prefer the standard library and existing dependencies. Propose a new dependency in the pull request that adds it, explaining why it is needed. It must have an OSI-approved license, be actively maintained, and publish wheels for the supported Python versions and platforms. Declare the core package's runtime dependencies in `pyproject.toml`, the hosted editor's in `web/pyproject.toml`, and development tools in the `dev` extras.
 
-Dependencies are obtained from PyPI through uv, using the committed `uv.lock` for development, CI, release builds, and the container image. For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
+Dependencies are obtained from PyPI through uv. For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
 
-Dependabot proposes weekly updates for Python packages, the container base image, and GitHub Actions, which are pinned to commit SHAs. OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../MAINTENANCE.md#dependency-and-installer-maintenance) covers reviewing these updates and the pinned toolchain versions.
+[Dependabot](dependabot.yml) proposes updates and OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../MAINTENANCE.md#dependency-and-installer-maintenance) covers reviewing these updates and the pinned toolchain versions.
 
 ## Check changes
 
