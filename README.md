@@ -121,17 +121,19 @@ Use a terminal and font that display Unicode tree characters, or choose ASCII ou
 
 </details>
 
-<details>
-<summary>This repository's own treestamp</summary>
+## Project Structure
+
+Maintained by treestamp.
 
 <!-- treestamp:start -->
 <!-- treestamp:config
-hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml", ".python-version", "src/treestamp/__init__.py", "src/treestamp/__main__.py", "src/treestamp/py.typed"]
+hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml", ".python-version", ".tool-versions", "CHANGELOG.md", "LICENSE", "Makefile", "PRIVACY.md", "pyproject.toml", "src/treestamp/__init__.py", "src/treestamp/__main__.py", "src/treestamp/py.typed", "uv.lock"]
 -->
 ```sh
 ./
-├── .github/ (7 files, 2 folders)
+├── .github/ (8 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
+├── docs/ (4 files)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -148,25 +150,23 @@ hidden = [".dockerignore", ".gitignore", ".pre-commit-config.yaml", ".pre-commit
 │       ├── tui.py
 │       └── tui_dialogs.py
 ├── tests/ (16 files)  # Contract and integration tests
-├── web/ (6 files, 3 folders)  # Hosted editor: a FastAPI adapter over the same package
-├── .nvmrc
-├── .tool-versions
-├── CHANGELOG.md
-├── LICENSE
-├── MAINTENANCE.md
-├── Makefile
-├── PRIVACY.md
-├── README.md
-├── pyproject.toml
-└── uv.lock
+├── web/  # Hosted editor: a FastAPI adapter over the same package
+│   ├── scripts/ (3 files)
+│   ├── src/ (1 folder)
+│   ├── tests/ (14 files, 2 folders)
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── fly.preview.toml
+│   ├── fly.toml
+│   ├── package.json
+│   └── pyproject.toml
+└── README.md
 ```
 <!-- treestamp:end -->
 
-</details>
-
 ## Development and support
 
-[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/MAINTENANCE.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
+[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/docs/MAINTENANCE.md) · [Governance](https://github.com/reponomics/treestamp/blob/main/docs/GOVERNANCE.md) · [Design](https://github.com/reponomics/treestamp/blob/main/docs/design.md) · [Security assessment](https://github.com/reponomics/treestamp/blob/main/docs/security-assessment.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
 
 Report bugs through [GitHub issues](https://github.com/reponomics/treestamp/issues), vulnerabilities through [private security reporting](https://github.com/reponomics/treestamp/security/advisories/new), and conduct concerns to [conduct@reponomics.org](mailto:conduct@reponomics.org).
 

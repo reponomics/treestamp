@@ -19,7 +19,7 @@ SDIST_FILES = {
     "README.md",
     "LICENSE",
     "PRIVACY.md",
-    "MAINTENANCE.md",
+    "docs/MAINTENANCE.md",
     "CHANGELOG.md",
     "pyproject.toml",
     "Makefile",
