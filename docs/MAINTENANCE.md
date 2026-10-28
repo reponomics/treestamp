@@ -67,6 +67,10 @@ Do not merge the first release PR before publication is ready: a release created
 
 Published versions are immutable. Correct a released package through a later release; do not move its tag, delete and recreate its release, or upload changed files under the same version. If a publication run fails, inspect which artifacts reached PyPI before retrying it.
 
+## Homebrew distribution
+
+The [Homebrew tap setup plan](https://github.com/reponomics/treestamp/blob/main/docs/homebrew-tap.md) describes packaging published PyPI releases in a separate `reponomics/homebrew-tap` repository, validating installations, and maintaining formula updates. The plan records proposed work; verify its completion criteria before advertising Homebrew as an available installation channel.
+
 ## Production deployment
 
 [`web/fly.toml`](https://github.com/reponomics/treestamp/blob/main/web/fly.toml) promotes the existing `treestamp-preview` Fly app to production at `https://treestamp.reponomics.org`. Future previews use the separate `reponomics-treestamp-preview` app. Leave `FLY_DEPLOY_ENABLED` unset until production deployment, session routing, and custom-domain checks succeed.
