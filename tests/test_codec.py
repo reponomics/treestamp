@@ -135,6 +135,66 @@ def test_invalid_printed_trees_fail(text: str) -> None:
         parse_tree(text)
 
 
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("length", [100_000, 100_001])
+def test_long_whitespace_row_is_rejected(style: str, length: int) -> None:
+    # Include complete indentation units and an incomplete final unit.
+    with pytest.raises(MarkerError, match=f"invalid {style} tree row"):
+        parse_tree("./\n" + " " * length + "\n", style)
+
+
+@pytest.mark.parametrize(
+    "style,connector,repeated",
+    [
+        ("unicode", "├── ", "└── a"),
+        ("unicode", "└── ", "├── a"),
+        ("ascii", "|-- ", "`-- a"),
+        ("ascii", "`-- ", "|-- a"),
+        ("list", "- ", "-- a"),
+    ],
+)
+def test_long_repeated_connectors_remain_literal_row_content(
+    style: str, connector: str, repeated: str
+) -> None:
+    name = repeated * 20_000
+    tree = parse_tree(f"./\n{connector}{name}\n", style)
+    assert tree.children == (Node(name, name, "file"),)
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_long_repeated_dashes_do_not_make_a_valid_connector(style: str) -> None:
+    with pytest.raises(MarkerError, match=f"invalid {style} tree row"):
+        parse_tree("./\n-- " + "-- a" * 20_000 + "\n", style)
+
+
+@pytest.mark.parametrize(
+    "style,indent,connector",
+    [
+        ("unicode", "│   ", "├── "),
+        ("unicode", "    ", "└── "),
+        ("ascii", "|   ", "|-- "),
+        ("ascii", "    ", "`-- "),
+        ("list", "  ", "- "),
+    ],
+)
+@pytest.mark.parametrize("depth", [0, 25_000])
+def test_connector_requires_row_content_even_after_long_indentation(
+    style: str, indent: str, connector: str, depth: int
+) -> None:
+    with pytest.raises(MarkerError, match=f"invalid {style} tree row"):
+        parse_tree(f"./\n{indent * depth}{connector}\n", style)
+
+
+@pytest.mark.parametrize(
+    "style,connector", [("unicode", "└── "), ("ascii", "`-- "), ("list", "- ")]
+)
+def test_long_indentation_with_content_reports_missing_parent(
+    style: str, connector: str
+) -> None:
+    with pytest.raises(MarkerError, match="tree indentation skips a parent"):
+        parse_tree("./\n" + " " * 100_000 + connector + "a\n", style)
+
+
 def test_unknown_style_fails() -> None:
     with pytest.raises(MarkerError):
         parse_tree(".\n", "invented")

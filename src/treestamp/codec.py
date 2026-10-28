@@ -281,18 +281,22 @@ def _parse_entry(head: str, annotation: str, parent: str, *, markdown: bool) -> 
     )
 
 
+_INDENTS = {"list": ("  ",), "ascii": ("|   ", "    "), "unicode": ("│   ", "    ")}
+_CONNECTORS = {"list": ("- ",), "ascii": ("|-- ", "`-- "), "unicode": ("├── ", "└── ")}
+
+
 def _depth_row(line: str, style: str) -> tuple[int, str]:
-    if style == "list":
-        match = re.match(r"((?:  )*)- (.+)$", line)
-        if match:
-            return len(match[1]) // 2 + 1, match[2]
-    else:
-        pattern = r"((?:│   |    )*)(?:├── |└── )(.+)$"
-        if style == "ascii":
-            pattern = r"((?:\|   |    )*)(?:\|-- |`-- )(.+)$"
-        match = re.match(pattern, line)
-        if match:
-            return len(match[1]) // 4 + 1, match[2]
+    # No indent unit is also a connector, so stripping indents greedily finds
+    # the only possible split, in linear time.
+    indents, connectors = _INDENTS[style], _CONNECTORS[style]
+    width = len(indents[0])
+    offset = 0
+    while line.startswith(indents, offset):
+        offset += width
+    for connector in connectors:
+        start = offset + len(connector)
+        if line.startswith(connector, offset) and len(line) > start:
+            return offset // width + 1, line[start:]
     raise MarkerError(f"invalid {style} tree row: {line!r}")
 
 
