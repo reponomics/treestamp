@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 STATIC = Path(__file__).parent / "static"
 RESERVED_PREFIXES = frozenset(("api", "static", "healthz"))
 DEFAULT_RETRY_AFTER = 60
+STATE_TOO_LARGE = (413, "state_too_large", "request body exceeds the state limit")
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'",
     "X-Content-Type-Options": "nosniff",
@@ -317,8 +318,9 @@ async def _routing_response(
         # Fly cannot replay bodies over 1 MB. Enforce the smaller application
         # limit even when the request would otherwise bypass the local route.
         await _bounded_body(request, limit)
-    except PreviewError as exc:
-        return _error(exc.status, exc.code, str(exc))
+    except PreviewError:
+        # _bounded_body fails only on the size limit; reply with that fixed error.
+        return _error(*STATE_TOO_LARGE)
     return response
 
 
@@ -334,17 +336,13 @@ async def _bounded_body(request: Request, limit: int) -> bytes:
     """Refuse oversized bodies before buffering them."""
     declared = request.headers.get("content-length")
     if declared is not None and (not declared.isdigit() or int(declared) > limit):
-        raise PreviewError(
-            413, "state_too_large", "request body exceeds the state limit"
-        )
+        raise PreviewError(*STATE_TOO_LARGE)
     chunks: list[bytes] = []
     size = 0
     async for chunk in request.stream():
         size += len(chunk)
         if size > limit:
-            raise PreviewError(
-                413, "state_too_large", "request body exceeds the state limit"
-            )
+            raise PreviewError(*STATE_TOO_LARGE)
         chunks.append(chunk)
     return b"".join(chunks)
 
