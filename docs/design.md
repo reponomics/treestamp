@@ -120,9 +120,7 @@ The [README](../README.md#3-add-it-to-your-readme) shows a complete region and d
 
 The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
-`special_paths` uses records such as `{ row = 1, path = "notes  # drafts" }`. Row indices start at 0 for the root and count only tree rows, excluding markers, metadata, and fences; the root itself cannot be registered. Paths are repository-relative strings or `git_bytes` values. The renderer regenerates registrations from the printed rows, excluding hidden entries and descendants of collapsed directories. An ordinary child of a specially named directory needs no registration of its own.
-
-Each registered row resolves directly to its specified path after parent and filename validation, without searching alternative interpretations. The former backtracking resolver and 100-registration ceiling are removed. [Resolve special filenames by row](special-path-resolution.md) describes the format and the problem it addresses. Old path-only registrations are rejected with a regeneration error; documents without special registrations remain valid. Manual tree edits are supported only for annotation text. Treestamp owns filenames, structure, and generated metadata.
+[Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and generated metadata.
 
 ### Pre-commit hooks
 

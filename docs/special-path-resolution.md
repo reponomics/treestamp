@@ -48,7 +48,7 @@ The renderer generates row indices and registrations from the same traversal tha
 
 ## Supported editing and transition
 
-Users may manually edit single-line annotation text, but manually changing filenames, tree structure, or generated metadata is unsupported. Annotation edits do not change row indices or registered identities. Treestamp regenerates registrations after expansions, collapses, hiding, reordering, and other generated structural changes.
+Annotation text is the only part of a tree that may be edited by hand (see the [document format](design.md#document-format)). Annotation edits do not change row indices or registered identities. Treestamp regenerates registrations after expansions, collapses, hiding, reordering, and other generated structural changes.
 
 Only displayed entries whose own names contain the delimiter receive registrations. Hidden entries retain their exact paths in `hidden` instead, and descendants of collapsed directories have no printed rows to register. Ordinary children of specially named directories use the parent identity established by parsing that directory. Regeneration after structural changes updates every affected row index.
 
