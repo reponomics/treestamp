@@ -33,6 +33,16 @@ Dependencies are obtained from PyPI through uv. For intentional dependency chang
 
 [Dependabot](dependabot.yml) proposes updates and OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../docs/MAINTENANCE.md#dependency-and-installer-maintenance) covers reviewing these updates and the pinned toolchain versions.
 
+## Tests for changes
+
+Every major change must add or update automated tests in the same pull request. A major change is one that alters what treestamp does:
+
+- a new feature, command, option, or editor action, or a change to existing behavior in the CLI, the terminal editor, the document format, or the hosted editor's API or page
+- a bug fix, which needs a test of the corrected behavior that fails without the fix
+- a change to security-relevant handling, such as input validation, size and rate limits, path checks, document writes, or GitHub access
+
+Tests belong in the suite that covers the changed area, described under [Check changes](#check-changes), and should assert the changed behavior itself, not only exercise the code. The coverage threshold is a floor, not the measure of whether a change is tested. Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the suites, need no new tests.
+
 ## Check changes
 
 Run focused tests during implementation and the relevant complete checks before review: `make ci`, `make web-ci`, `make web-browser-test`, and `make docs-check`. For distribution changes, also run `make build metadata-check distribution-check`. See [MAINTENANCE.md](../docs/MAINTENANCE.md) for release and deployment checks.
