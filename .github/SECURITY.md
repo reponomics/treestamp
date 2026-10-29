@@ -10,6 +10,20 @@ The maintainer acknowledges each report within 14 days and keeps the reporter in
 
 Confirmed vulnerabilities are published as [GitHub security advisories](https://github.com/reponomics/treestamp/security/advisories), with the affected and fixed versions, how to tell whether a system is affected, and how to remediate it. A CVE is requested through GitHub when appropriate, and the fix appears in the [changelog](../CHANGELOG.md).
 
+## Dependency and code scanning findings
+
+OSV-Scanner and Dependabot report known vulnerabilities in dependencies, and CodeQL reports security weaknesses in the code. Findings are fixed according to their severity, counted from when they are reported:
+
+| Severity | Fixed |
+| --- | --- |
+| Critical or high | Before the next release, and within 30 days |
+| Medium | Within 90 days |
+| Low | At the maintainer's discretion |
+
+No release is published while a critical or high finding, or a dependency license violation under [CONTRIBUTING](CONTRIBUTING.md#dependencies), is open. A finding that does not affect treestamp may be suppressed only with a recorded reason, given in the code scanning dismissal or the scanner's ignore entry.
+
+When a vulnerability in a dependency of the released package does not affect treestamp, the project records that in the OpenVEX document `vex/treestamp.openvex.json`, with the affected treestamp versions, the status `not_affected`, a justification, and an explanation, before suppressing the finding. [`vex/treestamp.openvex.example.json`](../vex/treestamp.openvex.example.json) shows the format.
+
 ## Supported versions
 
 Each release is supported until the next release is published. Support covers bug fixes and security fixes, which are delivered in a new release; once a newer release exists, earlier releases receive no further updates, including security updates. The project does not provide long-term support for older versions. The hosted editor runs the current `main` and receives fixes when it is redeployed. Reports should identify the exact affected version.
