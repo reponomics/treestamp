@@ -20,7 +20,7 @@ OSV-Scanner and Dependabot report known vulnerabilities in dependencies, and Cod
 | Medium | Within 90 days |
 | Low | At the maintainer's discretion |
 
-Dependencies must meet the license requirement in [CONTRIBUTING](CONTRIBUTING.md#dependencies); a dependency that does not is replaced or removed before the next release. No release is published while a critical or high finding or a license violation is open. A finding that does not affect treestamp may be suppressed only with a recorded reason, given in the code scanning dismissal or the scanner's ignore entry.
+No release is published while a critical or high finding, or a dependency license violation under [CONTRIBUTING](CONTRIBUTING.md#dependencies), is open. A finding that does not affect treestamp may be suppressed only with a recorded reason, given in the code scanning dismissal or the scanner's ignore entry.
 
 When a vulnerability in a dependency of the released package does not affect treestamp, the project records that in the OpenVEX document `vex/treestamp.openvex.json`, with the affected treestamp versions, the status `not_affected`, a justification, and an explanation, before suppressing the finding. [`vex/treestamp.openvex.example.json`](../vex/treestamp.openvex.example.json) shows the format.
 

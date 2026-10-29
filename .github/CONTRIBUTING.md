@@ -27,7 +27,7 @@ The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, th
 
 ## Dependencies
 
-Prefer the standard library and existing dependencies. Propose a new dependency in the pull request that adds it, explaining why it is needed. It must have an OSI-approved license, be actively maintained, and publish wheels for the supported Python versions and platforms. Declare the core package's runtime dependencies in `pyproject.toml`, the hosted editor's in `web/pyproject.toml`, and development tools in the `dev` extras.
+Prefer the standard library and existing dependencies. Propose a new dependency in the pull request that adds it, explaining why it is needed. It must be actively maintained, publish wheels for the supported Python versions and platforms, and have a license in the allowlist of the [dependency scan](workflows/osv-scanner.yml), which checks every locked package. Any other license, including copyleft licenses, needs the maintainer's review and a recorded exception in `osv-scanner.toml`. A dependency found to violate this is replaced or removed before the next release. Declare the core package's runtime dependencies in `pyproject.toml`, the hosted editor's in `web/pyproject.toml`, and development tools in the `dev` extras.
 
 Dependencies are obtained from PyPI through uv. For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
 

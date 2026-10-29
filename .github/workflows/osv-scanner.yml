@@ -55,11 +55,14 @@ jobs:
       - name: Scan the resolved dependency versions
         # The workspace lock covers core, hosted, build, and development
         # dependencies, including entries for other supported platforms.
+        # --licenses is the dependency license allowlist; osv-scanner.toml
+        # corrects packages whose metadata lacks an SPDX license.
         uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
         with:
           scan-args: |-
             --lockfile=uv.lock
             --no-resolve
+            --licenses=MIT,MIT-0,BSD-2-Clause,BSD-3-Clause,Apache-2.0,ISC,PSF-2.0,MPL-2.0
             --format=sarif
             --output-file=osv-scanner.sarif
       - name: Retain the report and resolved versions

@@ -167,7 +167,8 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │   ├── fly.toml
 │   ├── package.json
 │   └── pyproject.toml
-└── README.md
+├── README.md
+└── osv-scanner.toml
 ```
 <!-- treestamp:end -->
 

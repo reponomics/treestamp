@@ -1,0 +1,61 @@
+# OSV-Scanner configuration for the dependency scan in
+# .github/workflows/osv-scanner.yml, which also holds the license allowlist.
+
+# Package metadata that does not state an SPDX license. Each value was
+# confirmed against the project's license file.
+
+[[PackageOverrides]]
+name = "colorama"
+ecosystem = "PyPI"
+license.override = ["BSD-3-Clause"]
+reason = "PyPI metadata says only BSD; the license file is BSD-3-Clause"
+
+[[PackageOverrides]]
+name = "nodeenv"
+ecosystem = "PyPI"
+license.override = ["BSD-3-Clause"]
+reason = "PyPI metadata says only BSD; the license file is BSD-3-Clause"
+
+[[PackageOverrides]]
+name = "id"
+ecosystem = "PyPI"
+license.override = ["Apache-2.0"]
+reason = "PyPI metadata uses a classifier, not an SPDX identifier"
+
+[[PackageOverrides]]
+name = "pytest-playwright"
+ecosystem = "PyPI"
+license.override = ["Apache-2.0"]
+reason = "PyPI metadata uses the license text, not an SPDX identifier"
+
+[[PackageOverrides]]
+name = "python-discovery"
+ecosystem = "PyPI"
+license.override = ["MIT"]
+reason = "PyPI metadata uses the license text, not an SPDX identifier"
+
+[[PackageOverrides]]
+name = "trove-classifiers"
+ecosystem = "PyPI"
+license.override = ["Apache-2.0"]
+reason = "PyPI metadata uses a classifier, not an SPDX identifier"
+
+[[PackageOverrides]]
+name = "treestamp-web"
+ecosystem = "PyPI"
+license.override = ["MIT"]
+reason = "This repository's hosted editor, which has no registry license data"
+
+# Development tools that are not distributed with treestamp.
+
+[[PackageOverrides]]
+name = "docutils"
+ecosystem = "PyPI"
+license.ignore = true
+reason = "Used only by twine's README rendering during release checks; not distributed"
+
+[[PackageOverrides]]
+name = "text-unidecode"
+ecosystem = "PyPI"
+license.ignore = true
+reason = "Used only through test dependencies; not distributed"
