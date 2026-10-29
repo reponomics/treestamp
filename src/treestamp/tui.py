@@ -16,7 +16,7 @@ from textual.binding import Binding
 from textual.widgets import Label, ListItem, ListView, Static
 
 from treestamp.codec import format_counts
-from treestamp.document import DEFAULT_DOCUMENT_FILE
+from treestamp.document import ATTRIBUTION_URL, DEFAULT_DOCUMENT_FILE
 from treestamp.errors import TreestampError
 from treestamp.model import KIND_GITLINK, KIND_SYMLINK
 from treestamp.tui_dialogs import (
@@ -259,6 +259,7 @@ class TreestampApp(App[bool]):
     #tree ListItem { height: 1; padding: 0; }
     #tree Label { height: 1; text-wrap: nowrap; }
     #tree .hidden-entry Label { text-style: dim; }
+    #attribution { height: auto; margin-top: 1; }
     #status, #summary, .controls { height: auto; }
     #status { color: $text-muted; border-top: solid $primary-muted; }
     #summary, .controls { background: $surface; }
@@ -272,6 +273,11 @@ class TreestampApp(App[bool]):
         self.session = editor.state.session
         self.cursor = Cursor(self.session)
         self.tree_view = ListView(id="tree")
+        self.attribution_widget = Static(
+            f'Maintained with [link="{ATTRIBUTION_URL}"]treestamp[/link]',
+            id="attribution",
+        )
+        self.attribution_widget.display = False
         self.status_widget = Static("", markup=False, id="status")
         self.summary_widget = Static("", id="summary")
         self._rebuilding = False
@@ -280,6 +286,7 @@ class TreestampApp(App[bool]):
     def compose(self) -> ComposeResult:
         yield Static("treestamp", markup=False, id="title")
         yield self.tree_view
+        yield self.attribution_widget
         yield self.status_widget
         yield Static(
             "[bold]Tree[/]     ↑↓ Select  ←→ Expand/collapse  Space Toggle  "
@@ -401,6 +408,7 @@ class TreestampApp(App[bool]):
         finally:
             self._rebuilding = False
         files, dirs = self.session.hidden_stats()
+        self.attribution_widget.display = self.session.settings.attribution
         self.summary_widget.update(
             "[bold]View[/]     "
             f"c Counts: {'on' if self.session.show_counts else 'off'}  "

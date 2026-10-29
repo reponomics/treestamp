@@ -317,12 +317,14 @@ def test_rejected_presentation_restores_accepted_controls(
     expect(page.locator("#show_counts")).to_be_checked()
     page.locator("#attribution").check()
     expect(page.locator("#attribution")).not_to_be_checked()
+    expect(page.locator("#tree-attribution")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
 
 
+@pytest.mark.parametrize("tui_mode", [False, True])
 def test_attribution_toggle_updates_copy_and_survives_reload(
-    page: Page, service: str
+    page: Page, service: str, tui_mode: bool
 ) -> None:
     page.set_viewport_size({"width": 1280, "height": 900})
     page.add_init_script("""
@@ -332,13 +334,31 @@ def test_attribution_toggle_updates_copy_and_survives_reload(
         }});
     """)
     open_editor(page, service)
+    if tui_mode:
+        page.locator("#tui-mode").click()
     attribution = page.get_by_role(
         "checkbox", name="Add “Maintained with treestamp” link"
     )
     trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
     expect(attribution).not_to_be_checked()
+    visible_trailer = page.locator("#tree-attribution")
+    expect(visible_trailer).to_be_hidden()
     expect(page.locator("#region")).not_to_contain_text(trailer)
     attribution.check()
+    expect(visible_trailer).to_be_visible()
+    expect(visible_trailer).to_have_text("Maintained with treestamp")
+    expect(visible_trailer.get_by_role("link")).to_have_attribute(
+        "href", "https://github.com/reponomics/treestamp"
+    )
+    assert (
+        visible_trailer.evaluate("element => element.previousElementSibling.id")
+        == "rows"
+    )
+    assert visible_trailer.evaluate("element => !element.closest('#rows')")
+    page.set_viewport_size({"width": 390, "height": 844})
+    expect(visible_trailer).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.set_viewport_size({"width": 1280, "height": 900})
     expect(page.locator("#region")).to_contain_text(trailer)
     page.locator("#copy").click()
     page.wait_for_function("window.copiedBlocks.length === 1")
@@ -348,8 +368,10 @@ def test_attribution_toggle_updates_copy_and_survives_reload(
     page.reload()
     page.wait_for_selector("#rows .row")
     expect(attribution).to_be_checked()
+    expect(visible_trailer).to_be_visible()
     expect(page.locator("#region")).to_contain_text(trailer)
     attribution.uncheck()
+    expect(visible_trailer).to_be_hidden()
     expect(page.locator("#region")).not_to_contain_text(trailer)
     page.locator("#copy").click()
     page.wait_for_function("window.copiedBlocks.length === 1")

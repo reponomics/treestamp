@@ -50,7 +50,8 @@ class _FenceTracker:
 START_MARKER = "<!-- treestamp:start -->"
 END_MARKER = "<!-- treestamp:end -->"
 CONFIG_START = "<!-- treestamp:config"
-ATTRIBUTION = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
+ATTRIBUTION_URL = "https://github.com/reponomics/treestamp"
+ATTRIBUTION = f"Maintained with [treestamp]({ATTRIBUTION_URL})"
 DEFAULT_DOCUMENT_FILE = "README.md"
 _BOUNDARY = re.compile(r"^[ \t]*<!--[ \t]*treestamp:(?:start|end)")
 

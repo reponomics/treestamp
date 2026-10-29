@@ -406,6 +406,7 @@ function render(data, opening = false) {
   }
 
   renderRows(editor.rows);
+  document.getElementById("tree-attribution").hidden = !data.state.curation.settings.attribution;
 
   renderRegion(data.region);
   copy.disabled = false;
