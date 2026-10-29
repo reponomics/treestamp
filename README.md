@@ -34,6 +34,12 @@ cd /path/to/your/project
 treestamp
 ```
 
+Or, run it directly with no installation:
+
+```bash
+pipx run treestamp
+```
+
 Choose **New document** and accept `.` for the repository root. The terminal editor uses staged files, so stage your source changes before opening it.
 
 ### 2. Edit the tree
