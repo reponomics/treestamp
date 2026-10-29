@@ -337,7 +337,7 @@ def test_attribution_toggle_updates_copy_and_survives_reload(
     if tui_mode:
         page.locator("#tui-mode").click()
     attribution = page.get_by_role(
-        "checkbox", name="Add “Maintained with treestamp” link"
+        "checkbox", name="Add “Maintained with treestamp” footer"
     )
     trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
     expect(attribution).not_to_be_checked()
