@@ -75,7 +75,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.current.outputs.deploy == 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: make fly-production-deploy FLY_DEPLOY_FLAGS=--remote-only BUILD_COMMIT="$DEPLOY_COMMIT"
+        # setup-flyctl installs only the flyctl binary, not the fly alias.
+        run: make fly-production-deploy FLY=flyctl FLY_DEPLOY_FLAGS=--remote-only BUILD_COMMIT="$DEPLOY_COMMIT"
       - name: Verify the deployed revision through the public domain
         if: github.event_name == 'workflow_dispatch' || steps.current.outputs.deploy == 'true'
         run: |
