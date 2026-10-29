@@ -41,6 +41,12 @@ license.override = ["Apache-2.0"]
 reason = "PyPI metadata uses a classifier, not an SPDX identifier"
 
 [[PackageOverrides]]
+name = "treestamp"
+ecosystem = "PyPI"
+license.override = ["MIT"]
+reason = "This repository's package; release PRs lock a version not yet on PyPI, which has no registry license data"
+
+[[PackageOverrides]]
 name = "treestamp-web"
 ecosystem = "PyPI"
 license.override = ["MIT"]
