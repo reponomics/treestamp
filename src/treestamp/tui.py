@@ -167,6 +167,7 @@ _HELP = (
     "                This does not change which entries are printed.",
     "c               Show or hide counts on collapsed directories",
     "s               Switch between Unicode, ASCII, and list styles",
+    "t               Include or remove the Maintained with treestamp trailer",
     "",
     "DOCUMENT",
     "N               New document: choose a tree root",
@@ -213,6 +214,14 @@ def _cycle_style(session: TreeSession) -> str:
     return f"Printed style: {style}."
 
 
+def _toggle_attribution(session: TreeSession) -> str:
+    enabled = not session.settings.attribution
+    session.settings = replace(session.settings, attribution=enabled)
+    return (
+        "Attribution trailer included." if enabled else "Attribution trailer removed."
+    )
+
+
 class TreestampApp(App[bool]):
     """Edit a TreeSession; Textual widgets never discover or modify project files."""
 
@@ -232,6 +241,7 @@ class TreestampApp(App[bool]):
         Binding("a", "annotate", "Annotate"),
         Binding("c", "counts", "Show counts"),
         Binding("s", "style", "Tree style"),
+        Binding("t", "attribution", "Attribution trailer"),
         Binding("N", "new", "New document"),
         Binding("v", "preview", "Preview tree"),
         Binding("y", "copy", "Copy treestamp"),
@@ -395,6 +405,7 @@ class TreestampApp(App[bool]):
             "[bold]View[/]     "
             f"c Counts: {'on' if self.session.show_counts else 'off'}  "
             f"s Style: {STYLE_LABELS[self.session.settings.style]}  "
+            f"t Attribution: {'on' if self.session.settings.attribution else 'off'}  "
             f"H Hidden: {'shown' if self.session.show_hidden else 'concealed'} "
             f"({files + dirs})  S Unhide all"
         )
@@ -471,6 +482,9 @@ class TreestampApp(App[bool]):
 
     async def action_style(self) -> None:
         await self._edit_and_refresh(partial(_cycle_style, self.session))
+
+    async def action_attribution(self) -> None:
+        await self._edit_and_refresh(partial(_toggle_attribution, self.session))
 
     def action_annotate(self) -> None:
         self._sync_cursor()

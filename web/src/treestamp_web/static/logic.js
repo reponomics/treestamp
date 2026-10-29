@@ -54,7 +54,7 @@ export function sourceSelection(values, original = {}) {
 }
 
 export function settingsFromValues(base, values) {
-  return { ...base, style: values.style, show_counts: Boolean(values.show_counts) };
+  return { ...base, style: values.style, show_counts: Boolean(values.show_counts), attribution: Boolean(values.attribution) };
 }
 
 export function valuesFromQuery(query) {
@@ -68,7 +68,7 @@ export function valuesFromQuery(query) {
 }
 
 export function valuesFromSettings(settings) {
-  return { root: displayPath(settings.root), style: settings.style, show_counts: settings.show_counts };
+  return { root: displayPath(settings.root), style: settings.style, show_counts: settings.show_counts, attribution: Boolean(settings.attribution) };
 }
 
 // A DOM identity is independent of replacement characters in a displayed byte name.
@@ -136,6 +136,7 @@ function validatePreviewSettings(data) {
   const paths = data?.state?.curation;
   const settings = paths?.settings;
   if (!settings || !["unicode", "ascii", "list"].includes(settings.style) || typeof settings.show_counts !== "boolean"
+      || (settings.attribution !== undefined && typeof settings.attribution !== "boolean")
       || !validPath(settings.root) || !validPath(data.root) || !validPath(data.document)
       || ![paths.expanded, paths.hidden, paths.annotations].every(Array.isArray)) {
     throw new Error("The replacement tree has invalid editing settings. Your previous draft is unchanged.");

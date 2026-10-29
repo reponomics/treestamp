@@ -28,6 +28,7 @@ const fields = {
   style: document.getElementById("style"),
   root: document.getElementById("root"),
   show_counts: document.getElementById("show_counts"),
+  attribution: document.getElementById("attribution"),
   document: document.getElementById("document"),
 };
 const submit = document.getElementById("submit");
@@ -87,6 +88,7 @@ function formValues() {
   return {
     style: fields.style.value,
     show_counts: fields.show_counts.checked,
+    attribution: fields.attribution.checked,
     root: fields.root.value,
     document: fields.document.value,
   };
@@ -103,6 +105,7 @@ function settingsFromForm(base) {
 function setValues(values) {
   if ("style" in values) fields.style.value = values.style;
   if ("show_counts" in values) fields.show_counts.checked = values.show_counts;
+  if ("attribution" in values) fields.attribution.checked = values.attribution;
   if ("root" in values) fields.root.value = values.root;
   if ("document" in values) fields.document.value = values.document;
 }
@@ -525,6 +528,7 @@ async function sendOperation(type, path, text) {
   if (!saved && editor === accepted) {
     fields.style.value = accepted.state.curation.settings.style;
     fields.show_counts.checked = accepted.state.curation.settings.show_counts;
+    fields.attribution.checked = Boolean(accepted.state.curation.settings.attribution);
     reveal.checked = Boolean(accepted.revealed);
   }
   return saved;
@@ -752,7 +756,7 @@ function openLoadDialog() {
 }
 
 // Display controls apply immediately; source fields wait for Load repo confirmation.
-for (const name of ["style", "show_counts"]) {
+for (const name of ["style", "show_counts", "attribution"]) {
   fields[name].addEventListener("change", () => { if (editor) operate("present"); });
 }
 reloadButton.addEventListener("click", async () => {

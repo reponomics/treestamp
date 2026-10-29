@@ -315,8 +315,45 @@ def test_rejected_presentation_restores_accepted_controls(
     expect(page.locator("#style")).to_have_value("unicode")
     page.locator("#show_counts").uncheck()
     expect(page.locator("#show_counts")).to_be_checked()
+    page.locator("#attribution").check()
+    expect(page.locator("#attribution")).not_to_be_checked()
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
+
+
+def test_attribution_toggle_updates_copy_and_survives_reload(
+    page: Page, service: str
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.add_init_script("""
+        window.copiedBlocks = [];
+        Object.defineProperty(navigator, "clipboard", {value: {
+            writeText: async text => window.copiedBlocks.push(text)
+        }});
+    """)
+    open_editor(page, service)
+    attribution = page.get_by_role(
+        "checkbox", name="Add “Maintained with treestamp” link"
+    )
+    trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
+    expect(attribution).not_to_be_checked()
+    expect(page.locator("#region")).not_to_contain_text(trailer)
+    attribution.check()
+    expect(page.locator("#region")).to_contain_text(trailer)
+    page.locator("#copy").click()
+    page.wait_for_function("window.copiedBlocks.length === 1")
+    assert page.evaluate("window.copiedBlocks[0]").endswith(
+        f"\n\n{trailer}\n<!-- treestamp:end -->\n"
+    )
+    page.reload()
+    page.wait_for_selector("#rows .row")
+    expect(attribution).to_be_checked()
+    expect(page.locator("#region")).to_contain_text(trailer)
+    attribution.uncheck()
+    expect(page.locator("#region")).not_to_contain_text(trailer)
+    page.locator("#copy").click()
+    page.wait_for_function("window.copiedBlocks.length === 1")
+    assert trailer not in page.evaluate("window.copiedBlocks[0]")
 
 
 def test_failed_copy_does_not_report_success(page: Page, service: str) -> None:

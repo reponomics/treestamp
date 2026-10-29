@@ -130,8 +130,17 @@ test("new source parameters only select repository-relative root and document", 
 
 test("one count toggle edits presentation and retains the selected root", () => {
   const settings = { root: "docs", style: "unicode", show_counts: true };
-  assert.deepEqual(settingsFromValues(settings, { style: "list", show_counts: false }), { root: "docs", style: "list", show_counts: false });
-  assert.deepEqual(valuesFromSettings(settings), settings);
+  assert.deepEqual(settingsFromValues(settings, { style: "list", show_counts: false }), { root: "docs", style: "list", show_counts: false, attribution: false });
+  assert.deepEqual(valuesFromSettings(settings), { ...settings, attribution: false });
+});
+
+test("attribution defaults off for old drafts and survives form and shared state round trips", () => {
+  const original = { root: "docs", style: "unicode", show_counts: true };
+  const enabled = settingsFromValues(original, { ...valuesFromSettings(original), attribution: true });
+  assert.deepEqual(enabled, { ...original, attribution: true });
+  const restored = decodeState(encodeState({ settings: enabled })).settings;
+  assert.equal(valuesFromSettings(restored).attribution, true);
+  assert.deepEqual(settingsFromValues(restored, { ...valuesFromSettings(restored), attribution: false }), { ...original, attribution: false });
 });
 
 test("operation bodies retain the captured source and baseline while editing curation", () => {
@@ -176,6 +185,7 @@ test("preview candidates validate before adoption, including bundled examples", 
     for (const mutate of [
       candidate => { candidate.region = null; },
       candidate => { candidate.state.curation.settings = null; },
+      candidate => { candidate.state.curation.settings.attribution = "true"; },
       candidate => { candidate.rows[0].path = null; },
       candidate => { candidate.rows[0].depth = -1; },
     ]) {
