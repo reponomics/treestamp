@@ -54,6 +54,14 @@ Install the release App on the selected `reponomics/treestamp` repository with w
 
 In PyPI, configure a [pending Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/) for project `treestamp`, GitHub owner `reponomics`, repository `treestamp`, workflow filename `publish.yml`, and environment `pypi`. No long-lived PyPI upload token is needed. A pending publisher does not reserve the package name.
 
+## Secrets and credentials
+
+Secrets are stored only in the services that use them: GitHub repository secrets and environments for the workflows, and Fly.io secrets for the hosted editor, as listed in [Repository and release setup](#repository-and-release-setup) and [Production deployment](#production-deployment). They are never committed to the repository, built into images, or written to logs. The maintainer keeps the GitHub App private keys outside the repository. Prefer credentials that need no stored secret, such as PyPI Trusted Publishing, and scope each credential to one app or repository.
+
+Only the maintainer can read or change these secrets (see [GOVERNANCE.md](GOVERNANCE.md)). Workflows receive a secret only in the job that needs it, and deployment credentials only through the `production` environment.
+
+Credentials have no fixed rotation schedule. Rotate a credential immediately if it may have been exposed, and rotate the affected credentials whenever the people with access to them change. After rotating, revoke the old credential and confirm that the workflow or service using it still works.
+
 ## First release and subsequent releases
 
 The first release is configured as `0.1.0`. Complete these steps in order:
