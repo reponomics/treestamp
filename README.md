@@ -21,10 +21,10 @@ Turn your repository into a directory tree for your README. Choose what to show,
 
 **In your browser:** [Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL, and choose **Load repo → Create treestamp**. Nothing to install.
 
-**In your terminal:** Requires Python 3.11+ and Git. Until the first PyPI release, install from a checkout of this repository:
+**In your terminal:** Requires Python 3.11+ and Git. Install from PyPI:
 
 ```bash
-python -m pip install .
+python -m pip install treestamp
 ```
 
 Then open the repository you want to document:
@@ -89,24 +89,28 @@ Choose **Write to existing** in the terminal editor and enter `README.md`. Trees
 
 **GitHub Actions:** after checking out your repository and setting up Python 3.11+, add this step:
 
+<!-- x-release-please-start-version -->
 ```yaml
 - name: Check the README tree
   run: |
-    python -m pip install "git+https://github.com/reponomics/treestamp.git@25722b884e29dd8a4ff65e22c782f4e11ea98922"
+    python -m pip install "treestamp==0.2.0"
     treestamp check README.md
 ```
+<!-- x-release-please-end -->
 
 **Local pre-commit:** add this to `.pre-commit-config.yaml`, then run `pre-commit install`:
 
+<!-- x-release-please-start-version -->
 ```yaml
 repos:
   - repo: https://github.com/reponomics/treestamp
-    rev: 25722b884e29dd8a4ff65e22c782f4e11ea98922
+    rev: v0.2.0
     hooks:
       - id: treestamp-check
 ```
+<!-- x-release-please-end -->
 
-Both examples pin a reviewed source revision until the first package release. Run the check for source changes too, not just changes to Markdown.
+Both examples pin the latest release. Run the check for source changes too, not just changes to Markdown.
 
 <details>
 <summary>Snapshots, paths, and existing documents</summary>
