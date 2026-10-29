@@ -31,7 +31,7 @@ Prefer the standard library and existing dependencies. Propose a new dependency 
 
 Dependencies are obtained from PyPI through uv. For intentional dependency changes, edit the appropriate `pyproject.toml`, run `uv lock`, and commit the lock with the declarations. Use `make lock-update` for a deliberate full dependency refresh, or `uv lock --upgrade-package NAME` for a targeted update. Re-run `make install` and the relevant checks. The lock manages repository development and deployment; the published package retains compatible dependency ranges.
 
-[Dependabot](dependabot.yml) proposes updates and OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../docs/MAINTENANCE.md#dependency-and-installer-maintenance) covers reviewing these updates and the pinned toolchain versions.
+[Dependabot](dependabot.yml) proposes updates and OSV-Scanner checks the locked dependencies for known vulnerabilities. [MAINTENANCE.md](../docs/MAINTENANCE.md#dependencies-and-toolchain) covers reviewing these updates and the pinned toolchain versions.
 
 ## Tests for changes
 
