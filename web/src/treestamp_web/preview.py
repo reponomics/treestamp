@@ -10,6 +10,7 @@ import posixpath
 import time
 import uuid
 from dataclasses import asdict, dataclass
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
@@ -91,7 +92,8 @@ def _display(value: str) -> str:
 
 
 def _root(raw: str | None) -> str:
-    root = raw or "."
+    # Normalize dialog spelling without resolving '..' before validation.
+    root = PurePosixPath(raw or ".").as_posix()
     try:
         Settings(root=root)
     except MarkerError as exc:
