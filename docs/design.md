@@ -112,13 +112,15 @@ Errors are written to standard error, prefixed with `treestamp:`.
 
 ### Terminal editor
 
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
+The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
 
 ### Document format
 
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
 The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
+
+Both editors offer an attribution toggle, off by default. When enabled, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 
 [Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and generated metadata.
 

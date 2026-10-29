@@ -75,6 +75,8 @@ Choose **Copy** in the terminal editor or **Copy treestamp** on the web, then pa
 
 Hidden entries also produce a small configuration comment; keep that with the copied tree. The web editor exports to your clipboard and never writes to GitHub.
 
+To include an attribution footer, press `t` in the terminal editor or select **Add “Maintained with treestamp” footer** in the web editor's settings. This option is off by default. It adds `Maintained with [treestamp](https://github.com/reponomics/treestamp)` below the closing code fence (or below the Markdown list) and above `<!-- treestamp:end -->`. Loading or updating the document preserves the choice; toggle it off to remove the trailer.
+
 <details>
 <summary>Write directly from the terminal editor</summary>
 

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Input, Static, TextArea
 
-from treestamp.document import parse_document
+from treestamp.document import ATTRIBUTION, parse_document
 from treestamp.editor import EditorController
 from treestamp.gitio import Snapshot, capture_snapshot
 from treestamp.model import Entry, Settings, build_tree
@@ -560,6 +560,7 @@ def test_rejected_style_change_preserves_draft_and_controls(
             await press(pilot, "s")
             assert app.session.settings.style == "unicode"
             assert "Style: Unicode" in rendered_text(app.summary_widget)
+            assert "Attribution: off" in rendered_text(app.summary_widget)
             assert "draft retained" in rendered_text(app.status_widget)
             assert original() == before
 
@@ -579,7 +580,11 @@ def test_controls_remain_visible_and_reflect_view_settings(
                 assert widget.virtual_size.width <= size[0]
             assert "Counts: on" in rendered_text(app.summary_widget)
             assert "Style: Unicode" in rendered_text(app.summary_widget)
-            await press(pilot, "down", "h", "H", "c", "s")
+            await press(pilot, "down", "h", "H", "c", "s", "t")
+            assert app.attribution_widget.display
+            assert app.attribution_widget.region.bottom <= size[1]
+            for widget in app.query(".controls, #summary"):
+                assert widget.region.bottom <= size[1]
             summary = rendered_text(app.summary_widget)
             assert "Counts: off" in summary
             assert "Style: ASCII" in summary
@@ -590,6 +595,46 @@ def test_controls_remain_visible_and_reflect_view_settings(
             assert "This does not change which entries are printed" in help_text
             await press(pilot, "escape")
             assert app.tree_view.has_focus
+
+    asyncio.run(journey())
+
+
+def test_attribution_toggle_write_load_and_print(editor: EditorController) -> None:
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test() as pilot:
+            assert not app.session.settings.attribution
+            assert not app.attribution_widget.display
+            await press(pilot, "t")
+            assert app.editor.dirty
+            assert "Attribution: on" in rendered_text(app.summary_widget)
+            assert ATTRIBUTION in app.editor.region_text()
+            assert app.attribution_widget.display
+            assert "Maintained with treestamp" in rendered_text(app.attribution_widget)
+            await press(pilot, "v")
+            assert app.screen.query_one(TextArea).text.endswith(f"\n\n{ATTRIBUTION}\n")
+            await press(pilot, "escape")
+            field = await prompt(pilot, "n")
+            field.value = "attributed.md"
+            await press(pilot, "enter")
+            assert not app.editor.dirty
+            await press(pilot, "t")
+            assert ATTRIBUTION not in app.editor.region_text()
+            assert not app.attribution_widget.display
+            await press(pilot, "v")
+            assert ATTRIBUTION not in app.screen.query_one(TextArea).text
+            await press(pilot, "escape")
+            assert app.editor.dirty
+            # Restore the saved choice through the editor's load flow.
+            field = await prompt(pilot, "l")
+            field.value = "attributed.md"
+            await press(pilot, "enter", "y")
+            assert app.session.settings.attribution
+            assert app.attribution_widget.display
+            assert not app.editor.dirty
+            await press(pilot, "t", "p")
+        assert app.return_value is True
+        assert ATTRIBUTION not in app.editor.region_text()
 
     asyncio.run(journey())
 

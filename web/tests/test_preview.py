@@ -310,6 +310,31 @@ def test_show_counts_and_style_are_session_only(fake: FakeGitHub) -> None:
     assert "show_counts" not in result.region and "style =" not in result.region
 
 
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_attribution_is_opt_in_and_survives_loading_and_editing(
+    fake: FakeGitHub, repo: Repo, style: str
+) -> None:
+    service, _ = service_for(fake)
+    original = preview(service)
+    assert original.state["curation"]["settings"]["attribution"] is False
+    assert "Maintained with" not in original.region
+    original.state["curation"]["settings"].update(attribution=True, style=style)
+    enabled = op(service, original, "present")
+    trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
+    assert enabled.region.endswith(f"\n\n{trailer}\n<!-- treestamp:end -->\n")
+    assert parse_document(enabled.region.encode()).settings.attribution is True
+    repo.write("README.md", enabled.region)
+    repo.commit("document with attribution")
+    loaded = preview(service, document="README.md")
+    assert loaded.state["curation"]["settings"]["attribution"] is True
+    edited = op(service, loaded, "annotate", "", "repository note")
+    assert trailer in edited.region
+    edited.state["curation"]["settings"]["attribution"] = False
+    disabled = op(service, edited, "present")
+    assert trailer not in disabled.region
+    assert parse_document(disabled.region.encode()).settings.attribution is False
+
+
 def test_byte_identity_survives_rows_state_and_operations(
     fake: FakeGitHub, repo: Repo
 ) -> None:

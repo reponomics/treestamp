@@ -50,6 +50,8 @@ class _FenceTracker:
 START_MARKER = "<!-- treestamp:start -->"
 END_MARKER = "<!-- treestamp:end -->"
 CONFIG_START = "<!-- treestamp:config"
+ATTRIBUTION_URL = "https://github.com/reponomics/treestamp"
+ATTRIBUTION = f"Maintained with [treestamp]({ATTRIBUTION_URL})"
 DEFAULT_DOCUMENT_FILE = "README.md"
 _BOUNDARY = re.compile(r"^[ \t]*<!--[ \t]*treestamp:(?:start|end)")
 
@@ -235,6 +237,13 @@ def _unfence(text: str) -> str:
     return "\n".join(lines[1:-1])
 
 
+def _split_attribution(text: str) -> tuple[str, bool]:
+    tree_text, separator, last_line = text.rpartition("\n")
+    if separator and last_line == ATTRIBUTION:
+        return _trim_blank_lines(tree_text), True
+    return text, False
+
+
 def _parse_interior(interior: bytes) -> Document:
     text = _trim_blank_lines(
         interior.decode("utf-8", "surrogateescape").replace("\r\n", "\n")
@@ -245,6 +254,7 @@ def _parse_interior(interior: bytes) -> Document:
     if text.startswith(CONFIG_START):
         payload, text = _split_metadata(text)
         settings, hidden, special = _metadata(payload)
+    text, attribution = _split_attribution(text)
     body = _unfence(text)
     style = detect_style(body, fenced=body != text)
     tree = parse_tree(body, style, root=settings.root, special_paths=special)
@@ -252,7 +262,12 @@ def _parse_interior(interior: bytes) -> Document:
     visibility = {bool(node.files or node.dirs) for node in collapsed}
     if len(visibility) > 1:
         raise MarkerError("collapsed directories must use consistent count visibility")
-    settings = replace(settings, style=style, show_counts=next(iter(visibility), True))
+    settings = replace(
+        settings,
+        style=style,
+        show_counts=next(iter(visibility), True),
+        attribution=attribution,
+    )
     document = Document(tree, settings, hidden)
     if normalized_hidden(document) != hidden:
         raise MarkerError("hidden paths require a printed expanded parent")
@@ -358,6 +373,8 @@ def render_interior(document: Document, root: str | None = None) -> str:
     )
     payload = _settings_text(document, registered)
     output = f"{CONFIG_START}\n{payload}-->\n{body}" if payload else body
+    if document.settings.attribution:
+        output += f"\n{ATTRIBUTION}\n"
     # Validate framing and metadata together before any bytes can be published.
     _parse_interior(output.encode("utf-8", "surrogateescape"))
     return output

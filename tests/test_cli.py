@@ -112,6 +112,27 @@ def test_explicit_hidden_survives_maintenance(repo: Repo) -> None:
     }
 
 
+def test_attribution_survives_check_update_and_print(repo: Repo) -> None:
+    path = stamp(repo)
+    document, _ = load_document(path)
+    assert document is not None
+    write_document(
+        replace(document, settings=replace(document.settings, attribution=True)), path
+    )
+    assert run_cli("check")[0] == 0
+    repo.write("src/new.py")
+    repo.add("src/new.py")
+    assert run_cli("check")[0] == 1
+    assert run_cli("update")[0] == 0
+    maintained, _ = load_document(path)
+    assert maintained is not None and maintained.settings.attribution
+    assert "src/new.py" in {node.path for node in maintained.tree.walk()}
+    assert run_cli("check")[0] == 0
+    code, output, error = run_cli("--print", "--document", "README.md")
+    assert code == 0 and not error
+    assert parse_document(output.encode()).settings.attribution
+
+
 @pytest.mark.parametrize("replace_source", [False, True])
 def test_comparison_preserves_annotation_and_admits_unrelated_new_paths(
     repo: Repo, replace_source: bool
