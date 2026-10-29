@@ -59,6 +59,7 @@ class Settings:
     root: str = "."
     style: str = "unicode"
     show_counts: bool = True
+    attribution: bool = False
 
     def __post_init__(self) -> None:
         if self.root != ".":
@@ -67,6 +68,8 @@ class Settings:
             raise MarkerError("style must be unicode, ascii, or list")
         if type(self.show_counts) is not bool:
             raise MarkerError("show_counts must be a boolean")
+        if type(self.attribution) is not bool:
+            raise MarkerError("attribution must be a boolean")
 
 
 def repo_path(path: str, root: str) -> str:
