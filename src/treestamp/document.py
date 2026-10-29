@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, overload
 
-from treestamp.codec import detect_style, parse_tree, render_tree, special_paths
+from treestamp.codec import detect_style, parse_tree, render_tree_with_paths
 from treestamp.errors import MarkerError
 from treestamp.gitio import checked_path, document_path
 from treestamp.model import Node, Settings, read_path_value, tree_path
@@ -169,7 +169,30 @@ def _path_array(value: object, key: str, root: str) -> frozenset[str]:
     return frozenset(paths)
 
 
-def _metadata(text: str) -> tuple[Settings, frozenset[str], frozenset[str]]:
+def _special_path_record(item: object) -> tuple[int, object]:
+    if isinstance(item, str) or isinstance(item, dict) and set(item) == {"git_bytes"}:
+        raise MarkerError("legacy special_paths format; regenerate this treestamp")
+    if not isinstance(item, dict) or set(item) != {"row", "path"}:
+        raise MarkerError("each special_paths record must contain row and path")
+    row = item["row"]
+    if type(row) is not int or row <= 0:
+        raise MarkerError("special-path row must be a positive integer")
+    return row, item["path"]
+
+
+def _special_path_array(value: object) -> dict[int, str]:
+    if not isinstance(value, list):
+        raise MarkerError("special_paths must be an array of row/path records")
+    result: dict[int, str] = {}
+    for item in value:
+        row, path = _special_path_record(item)
+        if row in result:
+            raise MarkerError("special_paths contains duplicate rows")
+        result[row] = read_path_value(path)
+    return result
+
+
+def _metadata(text: str) -> tuple[Settings, frozenset[str], dict[int, str]]:
     try:
         values = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
@@ -179,9 +202,7 @@ def _metadata(text: str) -> tuple[Settings, frozenset[str], frozenset[str]]:
         raise MarkerError(f"unknown document settings: {', '.join(sorted(unknown))}")
     settings = Settings(root=read_path_value(values.get("root", ".")))
     hidden = _path_array(values.get("hidden", []), "hidden", settings.root)
-    special = _path_array(
-        values.get("special_paths", []), "special_paths", settings.root
-    )
+    special = _special_path_array(values.get("special_paths", []))
     return settings, hidden, special
 
 
@@ -220,7 +241,7 @@ def _parse_interior(interior: bytes) -> Document:
     )
     settings = Settings()
     hidden: frozenset[str] = frozenset()
-    special: frozenset[str] = frozenset()
+    special: dict[int, str] = {}
     if text.startswith(CONFIG_START):
         payload, text = _split_metadata(text)
         settings, hidden, special = _metadata(payload)
@@ -311,17 +332,20 @@ def normalized_hidden(document: Document) -> frozenset[str]:
     return frozenset(result)
 
 
-def _settings_text(document: Document) -> str:
+def _settings_text(document: Document, registered: dict[int, str]) -> str:
     rows = []
     if document.settings.root != ".":
         rows.append(f"root = {_path_literal(document.settings.root)}")
-    for key, paths in (
-        ("hidden", normalized_hidden(document)),
-        ("special_paths", special_paths(document.tree, document.settings.root)),
-    ):
-        if paths:
-            values = ", ".join(_path_literal(path) for path in sorted(paths))
-            rows.append(f"{key} = [{values}]")
+    hidden = normalized_hidden(document)
+    if hidden:
+        values = ", ".join(_path_literal(path) for path in sorted(hidden))
+        rows.append(f"hidden = [{values}]")
+    if registered:
+        values = ", ".join(
+            f"{{row = {row}, path = {_path_literal(path)}}}"
+            for row, path in registered.items()
+        )
+        rows.append(f"special_paths = [{values}]")
     return "".join(row + "\n" for row in rows)
 
 
@@ -329,8 +353,10 @@ def render_interior(document: Document, root: str | None = None) -> str:
     """Render the interior using repository-relative config identities."""
     if root is not None:
         document = replace(document, settings=replace(document.settings, root=root))
-    payload = _settings_text(document)
-    body = render_tree(document.tree, document.settings, fenced=True)
+    body, registered = render_tree_with_paths(
+        document.tree, document.settings, fenced=True
+    )
+    payload = _settings_text(document, registered)
     output = f"{CONFIG_START}\n{payload}-->\n{body}" if payload else body
     # Validate framing and metadata together before any bytes can be published.
     _parse_interior(output.encode("utf-8", "surrogateescape"))

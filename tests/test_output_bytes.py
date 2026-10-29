@@ -110,7 +110,7 @@ def test_headless_hash_collision_update_and_check_preserve_authored_notes(
     repo.write("notes  # draft.md")
     repo.add("notes  # draft.md")
     output = cli_bytes(repo, "--print")
-    assert b'special_paths = ["notes  # draft.md"]' in output
+    assert b'special_paths = [{row = 3, path = "notes  # draft.md"}]' in output
     output = output.replace(
         b"notes  # draft.md\n", b"notes  # draft.md  # Keep # this note\n"
     )

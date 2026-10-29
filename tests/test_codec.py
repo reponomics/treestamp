@@ -426,7 +426,7 @@ def test_ordinary_names_need_no_quotes_or_extra_marker(style: str) -> None:
     tree = build_tree(Entry(name) for name in names)
     settings = Settings(style=style)
     printed = render_tree(tree, settings)
-    assert special_paths(tree) == frozenset()
+    assert special_paths(tree) == {}
     for name in names:
         assert name in printed
     assert parse_tree(printed, style) == tree
@@ -507,16 +507,14 @@ def test_special_directory_establishes_identity_for_ordinary_children(
     )
     settings = Settings(root="src", style=style)
     paths = special_paths(tree, settings.root)
-    assert paths == frozenset(
-        {
-            "src/notes  # drafts",
-            "src/notes  # drafts/another  # draft.md",
-        }
-    )
+    assert paths == {
+        1: "src/notes  # drafts",
+        4: "src/notes  # drafts/another  # draft.md",
+    }
     text = render_tree(tree, settings)
     assert parse_tree(text, style, root="src", special_paths=paths) == tree
     collapsed = replace(tree, children=(replace(tree.children[0], children=()),))
-    assert special_paths(collapsed, "src") == frozenset({"src/notes  # drafts"})
+    assert special_paths(collapsed, "src") == {1: "src/notes  # drafts"}
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
@@ -543,14 +541,14 @@ def test_special_name_roundtrip_preserves_bytes_and_controls(
 @pytest.mark.parametrize(
     "paths",
     [
-        frozenset({"unused  # path"}),
-        frozenset({"ordinary"}),
-        frozenset({"other/a  # b"}),
-        frozenset({"../escape  # path"}),
+        {1: "unused  # path"},
+        {1: "ordinary"},
+        {1: "other/a  # b"},
+        {1: "../escape  # path"},
     ],
 )
 def test_special_registrations_must_match_visible_scoped_names(
-    paths: frozenset[str],
+    paths: dict[int, str],
 ) -> None:
     with pytest.raises(MarkerError):
         parse_tree("./\n└── ordinary\n", special_paths=paths)
@@ -558,7 +556,7 @@ def test_special_registrations_must_match_visible_scoped_names(
 
 @pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
 @pytest.mark.parametrize("reverse", [False, True])
-def test_special_name_prefixes_resolve_using_all_registered_identities(
+def test_special_name_prefixes_resolve_using_row_identities(
     style: str, reverse: bool
 ) -> None:
     tree = build_tree([Entry("x  # y"), Entry("x  # y  # z")])
@@ -569,7 +567,7 @@ def test_special_name_prefixes_resolve_using_all_registered_identities(
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
-def test_special_parent_assignment_uses_descendant_registrations(style: str) -> None:
+def test_special_parents_and_children_resolve_by_row(style: str) -> None:
     tree = build_tree(
         [Entry("x  # y/a  # b"), Entry("x  # y  # z/a  # b"), Entry("ordinary")]
     )
@@ -578,35 +576,22 @@ def test_special_parent_assignment_uses_descendant_registrations(style: str) -> 
     assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
 
 
-def test_multiple_complete_special_identity_assignments_are_rejected() -> None:
-    with pytest.raises(MarkerError, match="ambiguous special-path"):
-        parse_tree(
-            "./\n├── x  # y\n└── x  # y\n",
-            special_paths=frozenset({"x  # y"}),
-        )
-
-
-def test_special_identity_search_limit_is_an_explicit_error(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("registered_row", [1, 2])
+def test_identical_printed_rows_have_exact_registered_identities(
+    registered_row: int,
 ) -> None:
-    monkeypatch.setattr("treestamp.codec.MAX_IDENTITY_BRANCHES", 0)
-    with pytest.raises(
-        MarkerError, match="identity resolution exceeds the search limit"
-    ):
-        parse_tree(
-            "./\n├── x  # y\n└── ordinary\n",
-            special_paths=frozenset({"x  # y"}),
-        )
+    tree = parse_tree(
+        "./\n├── x  # y\n└── x  # y\n",
+        special_paths={registered_row: "x  # y"},
+    )
+    special = tree.children[registered_row - 1]
+    ordinary = tree.children[2 - registered_row]
+    assert (special.path, special.annotation) == ("x  # y", "")
+    assert (ordinary.path, ordinary.annotation) == ("x", "y")
 
 
-def test_special_path_limit_precedes_row_parsing() -> None:
-    # The ceiling is per tree, even when registrations have different parents.
-    paths = frozenset(f"dir{i}/file  # suffix" for i in range(101))
-    with pytest.raises(MarkerError, match="special_paths supports at most 100 entries"):
-        parse_tree("invalid tree", special_paths=paths)
-
-
-def test_filename_and_annotation_overlap_cannot_duplicate_registered_identity() -> None:
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_filename_and_annotation_overlap_keeps_registered_identity(style: str) -> None:
     tree = Node(
         ".",
         "",
@@ -616,8 +601,102 @@ def test_filename_and_annotation_overlap_cannot_duplicate_registered_identity() 
             Node("x  # y", "x  # y", "file"),
         ),
     )
-    with pytest.raises(MarkerError, match="cannot represent"):
-        render_tree(tree, Settings())
+    printed = render_tree(tree, Settings(style=style))
+    assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_registered_prefix_file_and_directory_remain_distinct(style: str) -> None:
+    tree = Node(
+        ".",
+        "",
+        "dir",
+        children=(
+            Node("x  # y", "x  # y", "file", annotation="z"),
+            Node(
+                "x  # y  # z",
+                "x  # y  # z",
+                "dir",
+                children=(Node("ordinary", "x  # y  # z/ordinary", "file"),),
+            ),
+        ),
+    )
+    settings = Settings(root="src", style=style)
+    printed = render_tree(tree, settings)
+    assert (
+        parse_tree(printed, style, root="src", special_paths=special_paths(tree, "src"))
+        == tree
+    )
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_registered_rows_preserve_types_targets_and_counts(style: str) -> None:
+    tree = Node(
+        ".",
+        "",
+        "dir",
+        children=(
+            Node(
+                "dir  # name", "dir  # name", "dir", files=3, dirs=2, annotation="note"
+            ),
+            Node("link  # name", "link  # name", "symlink", target="dir/file"),
+            Node(
+                "module  # name",
+                "module  # name",
+                "gitlink",
+                annotation="nested  # note",
+            ),
+        ),
+    )
+    printed = render_tree(tree, Settings(style=style))
+    assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        {0: "x  # y"},
+        {-1: "x  # y"},
+        {3: "x  # y"},
+        {True: "x  # y"},
+        {1: "x  # y", 2: "x  # y"},
+        {1: "parent/x  # y"},
+    ],
+)
+def test_invalid_row_registrations_are_rejected(paths: dict[int, str]) -> None:
+    with pytest.raises(MarkerError):
+        parse_tree("./\n├── x  # y\n└── ordinary\n", special_paths=paths)
+
+
+@pytest.mark.parametrize("suffix", ["extra", " [gitlink]extra", "/junk"])
+def test_registered_name_requires_a_valid_suffix(suffix: str) -> None:
+    with pytest.raises(MarkerError):
+        parse_tree(f"./\n└── x  # y{suffix}\n", special_paths={1: "x  # y"})
+
+
+@pytest.mark.parametrize("ordinary_count", [400, 6400])
+def test_special_rows_do_not_revisit_following_ordinary_rows(
+    ordinary_count: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from treestamp import codec
+
+    names = [f"special{i:02d}  # suffix" for i in range(10)]
+    rows = [*names, *(f"ordinary{i:04d}" for i in range(ordinary_count))]
+    text = "./\n" + "".join(f"├── {name}\n" for name in rows)
+    original = codec._parse_row
+    calls = 0
+
+    def counted(
+        text: str, parent: str, *, root: bool = False, markdown: bool = False
+    ) -> Node:
+        nonlocal calls
+        calls += 1
+        return original(text, parent, root=root, markdown=markdown)
+
+    monkeypatch.setattr(codec, "_parse_row", counted)
+    parsed = parse_tree(text, special_paths=dict(enumerate(names, 1)))
+    assert [node.path for node in parsed.children] == rows
+    assert calls == len(rows) + 1
 
 
 @pytest.mark.parametrize("target", ["ordinary  # target", "null"])

@@ -175,6 +175,32 @@ def test_open_updates_before_editing_and_keeps_baseline(
     assert noted.state["revision"] == updated.state["revision"] + 1
 
 
+def test_special_row_identity_survives_hosted_annotation_and_visibility_edits(
+    fake: FakeGitHub, repo: Repo
+) -> None:
+    repo.write("special/x")
+    repo.write("special/x  # y")
+    stamp(repo, root="special")
+    service, _ = service_for(fake)
+    loaded = preview(service)
+    assert loaded.loaded and not loaded.dirty
+    # Both rows now print the same name/annotation text, but their row metadata
+    # preserves the two distinct filenames through each API round trip.
+    annotated = op(service, loaded, "annotate", "x", "y")
+    parsed = parse_document(annotated.region.encode())
+    assert {node.path: node.annotation for node in parsed.tree.walk()} == {
+        "x": "y",
+        "x  # y": "",
+    }
+    hidden = op(service, annotated, "hide", "x  # y")
+    assert "special_paths" not in hidden.region
+    assert parse_document(hidden.region.encode()).hidden == frozenset(
+        {"special/x  # y"}
+    )
+    restored = op(service, hidden, "unhide", "x  # y")
+    assert restored.region == annotated.region
+
+
 def test_root_is_repo_relative_and_absent_subtree_is_valid(
     fake: FakeGitHub, repo: Repo
 ) -> None:

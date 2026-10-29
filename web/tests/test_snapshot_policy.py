@@ -200,7 +200,7 @@ def test_failed_candidate_edit_preserves_previously_accepted_document(fake, repo
     repo.commit("annotation collision fixture")
     service, _ = service_for(fake)
     first = preview(service, document="")
-    with pytest.raises(PreviewError, match="cannot represent"):
-        op(service, first, "annotate", "x", "y")
+    with pytest.raises(PreviewError, match="single line"):
+        op(service, first, "annotate", "x", "invalid\nnote")
     restored = op(service, first, "restore")
     assert restored.state == first.state and restored.region == first.region

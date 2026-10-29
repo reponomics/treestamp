@@ -1,6 +1,5 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
-import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -408,8 +407,8 @@ def test_config_is_only_curation_and_minimal_special_identities(style: str) -> N
     assert 'root = "src"' in region
     assert 'hidden = ["src/hidden"]' in region
     assert (
-        'special_paths = ["src/notes  # drafts", "src/notes  # drafts/a  # b"]'
-        in region
+        'special_paths = [{row = 1, path = "src/notes  # drafts"}, '
+        '{row = 2, path = "src/notes  # drafts/a  # b"}]' in region
     )
     assert "style =" not in region and "show_counts =" not in region
     assert parse_document(region.encode()) == source
@@ -425,33 +424,13 @@ def test_root_only_style_and_count_inference(style: str) -> None:
     assert loaded.settings.show_counts is True
 
 
-@pytest.mark.parametrize("count", [100, 101])
-def test_special_path_limit_applies_to_document_loading_and_rendering(
-    count: int,
-) -> None:
-    names = [f"file{i:03d}  # suffix" for i in range(count)]
-    # Ordinary entries do not count toward the special-path ceiling.
-    tree = build_tree([Entry(name) for name in [*names, "ordinary.txt"]])
-    document = Document(tree)
-    content = (
-        "<!-- treestamp:start -->\n<!-- treestamp:config\nspecial_paths = "
-        + json.dumps(names)
-        + "\n-->\n```\n./\n"
-        + "".join(f"├── {name}\n" for name in names)
-        + "└── ordinary.txt\n```\n<!-- treestamp:end -->\n"
-    ).encode()
-    if count == 100:
-        assert parse_document(content) == document
-        assert parse_document(render_region(document).encode()) == document
-    else:
-        with pytest.raises(
-            MarkerError, match="special_paths supports at most 100 entries"
-        ):
-            parse_document(content)
-        with pytest.raises(
-            MarkerError, match="special_paths supports at most 100 entries"
-        ):
-            render_region(document)
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_more_than_100_special_entries_roundtrip(style: str) -> None:
+    names = [f"file{i:03d}  # suffix" for i in range(120)]
+    document = Document(
+        build_tree([Entry(name) for name in names]), Settings(style=style)
+    )
+    assert parse_document(render_region(document).encode()) == document
 
 
 def test_count_visibility_inferred_without_config() -> None:
@@ -485,6 +464,75 @@ def test_invalid_metadata_never_reconstructs_another_identity(payload: str) -> N
         parse_document(content.encode())
 
 
+@pytest.mark.parametrize(
+    "records",
+    [
+        '[{row = 1, path = "x  # y"}, {row = 1, path = "z  # q"}]',
+        '[{row = 1, path = "x  # y"}, {row = 2, path = "x  # y"}]',
+        '[{row = true, path = "x  # y"}]',
+        '[{row = 1.0, path = "x  # y"}]',
+        '[{row = "1", path = "x  # y"}]',
+        '[{row = 0, path = "x  # y"}]',
+        '[{row = -1, path = "x  # y"}]',
+        '[{row = 3, path = "x  # y"}]',
+        "[{row = 1}]",
+        '[{path = "x  # y"}]',
+        '[{row = 1, path = "x  # y", extra = 0}]',
+        "[{row = 1, path = 4}]",
+        '[{row = 1, path = {git_bytes = "invalid"}}]',
+        '[{row = 1, path = "other  # name"}]',
+        '[{row = 1, path = "parent/x  # y"}]',
+        '[{row = 1, path = "../x  # y"}]',
+        '[{row = 1, path = "ordinary"}]',
+        "[4]",
+        '{row = 1, path = "x  # y"}',
+    ],
+)
+def test_invalid_special_row_metadata_is_rejected(records: str) -> None:
+    content = (
+        f"<!-- treestamp:start -->\n<!-- treestamp:config\nspecial_paths = {records}\n"
+        "-->\n```\n./\n├── x  # y\n└── z  # q\n```\n<!-- treestamp:end -->\n"
+    ).encode()
+    with pytest.raises(MarkerError):
+        parse_document(content)
+
+
+@pytest.mark.parametrize(
+    "records",
+    ['["x  # y"]', '[{git_bytes = "782020232079"}]'],
+)
+def test_legacy_special_metadata_requires_regeneration(records: str) -> None:
+    content = (
+        f"<!-- treestamp:start -->\n<!-- treestamp:config\nspecial_paths = {records}\n"
+        "-->\n```\n./\n└── x  # y\n```\n<!-- treestamp:end -->\n"
+    ).encode()
+    with pytest.raises(MarkerError, match="legacy special_paths format; regenerate"):
+        parse_document(content)
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_manual_annotations_preserve_registered_row_identities(
+    style: str, eol: str
+) -> None:
+    source = Document(
+        build_tree([Entry("x"), Entry("x  # y"), Entry("x  # y  # z")]),
+        Settings(style=style),
+    )
+    region = render_region(source).replace("\n", eol)
+    # Change only row annotations; leave the generated registrations untouched.
+    edited = region.replace("x" + eol, "x  # y" + eol).replace(
+        "x  # y  # z" + eol, "x  # y  # z  # another  # note" + eol
+    )
+    content = ("# Outside the region" + eol * 3 + edited + eol + "After.").encode()
+    loaded = parse_document(content)
+    assert {node.path: node.annotation for node in loaded.tree.walk()} == {
+        "x": "y",
+        "x  # y": "",
+        "x  # y  # z": "another  # note",
+    }
+
+
 def test_hidden_cannot_overlap_printed_rows_or_live_under_a_collapsed_directory() -> (
     None
 ):
@@ -504,11 +552,16 @@ def test_region_extraction_preserves_original_framing_and_endings() -> None:
         extract_region(b"ordinary document")
 
 
-def test_byte_special_paths_roundtrip_without_redundant_descendants() -> None:
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("root", [".", "src  # root"])
+def test_byte_special_paths_roundtrip_without_redundant_descendants(
+    style: str, root: str
+) -> None:
     source = Document(
         build_tree(
             [Entry("bad\udcff  # dir/plain"), Entry("bad\udcff  # dir/child  # name")]
-        )
+        ),
+        Settings(root=root, style=style),
     )
     content = render_region(source).encode()
     assert b"git_bytes" in content

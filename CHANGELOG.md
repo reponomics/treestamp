@@ -4,7 +4,7 @@
 
 ### Bug Fixes
 
-- Limit documents to 100 displayed entries whose names contain the annotation delimiter (`  # `), bounding the number of special-path registrations considered during parsing. Loading or rendering a document above this limit now fails explicitly; use fewer displayed special names or a smaller subtree.
+- Replace special-path identity backtracking with direct row-number-plus-path registrations, removing the branch limit and 100-registration ceiling. **Format change:** documents using the old path-only `special_paths` array must be regenerated from the repository; loading them reports an explicit error. Documents without special registrations remain valid.
 
 ## [0.1.2](https://github.com/reponomics/treestamp/compare/v0.1.1...v0.1.2) (2026-10-28)
 

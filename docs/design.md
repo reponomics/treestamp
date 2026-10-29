@@ -118,11 +118,11 @@ The terminal editor is a keyboard-driven Textual application. Arrow keys, Space,
 
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
-The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
+The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
-A document supports at most 100 `special_paths` entries across its displayed tree. Loading or rendering a tree that exceeds this limit fails with an explicit error. Ordinary filenames do not count toward the limit; hide entries, collapse directories, or select a smaller subtree to reduce the number of displayed special names.
+`special_paths` uses records such as `{ row = 1, path = "notes  # drafts" }`. Row indices start at 0 for the root and count only tree rows, excluding markers, metadata, and fences; the root itself cannot be registered. Paths are repository-relative strings or `git_bytes` values. The renderer regenerates registrations from the printed rows, excluding hidden entries and descendants of collapsed directories. An ordinary child of a specially named directory needs no registration of its own.
 
-That ceiling does not prevent expensive identity-search backtracking with fewer registrations. [Resolve special filenames by row](special-path-resolution.md) documents the remaining problem and the recommended replacement format; it is not yet implemented. Manual tree edits are supported only for annotation text. Treestamp owns filenames, structure, and generated metadata.
+Each registered row resolves directly to its specified path after parent and filename validation, without searching alternative interpretations. The former backtracking resolver and 100-registration ceiling are removed. [Resolve special filenames by row](special-path-resolution.md) describes the format and the problem it addresses. Old path-only registrations are rejected with a regeneration error; documents without special registrations remain valid. Manual tree edits are supported only for annotation text. Treestamp owns filenames, structure, and generated metadata.
 
 ### Pre-commit hooks
 
