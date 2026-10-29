@@ -4,6 +4,13 @@
     </picture>
 </div>
 
+<br>
+
+![OSSF-Scorecard Score](https://img.shields.io/ossf-scorecard/github.com/reponomics/treestamp?style=flat&label=OpenSSF%20Scorecard)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15900/baseline)](https://www.bestpractices.dev/projects/15900)
+[![CodeQL](https://github.com/reponomics/treestamp/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/reponomics/treestamp/actions/workflows/github-code-scanning/codeql)
+
+
 # treestamp
 
 Turn your repository into a directory tree for your README. Choose what to show, add short notes, and copy the result—from your terminal or browser.
