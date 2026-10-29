@@ -3,6 +3,8 @@ name: OSV dependency scan
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   schedule:
     - cron: "7 10 * * 1"
   workflow_dispatch:
@@ -70,8 +72,11 @@ jobs:
             uv.lock
           retention-days: 5
       - name: Upload SARIF to code scanning
-        # Private repositories may not have GitHub Code Security enabled.
-        if: ${{ !cancelled() && !github.event.repository.private && hashFiles('osv-scanner.sarif') != '' }}
+        # Private repositories may not have GitHub Code Security enabled, and
+        # pull requests from forks receive a token that cannot upload results.
+        if: >-
+          ${{ !cancelled() && !github.event.repository.private && hashFiles('osv-scanner.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: osv-scanner.sarif
