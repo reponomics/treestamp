@@ -118,7 +118,9 @@ The terminal editor is a keyboard-driven Textual application. Arrow keys, Space,
 
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
-The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
+The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
+
+[Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and generated metadata.
 
 ### Pre-commit hooks
 

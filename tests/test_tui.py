@@ -520,17 +520,22 @@ def test_invalid_annotation_keeps_draft_and_prompt_for_correction(repo: Repo) ->
         async with app.run_test() as pilot:
             await press(pilot, "down")
             field = await prompt(pilot, "a")
-            field.value = "y"
+            field.value = "invalid\x00note"
             await press(pilot, "enter")
             assert isinstance(app.screen, PromptScreen)
-            assert app.screen.query_one(Input).value == "y"
+            assert app.screen.query_one(Input).value == "invalid\x00note"
             assert "draft retained" in rendered_text(app.status_widget)
             assert editor.region_text() == before
             assert app.cursor.path == "x"
-            app.screen.query_one(Input).value = "valid note"
+            app.screen.query_one(Input).value = "y"
             await press(pilot, "enter")
             assert not isinstance(app.screen, PromptScreen)
-            assert editor.state.session.annotations["x"] == "valid note"
+            assert editor.state.session.annotations["x"] == "y"
+            loaded = parse_document(editor.region_text().encode())
+            assert {node.path: node.annotation for node in loaded.tree.walk()} == {
+                "x": "y",
+                "x  # y": "",
+            }
 
     asyncio.run(journey())
 
