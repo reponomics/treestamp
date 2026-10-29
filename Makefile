@@ -4,7 +4,7 @@ PYTHON ?= python3
 UV ?= uv
 UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
-FLY ?= fly
+FLY ?= flyctl
 ACTIONLINT ?= actionlint
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
