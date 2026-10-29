@@ -157,6 +157,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── tui.py
 │       └── tui_dialogs.py
 ├── tests/ (16 files)  # Contract and integration tests
+├── vex/ (1 file)
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)

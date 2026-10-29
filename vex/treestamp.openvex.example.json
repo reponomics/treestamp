@@ -1,0 +1,27 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/reponomics/treestamp/blob/main/vex/treestamp.openvex.json",
+  "author": "Reponomics",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-0000-00000"
+      },
+      "products": [
+        {
+          "@id": "pkg:pypi/treestamp@X.Y.Z",
+          "subcomponents": [
+            {
+              "@id": "pkg:pypi/textual@X.Y.Z"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Placeholder: one sentence explaining why the vulnerable code in this dependency cannot be reached or exploited through treestamp."
+    }
+  ]
+}
