@@ -16,7 +16,7 @@ from textual.binding import Binding
 from textual.widgets import Label, ListItem, ListView, Static
 
 from treestamp.codec import format_counts
-from treestamp.document import DEFAULT_DOCUMENT_FILE
+from treestamp.document import ATTRIBUTION_URL, DEFAULT_DOCUMENT_FILE
 from treestamp.errors import TreestampError
 from treestamp.model import KIND_GITLINK, KIND_SYMLINK
 from treestamp.tui_dialogs import (
@@ -167,6 +167,7 @@ _HELP = (
     "                This does not change which entries are printed.",
     "c               Show or hide counts on collapsed directories",
     "s               Switch between Unicode, ASCII, and list styles",
+    "t               Include or remove the Maintained with treestamp trailer",
     "",
     "DOCUMENT",
     "N               New document: choose a tree root",
@@ -213,6 +214,14 @@ def _cycle_style(session: TreeSession) -> str:
     return f"Printed style: {style}."
 
 
+def _toggle_attribution(session: TreeSession) -> str:
+    enabled = not session.settings.attribution
+    session.settings = replace(session.settings, attribution=enabled)
+    return (
+        "Attribution trailer included." if enabled else "Attribution trailer removed."
+    )
+
+
 class TreestampApp(App[bool]):
     """Edit a TreeSession; Textual widgets never discover or modify project files."""
 
@@ -232,6 +241,7 @@ class TreestampApp(App[bool]):
         Binding("a", "annotate", "Annotate"),
         Binding("c", "counts", "Show counts"),
         Binding("s", "style", "Tree style"),
+        Binding("t", "attribution", "Attribution trailer"),
         Binding("N", "new", "New document"),
         Binding("v", "preview", "Preview tree"),
         Binding("y", "copy", "Copy treestamp"),
@@ -249,6 +259,7 @@ class TreestampApp(App[bool]):
     #tree ListItem { height: 1; padding: 0; }
     #tree Label { height: 1; text-wrap: nowrap; }
     #tree .hidden-entry Label { text-style: dim; }
+    #attribution { height: auto; margin-top: 1; }
     #status, #summary, .controls { height: auto; }
     #status { color: $text-muted; border-top: solid $primary-muted; }
     #summary, .controls { background: $surface; }
@@ -262,6 +273,11 @@ class TreestampApp(App[bool]):
         self.session = editor.state.session
         self.cursor = Cursor(self.session)
         self.tree_view = ListView(id="tree")
+        self.attribution_widget = Static(
+            f'Maintained with [link="{ATTRIBUTION_URL}"]treestamp[/link]',
+            id="attribution",
+        )
+        self.attribution_widget.display = False
         self.status_widget = Static("", markup=False, id="status")
         self.summary_widget = Static("", id="summary")
         self._rebuilding = False
@@ -270,6 +286,7 @@ class TreestampApp(App[bool]):
     def compose(self) -> ComposeResult:
         yield Static("treestamp", markup=False, id="title")
         yield self.tree_view
+        yield self.attribution_widget
         yield self.status_widget
         yield Static(
             "[bold]Tree[/]     ↑↓ Select  ←→ Expand/collapse  Space Toggle  "
@@ -391,10 +408,12 @@ class TreestampApp(App[bool]):
         finally:
             self._rebuilding = False
         files, dirs = self.session.hidden_stats()
+        self.attribution_widget.display = self.session.settings.attribution
         self.summary_widget.update(
             "[bold]View[/]     "
             f"c Counts: {'on' if self.session.show_counts else 'off'}  "
             f"s Style: {STYLE_LABELS[self.session.settings.style]}  "
+            f"t Attribution: {'on' if self.session.settings.attribution else 'off'}  "
             f"H Hidden: {'shown' if self.session.show_hidden else 'concealed'} "
             f"({files + dirs})  S Unhide all"
         )
@@ -471,6 +490,9 @@ class TreestampApp(App[bool]):
 
     async def action_style(self) -> None:
         await self._edit_and_refresh(partial(_cycle_style, self.session))
+
+    async def action_attribution(self) -> None:
+        await self._edit_and_refresh(partial(_toggle_attribution, self.session))
 
     def action_annotate(self) -> None:
         self._sync_cursor()

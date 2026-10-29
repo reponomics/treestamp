@@ -7,6 +7,7 @@ import pytest
 
 from treestamp.codec import parse_tree
 from treestamp.document import (
+    ATTRIBUTION,
     Document,
     load_document,
     normalized_hidden,
@@ -369,6 +370,64 @@ def test_default_document_has_no_config_noise(document: Document) -> None:
     region = render_region(document, ".")
     assert "treestamp:config" not in region
     assert parse_document(region.encode()) == document
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_attribution_round_trip_and_removal(
+    document: Document, tmp_path: Path, style: str, eol: str
+) -> None:
+    source = replace(
+        document,
+        settings=Settings(style=style, attribution=True),
+        hidden=frozenset({"hidden.txt"}),
+    )
+    region = render_region(source)
+    assert region.endswith(f"\n\n{ATTRIBUTION}\n{END.decode()}\n")
+    if style != "list":
+        assert f"```\n\n{ATTRIBUTION}" in region
+    path = tmp_path / "README.md"
+    original = ("Before\n" + region + "After\n").replace("\n", eol).encode()
+    path.write_bytes(original)
+    loaded, snapshot = load_document(path)
+    assert loaded == source
+    assert prepare_write(loaded, path, expected=snapshot).content == original
+    disabled = replace(source, settings=replace(source.settings, attribution=False))
+    result = write_document(disabled, path, expected=snapshot)
+    expected = original.replace(
+        ("\n" + ATTRIBUTION + "\n").replace("\n", eol).encode(), b""
+    )
+    assert result.content == expected
+    assert load_document(path)[0] == disabled
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_attribution_in_annotation_does_not_enable_trailer(
+    document: Document, style: str
+) -> None:
+    source = replace(
+        document,
+        settings=Settings(style=style),
+        tree=replace(document.tree, annotation=ATTRIBUTION),
+    )
+    assert parse_document(render_region(source).encode()) == source
+
+
+@pytest.mark.parametrize("trailer", [ATTRIBUTION + "\n" + ATTRIBUTION, "Other prose"])
+def test_invalid_trailing_prose_is_not_silently_discarded(
+    document: Document, trailer: str
+) -> None:
+    content = render_region(document).replace(
+        END.decode(), trailer + "\n" + END.decode()
+    )
+    with pytest.raises(MarkerError):
+        parse_document(content.encode())
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "true"])
+def test_attribution_requires_boolean(value: object) -> None:
+    with pytest.raises(MarkerError, match="attribution must be a boolean"):
+        Settings(attribution=value)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("ending", [b"\n", b"\r\n"])

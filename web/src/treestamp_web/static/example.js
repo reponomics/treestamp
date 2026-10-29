@@ -22,7 +22,8 @@ export const EXAMPLES = {
     "settings": {
       "root": ".",
       "style": "unicode",
-      "show_counts": true
+      "show_counts": true,
+      "attribution": false
     },
     "entries": 45,
     "root_children": 3,
@@ -36,7 +37,8 @@ export const EXAMPLES = {
         "settings": {
           "root": ".",
           "style": "unicode",
-          "show_counts": true
+          "show_counts": true,
+          "attribution": false
         },
         "expanded": [
           ".github",
@@ -202,7 +204,8 @@ export const EXAMPLES = {
     "settings": {
       "root": ".",
       "style": "unicode",
-      "show_counts": true
+      "show_counts": true,
+      "attribution": false
     },
     "entries": 523,
     "root_children": 9,
@@ -216,7 +219,8 @@ export const EXAMPLES = {
         "settings": {
           "root": ".",
           "style": "unicode",
-          "show_counts": true
+          "show_counts": true,
+          "attribution": false
         },
         "expanded": [
           "dashboard_action",
@@ -483,7 +487,8 @@ export const EXAMPLES = {
     "settings": {
       "root": "src",
       "style": "unicode",
-      "show_counts": true
+      "show_counts": true,
+      "attribution": false
     },
     "entries": 33,
     "root_children": 9,
@@ -497,7 +502,8 @@ export const EXAMPLES = {
         "settings": {
           "root": "src",
           "style": "unicode",
-          "show_counts": true
+          "show_counts": true,
+          "attribution": false
         },
         "expanded": [
           "routes"

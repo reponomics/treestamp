@@ -6,6 +6,7 @@ from dataclasses import replace
 import pytest
 
 from treestamp.document import (
+    ATTRIBUTION,
     Document,
     load_document,
     parse_document,
@@ -28,6 +29,23 @@ def make_editor(repo: Repo) -> EditorController:
     editor.state.session.expand("src")
     editor.state.session.expand("src/pkg")
     return editor
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_preview_includes_attribution_without_changing_draft(
+    repo: Repo, style: str
+) -> None:
+    editor = make_editor(repo)
+    session = editor.state.session
+    session.settings = replace(session.settings, style=style)
+    without_trailer = editor.preview()
+    assert ATTRIBUTION not in without_trailer
+    session.settings = replace(session.settings, attribution=True)
+    before = session.draft_signature()
+    assert editor.preview() == without_trailer + f"\n{ATTRIBUTION}\n"
+    assert session.draft_signature() == before
+    session.settings = replace(session.settings, attribution=False)
+    assert editor.preview() == without_trailer
 
 
 def test_write_collapse_expand_keeps_session_only_curation(repo: Repo) -> None:

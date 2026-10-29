@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from treestamp.codec import render_tree
 from treestamp.document import (
+    ATTRIBUTION,
     Document,
     DocumentSnapshot,
     load_document,
@@ -195,7 +196,8 @@ class EditorController:
 
     def preview(self) -> str:
         session = self.state.session
-        return render_tree(session.printed_tree(), session.settings)
+        tree = render_tree(session.printed_tree(), session.settings)
+        return tree + (f"\n{ATTRIBUTION}\n" if session.settings.attribution else "")
 
     def region_text(self) -> str:
         """Print the complete treestamp without modifying the draft or document."""
