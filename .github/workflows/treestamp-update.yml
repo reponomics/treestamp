@@ -39,6 +39,13 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Validate the requested branch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ ! "$BASE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$ || "$BASE_BRANCH" == *..* ]]; then
+            echo "::error::base_branch must be a branch name using letters, digits, '.', '_', '-', or '/'"
+            exit 1
+          fi
       - name: Check out the selected trusted branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
