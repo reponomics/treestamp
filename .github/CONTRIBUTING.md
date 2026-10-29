@@ -35,13 +35,9 @@ Dependencies are obtained from PyPI through uv. For intentional dependency chang
 
 ## Tests for changes
 
-Every major change must add or update automated tests in the same pull request. A major change is one that alters what treestamp does:
+Treestamp maintains a high level of code coverage. Non-trivial changes must add or update automated tests in the same pull request. High-impact changes must be accompanied by thorough testing.
 
-- a new feature, command, option, or editor action, or a change to existing behavior in the CLI, the terminal editor, the document format, or the hosted editor's API or page
-- a bug fix, which needs a test of the corrected behavior that fails without the fix
-- a change to security-relevant handling, such as input validation, size and rate limits, path checks, document writes, or GitHub access
-
-Tests belong in the suite that covers the changed area, described under [Check changes](#check-changes), and should assert the changed behavior itself, not only exercise the code. The coverage threshold is a floor, not the measure of whether a change is tested. Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the suites, need no new tests.
+Tests belong in the suite that covers the changed area, described under [Check changes](#check-changes), and should assert the changed behavior itself, not only exercise the code (test coverage as well as code coverage). Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the suites, need no new tests. Avoid brittle tests that depend on specific string literals, and, especially when working with coding agents, avoid excessive testing that provides no durable benefit.
 
 ## Check changes
 

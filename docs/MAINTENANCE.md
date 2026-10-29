@@ -25,17 +25,9 @@ Dependabot proposes uv dependency updates. Review lock changes with their declar
 
 ## Repository and release setup
 
-Use `main` as the default branch and require pull requests and signed commits. After the checks have run in the repository, select these required PR check names:
+Use `main` as the default branch and require pull requests and signed commits. PRs should require checks including regression tests, compatibility, and vulnerability scanning.
 
-- `Regression suite (Linux, Python 3.11)`
-- `Regression suite (Linux, Python 3.12)`
-- `Regression suite (Windows, Python 3.11)`
-- `Regression suite (Windows, Python 3.12)`
-- `Hosted editor (Linux, Python 3.11)`
-- `README tree freshness`
-- `Validate PR title`
-
-Production deployment, Release Please, and PyPI publication do not run on ordinary PRs and should not be required PR checks. Enable immutable GitHub Releases before the first release. CodeQL uses GitHub's default setup with the extended query suite for Python, JavaScript/TypeScript, and GitHub Actions, managed in the repository's code scanning settings. Do not enable an advanced CodeQL workflow alongside default setup: GitHub rejects its analysis uploads. Scorecard runs only when the repository is public; OSV scans resolved Python dependencies while private, retaining its report in Actions without uploading it to code scanning.
+Production deployment, Release Please, and PyPI publication do not run on ordinary PRs and should not be required PR checks. Immutable releases are enabled. CodeQL uses GitHub's default setup with the extended query suite for Python, JavaScript/TypeScript, and GitHub Actions, managed in the repository's code scanning settings. Do not enable an advanced CodeQL workflow alongside default setup: GitHub rejects its analysis uploads.
 
 Release Please manages the core and hosted versions together, updates `CHANGELOG.md`, and creates version tags and GitHub Releases after its release PR is merged. The published-release event runs the PyPI workflow, which validates the tag, versions, and commit on `main`, builds and tests fresh distributions, and publishes them with attestations through Trusted Publishing. Website deployment has its own trigger and does not wait for a package release.
 
@@ -50,9 +42,9 @@ Configure these GitHub settings before enabling publication or production deploy
 | `FLY_DEPLOY_ENABLED=true` | Repository variable | Enables independent production deployment on pushes to `main` |
 | `FLY_API_TOKEN` | Secret in the `production` environment | Deploy token scoped to the production Fly app |
 
-Install the release App on the selected `reponomics/treestamp` repository with write access to contents, issues, and pull requests. Its token lets release PRs trigger CI and GitHub Releases trigger publication. The App does not need organization-wide repository access. The `pypi` environment exists; review its protections and those of `production` against the maintainers' approval policy. Publication runs from release tags, while deployment runs from `main`.
+Install the release App on the selected `reponomics/treestamp` repository with write access to contents, issues, and pull requests. Its token lets release PRs trigger CI and GitHub Releases trigger publication. The `pypi` environment exists; review its protections and those of `production` against the maintainers' approval policy. Publication runs from release tags, while deployment runs from `main`.
 
-In PyPI, configure a [pending Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/) for project `treestamp`, GitHub owner `reponomics`, repository `treestamp`, workflow filename `publish.yml`, and environment `pypi`. No long-lived PyPI upload token is needed. A pending publisher does not reserve the package name.
+In PyPI, configure a [pending Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/) for project `treestamp`, GitHub owner `reponomics`, repository `treestamp`, workflow filename `publish.yml`, and environment `pypi`. No long-lived PyPI upload token is needed.
 
 ## Secrets and credentials
 
@@ -61,19 +53,6 @@ Secrets are stored only in the services that use them: GitHub repository secrets
 Only the maintainer can read or change these secrets (see [GOVERNANCE.md](GOVERNANCE.md)). Workflows receive a secret only in the job that needs it, and deployment credentials only through the `production` environment.
 
 Credentials have no fixed rotation schedule. Rotate a credential immediately if it may have been exposed, and rotate the affected credentials whenever the people with access to them change. After rotating, revoke the old credential and confirm that the workflow or service using it still works.
-
-## First release and subsequent releases
-
-The first release is configured as `0.1.0`. Complete these steps in order:
-
-1. Merge the automation setup to `main`, configure the release App, enable immutable releases, and configure the `pypi` environment and Trusted Publisher.
-2. Finish the public-content review, make the repository public, enable private vulnerability reporting, and set `PYPI_PUBLISH_ENABLED=true`.
-3. Review Release Please's first release PR. Confirm that both project versions and its manifest say `0.1.0`. Consolidate the existing `0.1.0 (Unreleased)` notes into the generated dated release section so the changelog describes the release once.
-4. After its required checks pass, merge that release PR. Release Please creates the tag and GitHub Release; the publication workflow validates and uploads the package. Verify the PyPI files, installation, and attestations.
-
-Do not merge the first release PR before publication is ready: a release created while the repository is private or publication is disabled will not publish automatically when those settings change later. Subsequent releases follow the same release-PR process. Explain changes requiring user action in the changelog, including format changes before `1.0`.
-
-Published versions are immutable. Correct a released package through a later release; do not move its tag, delete and recreate its release, or upload changed files under the same version. If a publication run fails, inspect which artifacts reached PyPI before retrying it.
 
 ## Production deployment
 
