@@ -1,11 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Bug Fixes
-
-- Replace special-path identity backtracking with direct row-number-plus-path registrations, removing the branch limit and 100-registration ceiling. **Format change:** documents using the old path-only `special_paths` array must be regenerated from the repository; loading them reports an explicit error. Documents without special registrations remain valid.
-
 ## [0.2.0](https://github.com/reponomics/treestamp/compare/v0.1.2...v0.2.0) (2026-10-29)
 
 
@@ -13,8 +7,11 @@
 
 * Documents with path-only special_paths registrations must be regenerated; documents without special registrations remain supported.
 
+
 ### Bug Fixes
 
+* Replace special-path identity backtracking with direct row-number-plus-path registrations.
+  
 * fix potential DoS threat and improve docs ([#15](https://github.com/reponomics/treestamp/issues/15)) ([f3c77eb](https://github.com/reponomics/treestamp/commit/f3c77eb03a45d22fa47c9fcd7a8fe02339587dd6))
 
 ## [0.1.2](https://github.com/reponomics/treestamp/compare/v0.1.1...v0.1.2) (2026-10-28)
