@@ -747,7 +747,7 @@ def test_cli_explicit_load_opens_document_without_startup_dialogs(
             assert app.tree_view.children
             assert not app.editor.dirty
             field = await prompt(pilot, "w")
-            assert field.value == "docs/tree.md"
+            assert field.value == str(Path("docs") / "tree.md")
             await press(pilot, "escape", "q")
         return app.return_value
 
