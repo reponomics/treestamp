@@ -90,9 +90,9 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
-[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) includes examples and migration guidance.
+[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) documents command usage, path rules, and defaults.
 
-`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents New/Load. There is no positional repository argument. `treestamp` with no command is equivalent to `treestamp tui`.
+`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents New/Load. `treestamp` with no command is equivalent to `treestamp tui`.
 
 With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new tree if the README is absent or unmarked; malformed or empty marked regions remain errors.
 

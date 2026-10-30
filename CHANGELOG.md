@@ -4,9 +4,9 @@
 
 ### ⚠ BREAKING CHANGES
 
-* Replace `--document` with `--load DOCUMENT`, which opens an existing treestamp directly instead of seeding the TUI's opening dialog. No compatibility alias is provided.
-* Remove the TUI's positional repository `PATH`. Use `--load /path/to/repository/README.md` or change directories before opening the editor.
-* Resolve explicit CLI document paths from cwd, accepting absolute paths and selecting the document's containing repository. From `docs/`, use `check ../README.md` to select the root README; bare `check`, `update`, and `--print` retain their repository-root README defaults. Paths stored in treestamps and entered within the editor remain repository-relative.
+* Replace `--document` with `--load DOCUMENT` to open an existing treestamp directly.
+* Remove positional repository `PATH`; load a document in the desired repository or change directories first.
+* Resolve explicit document paths from cwd (absolute paths also work). From `docs/`, use `check ../README.md` for the root README. Bare `check`, `update`, and `--print` keep the repository-root README default; editor and stored paths stay repository-relative.
 
 ## [0.3.1](https://github.com/reponomics/treestamp/compare/v0.3.0...v0.3.1) (2026-10-30)
 

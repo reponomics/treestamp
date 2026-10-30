@@ -1,6 +1,6 @@
 # CLI reference
 
-This reference describes the current CLI. [ADR 0001](adr/0001-cli-path-coherence.md) records the accepted path-handling and repository-selection contract. See [Design](design.md) for the document format and architecture.
+See [Design](design.md) for the document format and architecture, and [ADR 0001](adr/0001-cli-path-coherence.md) for the rationale behind repository selection.
 
 ## Commands
 
@@ -24,11 +24,11 @@ With no command, `treestamp` opens the TUI. `tui` can also be omitted before its
 | TUI startup without `--load` | The repository containing cwd; shows New/Load |
 | TUI tree root and document dialogs | Paths relative to the selected repository root |
 
-Explicit CLI document paths follow filesystem conventions. From `docs/`, `treestamp check README.md` checks `docs/README.md`, while `treestamp check ../README.md` checks the repository's top-level README. Bare `treestamp check` still selects the top-level README. A document can select another checkout even when cwd is outside any repository.
+Explicit CLI document paths follow filesystem conventions. From `docs/`, `treestamp check README.md` checks `docs/README.md`, while `treestamp check ../README.md` checks the repository's top-level README. Bare `treestamp check` selects the top-level README. A document can select another checkout even when cwd is outside any repository.
 
-CLI document paths may include `..`, but symlinks are refused, including traversed components before parent normalization. A document in an initialized nested repository or submodule selects that repository. Paths into an uninitialized submodule are rejected. Within the editor, document paths remain repository-root-relative: absolute paths, parent traversal, symlinks, and crossings into other repositories or submodules are rejected.
+CLI document paths may include `..`, but symlinks are refused, including traversed components before parent normalization. A document in an initialized nested repository or submodule selects that repository. Paths into an uninitialized submodule are rejected. Within the editor, document paths are repository-root-relative: absolute paths, parent traversal, symlinks, and crossings into other repositories or submodules are rejected.
 
-There is no positional repository argument. To open another repository, load a document in it or change directories before starting treestamp. Choose a subtree in the New document dialog; the root dialog accepts spellings such as `./src/` and stores the canonical `src` path.
+To open another repository, load a document in it or change directories before starting treestamp. Choose a subtree in the New document dialog; the root dialog accepts spellings such as `./src/` and stores the canonical `src` path.
 
 The default source is a captured Git index, not the working tree. Stage additions, deletions, and renames before opening or checking a treestamp. Untracked files are absent, and unstaged changes are not incorporated. New or Load captures a snapshot; subsequent edits use that snapshot until another New or Load operation. The containing document is read from disk, not from the index. Treestamp does not stage or commit files or fetch remote history.
 
@@ -80,12 +80,6 @@ Both commands require an existing, valid treestamp. `check` computes the same re
 `--target REF` selects a local Git revision in the document's repository instead of its captured index. `--compare REF` supplies the earlier revision for Git rename detection. For example, `--compare HEAD` can preserve annotations across staged renames; after committing a rename, select an appropriate earlier comparison revision.
 
 Annotation transfer is best effort: supported moves must remain within the selected subtree, destination annotations take precedence, and hiding and collapse choices are respected. Directory annotations are not transferred by rename detection. Without `--compare`, annotations are preserved at unchanged paths but do not follow moves. TUI loading and `--print` do not perform rename detection.
-
-## Migrating from 0.3.x
-
-`--document` has been removed without a compatibility alias. Use `--load DOCUMENT`, which now opens the document directly. The positional repository `PATH` has also been removed; replace `treestamp /other/project --document README.md` with `treestamp --load /other/project/README.md`, or change directories and run `treestamp` to retain the New/Load choice.
-
-Explicit document paths now resolve from cwd instead of the repository root. From a repository's `docs/` directory, replace `treestamp check README.md` with `treestamp check ../README.md` to continue checking the root README, or omit the document argument. Apply the same adjustment to `update` and `--load`. Stored treestamps and paths entered within the editor do not need migration.
 
 ## Output and exit status
 
