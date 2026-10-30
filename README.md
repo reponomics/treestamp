@@ -13,7 +13,9 @@
 
 # treestamp
 
-treestamp is an editor for creating and maintaining directory trees for project documentation. Easily select which files and folders to include, and add brief annotations. The application reloads your treeestamp when you want to update it, and automated checks can notify you when there is any drift betweeen treestamp and the repository, making it easy to keep documentation up to date.
+treestamp is an editor for creating and maintaining directory trees for project documentation. Easily select which files and folders to include, and add brief annotations. The application reloads your treestamp when you want to update it, and automated checks can notify you when there is any drift between treestamp and the repository, making it easy to keep documentation up to date.
+
+<p><a href="#project-structure">⏬ See this repo's treestamp ⏬</a></p>
 
 ## Quickstart
 
@@ -42,11 +44,11 @@ pipx run treestamp
 
 Choose **New document** and select the path where you want the root of the repository tree to be located (defaults to the repository root, `.`, but you can generate a treestamp for any sub-tree in the repository) - the treestamp root is a relative path from the repository's root.
 
-> [!NOTE] 
-> Paths in treestamp are always relative to the _repository root_, regardless of where the application is launched, where the document containing the treestamp is located, or where the root of the rendered tree is located.
+> [!NOTE]
+> Tree-root and document paths entered in the editor, and paths stored in its configuration, are relative to the _repository root_. Entries in the rendered tree are relative to the selected subtree.
 
-> [!TIP] 
-> The editor only recognizes git-tracked files, staged or committed, so stage/commit any changes before opening it.
+> [!TIP]
+> The terminal editor captures the Git index, so stage additions, deletions, and renames before opening it; untracked files and unstaged changes are not included. The web editor reads the pushed state of the repository's default branch.
 
 ### 2. Edit the tree
 
@@ -62,7 +64,7 @@ Use the editor to expand the important parts of the directory tree, hide the dot
 
 ### 3. Add it to your README
 
-When first writing a treestamp to a document, choose **Copy** in the terminal editor or **Copy treestamp** on the web, then paste the block into your Markdown document. treestamp renders directory trees inside a pair of HTML comment boundary markers:
+When first writing a treestamp to a document, choose **Copy** in the terminal editor or **Copy treestamp** on the web, then paste the block into your project's Markdown document. treestamp renders directory trees inside a pair of HTML comment boundary markers:
 
 `<!-- treestamp:start -->`
 
@@ -70,9 +72,9 @@ When first writing a treestamp to a document, choose **Copy** in the terminal ed
 
 These markers help the application recognize existing treestamps, and make sure that everything outside the boundaries stays the same.
 
-Paste the whole block, including the markers, anywhere in your document.
+Paste the whole block, including the markers, anywhere in your project's document (the web editor does not perform any writes to GitHub).
 
-````html
+````markdown
 <!-- treestamp:start -->
 ```sh
 ./
@@ -89,12 +91,20 @@ Paste the whole block, including the markers, anywhere in your document.
 
 #### The config block
 
-The treestramp may also contain a `<!-- treestamp:config --->` block after the top boundary marker containing a list of paths that are in the git-tracked directory structure, but which the user has elected to hide in the rendered tree. A record of these is retained so that when the treestamp is reloaded, the application can remember: "don't render these in the output." (These hidden paths can always be viewed and unhidden in the editor interface.)
+The treestamp may also contain a configuration comment after the top boundary marker. It opens with `<!-- treestamp:config`, contains TOML settings, and closes with `-->` on a separate line. For example:
+
+```html
+<!-- treestamp:config
+hidden = ["tests"]
+-->
+```
+
+The `hidden` array records paths that the user has elected to hide, so that when the treestamp is reloaded, the application can remember: "don't render these in the output." These hidden paths can always be viewed and unhidden in the editor interface.
 
 <details>
-<summary>Alternate boostrapping method</summary>
+<summary>Alternate bootstrapping method</summary>
 
-Another way to write the initial treestramp is to simply place the boundary markers into the target document, like so:
+Another way to write the initial treestamp is to simply place the boundary markers into the target document, like so:
 
 
 ```html
@@ -102,7 +112,7 @@ Another way to write the initial treestramp is to simply place the boundary mark
 <!-- treestamp:end -->
 ```
 
-Then, you can go to the TUI editor and load that document, and it will recognize that as a valid treestamp block. Then, when you are ready to write the result, the application can write directly in between those blocks, without having to do any copy/paste.
+In the terminal editor, choose **New document**, select the tree root, and edit the tree. When you are ready, choose **Write to existing** and enter the path to the document containing those markers. The application fills the marked region by writing to that file and preserves the surrounding content.
 
 </details>
 
@@ -112,13 +122,13 @@ To load an existing treestamp for editing, enter the path to the document contai
 
 (i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the draft;
 
-(ii) paths that are in the Git-tracked directory structure but not in the treestamp draft, _and are not included in the array of hidden paths_, will be added to the draft _if_ they are siblings of a directory that is not collapsed. (Newly added directories will be initialized as collapsed.)
+(ii) new tracked entries (files and folders) will be added if they appear beneath already-expanded directories, including the tree root. Entries beneath collapsed directories remain unexpanded, and newly added directories start collapsed.
 
 The application is designed to help keep documentation up to date by removing stale paths, which positively misrepresent the state of the repository; add new paths when they appear, but in a conservative manner; and preserve the user's previous edits and decisions, as best as possible.
 
 ### Include a treestamp footer (optional)
 
-treestamp is a very cool software, and you will probably want to let other people know that you're using it. Of course, you don't have to (we understand that sometimes it's cooler to keep things a secret), but if you want to include a small recognition in the footer of your treestamp, you can opt in to doing so by selecting **Add "Mainted with treestamp" footer** (or press <kbd>t</kbd> in the terminal). This will simply print the following line below the rendered tree, and before the closing boundary marker:
+treestamp is a very cool software, and you will probably want to let other people know that you're using it. Of course, you don't have to (we understand that sometimes it's cooler to keep things a secret), but if you want to include a small recognition in the footer of your treestamp, you can opt in to doing so by selecting **Add “Maintained with treestamp” footer** (or press <kbd>t</kbd> in the terminal). This will simply print the following line below the rendered tree, and before the closing boundary marker:
 
 ```markdown
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
@@ -126,7 +136,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ## Check your README automatically
 
-treestamp can help you keep your documentation up to date. `treestamp check` will compare the tree to the current state of the checkout, and exit 1 if the two are not in sync. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
+treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index), or the revision selected with `--target REF`, and exits 1 when an update would change the document. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
 
 **GitHub Actions:** after checking out your repository and setting up Python 3.11+, add this step:
 
@@ -159,6 +169,16 @@ Use a terminal and font that display Unicode tree characters, or choose ASCII ou
 
 </details>
 
+## Limitations and edge cases
+
+The editor has to define a reserved sequence to be the delimiter between a filename and the annotation that follows it. In this case, it's `  # ` (space-space-hash-space). The problem is: this sequence is legal within a filename. This creates the potential for ambiguity for the parser. To avoid this, and maintain support for these uncommon filenames, pathnames that end in a segment that contains that sequence are stored in the config block in a `special_paths` array (see [special-path-resolution](https://github.com/reponomics/treestamp/blob/main/docs/special-path-resolution.md)).
+
+Currently, there is also the potential for a treestamp to be corrupted if it contains filenames that have trailing whitespace, and this whitespace is truncated or edited by some automation such as a linter.
+
+The TUI and web editor do not currently detect moves or renames, so annotations on moved entries may be dropped when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
+
+treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on the treestamp's content (whatever is between the boundary markers) remaining unchanged and not manually edited (with one exception: manual edits of annotations are tolerable). This establishes an informal contract that the user must agree not to manually edit the other contents of the treestamp outside of the editor, if they want the application to be able to reliably parse and recognize the treestamp in the way it was authored previously.
+
 ## Project Structure
 
 <!-- treestamp:start -->
@@ -169,7 +189,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ./
 ├── .github/ (8 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (6 files, 1 folder)
+├── docs/ (7 files, 1 folder)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -204,7 +224,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ## Development and support
 
-[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/docs/MAINTENANCE.md) · [Governance](https://github.com/reponomics/treestamp/blob/main/docs/GOVERNANCE.md) · [Design](https://github.com/reponomics/treestamp/blob/main/docs/design.md) · [Security assessment](https://github.com/reponomics/treestamp/blob/main/docs/security-assessment.md) · [Verifying releases](https://github.com/reponomics/treestamp/blob/main/docs/verifying-releases.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
+[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/docs/MAINTENANCE.md) · [Governance](https://github.com/reponomics/treestamp/blob/main/docs/GOVERNANCE.md) · [Design](https://github.com/reponomics/treestamp/blob/main/docs/design.md) · [Roadmap](https://github.com/reponomics/treestamp/blob/main/docs/ROADMAP.md) · [Security assessment](https://github.com/reponomics/treestamp/blob/main/docs/security-assessment.md) · [Verifying releases](https://github.com/reponomics/treestamp/blob/main/docs/verifying-releases.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
 
 Report bugs through [GitHub issues](https://github.com/reponomics/treestamp/issues), vulnerabilities through [private security reporting](https://github.com/reponomics/treestamp/security/advisories/new), and conduct concerns to [conduct@reponomics.org](mailto:conduct@reponomics.org).
 
