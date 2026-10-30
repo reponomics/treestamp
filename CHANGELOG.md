@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### ⚠ BREAKING CHANGES
+
+* Replace `--document` with `--load DOCUMENT` to open an existing treestamp directly.
+* Remove positional repository `PATH`; load a document in the desired repository or change directories first.
+* Resolve explicit document paths from cwd (absolute paths also work). From `docs/`, use `check ../README.md` for the root README. Bare `check`, `update`, and `--print` keep the repository-root README default; editor and stored paths stay repository-relative.
+
 ## [0.3.1](https://github.com/reponomics/treestamp/compare/v0.3.0...v0.3.1) (2026-10-30)
 
 

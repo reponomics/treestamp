@@ -36,7 +36,7 @@ python -m pip install treestamp
 treestamp
 ```
 
-Invoke it directly from anywhere within a Git repository (or pass the path to another repository via the `path` positional argument). You can also run it directly without a persistent installation:
+Invoke it directly from anywhere within a Git repository. You can also run it directly without a persistent installation:
 
 ```
 pipx run treestamp
@@ -118,7 +118,7 @@ In the terminal editor, choose **New document**, select the tree root, and edit 
 
 ### 4. Update an existing treestamp
 
-To load an existing treestamp for editing, enter the path to the document containing the treestamp in the editor interface. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the draft when loaded into the editor:
+To load an existing treestamp for editing, enter the path to its document in the editor interface, or run `treestamp --load docs/structure.md` to open it directly. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the draft when loaded into the editor:
 
 (i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the draft;
 
@@ -136,7 +136,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ## Check your README automatically
 
-treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index), or the revision selected with `--target REF`, and exits 1 when an update would change the document. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
+treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index), or the revision selected with `--target REF`, and exits 1 when an update would change the document. With no document argument, it checks the repository-root README; an explicit document path is relative to your current directory. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
 
 **GitHub Actions:** after checking out your repository and setting up Python 3.11+, add this step:
 

@@ -1,11 +1,11 @@
 # CLI reference
 
-This reference describes the current CLI. [ADR 0001](adr/0001-cli-path-coherence.md) discusses provisional changes to path handling; those proposals are not implemented. See [Design](design.md) for the document format and architecture.
+See [Design](design.md) for the document format and architecture, and [ADR 0001](adr/0001-cli-path-coherence.md) for the rationale behind repository selection.
 
 ## Commands
 
 ```text
-treestamp [tui] [PATH] [--document DOCUMENT] [--print]
+treestamp [tui] [--load DOCUMENT] [--print]
 treestamp check [DOCUMENT] [--target REF] [--compare REF]
 treestamp update [DOCUMENT] [--target REF] [--compare REF]
 treestamp --version
@@ -16,16 +16,19 @@ With no command, `treestamp` opens the TUI. `tui` can also be omitted before its
 
 ## Repositories, paths, and snapshots
 
-| Input | Current interpretation |
+| Input | Interpretation |
 | --- | --- |
-| TUI positional `PATH` | A filesystem location used to discover its containing Git repository; defaults to cwd, accepts absolute paths, and resolves relative paths from cwd |
-| `--document DOCUMENT` | A document path relative to the selected repository root; defaults to `README.md` |
-| `check DOCUMENT` / `update DOCUMENT` | A document path relative to the repository containing cwd; defaults to `README.md` |
+| `--load DOCUMENT` | A cwd-relative or absolute document path; opens it directly and selects its containing repository |
+| Explicit `check DOCUMENT` / `update DOCUMENT` | A cwd-relative or absolute document path; selects its containing repository |
+| Omitted document for `check`, `update`, or `--print` | The repository-root `README.md` in the repository containing cwd |
+| TUI startup without `--load` | The repository containing cwd; shows New/Load |
 | TUI tree root and document dialogs | Paths relative to the selected repository root |
 
-Passing `treestamp tui ./src` selects the repository containing `src`; it does not select `src` as the rendered tree root. Choose that subtree in the New document dialog. The root dialog accepts spellings such as `./src/` and stores the canonical `src` path. Currently, positional `PATH` and `--document` may be supplied together.
+Explicit CLI document paths follow filesystem conventions. From `docs/`, `treestamp check README.md` checks `docs/README.md`, while `treestamp check ../README.md` checks the repository's top-level README. Bare `treestamp check` selects the top-level README. A document can select another checkout even when cwd is outside any repository.
 
-Document paths remain repository-root-relative even when invoked from a subdirectory. For example, from `docs/`, `treestamp check README.md` still checks the repository's top-level README. Absolute document paths, parent traversal such as `../README.md`, symlink paths, and paths crossing into another repository or submodule are rejected.
+CLI document paths may include `..`, but symlinks are refused, including traversed components before parent normalization. A document in an initialized nested repository or submodule selects that repository. Paths into an uninitialized submodule are rejected. Within the editor, document paths are repository-root-relative: absolute paths, parent traversal, symlinks, and crossings into other repositories or submodules are rejected.
+
+To open another repository, load a document in it or change directories before starting treestamp. Choose a subtree in the New document dialog; the root dialog accepts spellings such as `./src/` and stores the canonical `src` path.
 
 The default source is a captured Git index, not the working tree. Stage additions, deletions, and renames before opening or checking a treestamp. Untracked files are absent, and unstaged changes are not incorporated. New or Load captures a snapshot; subsequent edits use that snapshot until another New or Load operation. The containing document is read from disk, not from the index. Treestamp does not stage or commit files or fetch remote history.
 
@@ -33,11 +36,11 @@ The default source is a captured Git index, not the working tree. Stage addition
 
 ```bash
 treestamp
-treestamp tui /path/to/another/checkout
-treestamp --document docs/structure.md
+treestamp --load docs/structure.md
+treestamp tui --load /path/to/another/checkout/README.md
 ```
 
-Startup offers **New document** or **Load document**. `--document` supplies the Load dialog's initial path; it does not bypass this choice. New document starts with the selected root's immediate children and collapsed directories. Load reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
+Without `--load`, startup offers **New document** or **Load document**. `--load DOCUMENT` opens the document directly, bypassing the opening choice and path-entry dialog. An invalid explicit load reports an error without launching the editor or starting a new document. New document starts with the selected root's immediate children and collapsed directories. Load reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
 
 | Keys | Action |
 | --- | --- |
@@ -56,10 +59,10 @@ Write new file requires a nonexistent destination. Write to existing requires a 
 
 ```bash
 treestamp --print
-treestamp --document docs/structure.md --print
+treestamp --load docs/structure.md --print
 ```
 
-`--print` writes the complete treestamp to stdout without changing a document. With explicit `--document`, the file must contain a valid treestamp; its updated draft is printed. Without `--document`, a valid treestamp in the default README is loaded, while an absent README or one without markers starts a new tree. Malformed or empty marked regions are errors, not requests to initialize a tree.
+`--print` writes the complete treestamp to stdout without changing a document. With explicit `--load`, the file must contain a valid treestamp; its updated draft is printed. Without `--load`, a valid treestamp in the repository-root README is loaded, while an absent README or one without markers starts a new tree. Malformed or empty marked regions are errors, not requests to initialize a tree.
 
 Printing does not accept `--target` or `--compare`. Shell redirection writes independently of treestamp; do not redirect output over a document the command must read.
 
@@ -74,7 +77,7 @@ treestamp check README.md --target HEAD --compare HEAD~1
 
 Both commands require an existing, valid treestamp. `check` computes the same replacement as `update` without writing it. It prints `Current: …` and exits `0` when unchanged, or a unified diff and exits `1` when an update would change the document, including generated formatting. `update` replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
 
-`--target REF` selects a local Git revision instead of the captured index. `--compare REF` supplies the earlier revision for Git rename detection. For example, `--compare HEAD` can preserve annotations across staged renames; after committing a rename, select an appropriate earlier comparison revision.
+`--target REF` selects a local Git revision in the document's repository instead of its captured index. `--compare REF` supplies the earlier revision for Git rename detection. For example, `--compare HEAD` can preserve annotations across staged renames; after committing a rename, select an appropriate earlier comparison revision.
 
 Annotation transfer is best effort: supported moves must remain within the selected subtree, destination annotations take precedence, and hiding and collapse choices are respected. Directory annotations are not transferred by rename detection. Without `--compare`, annotations are preserved at unchanged paths but do not follow moves. TUI loading and `--print` do not perform rename detection.
 
