@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/reponomics/treestamp/compare/v0.3.0...v0.3.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* normalize relative paths in editor ([#24](https://github.com/reponomics/treestamp/issues/24)) ([23484e2](https://github.com/reponomics/treestamp/commit/23484e25ac833f76eb188af8aae6689c1f3e7c46))
+
 ## [0.3.0](https://github.com/reponomics/treestamp/compare/v0.2.0...v0.3.0) (2026-10-29)
 
 

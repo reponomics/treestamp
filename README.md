@@ -144,7 +144,7 @@ treestamp can help you keep your documentation up to date. `treestamp check` com
 ```yaml
 - name: Check the README tree
   run: |
-    python -m pip install "treestamp==0.3.0"
+    python -m pip install "treestamp==0.3.1"
     treestamp check README.md
 ```
 <!-- x-release-please-end -->
@@ -155,7 +155,7 @@ treestamp can help you keep your documentation up to date. `treestamp check` com
 ```yaml
 repos:
   - repo: https://github.com/reponomics/treestamp
-    rev: v0.3.0
+    rev: v0.3.1
     hooks:
       - id: treestamp-check
 ```
