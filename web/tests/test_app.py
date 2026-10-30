@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from importlib.metadata import version
+from pathlib import Path
 
 import httpx
 import pytest
@@ -381,6 +382,40 @@ def test_healthz_reports_the_credential_and_config_rejects_partial_app_settings(
         }
     )
     assert flattened.github_app_private_key == "-----BEGIN X-----\nabc\n-----END X-----"
+
+
+def test_credentials_can_be_read_from_separate_files(tmp_path: Path) -> None:
+    key = tmp_path / "app.pem"
+    key.write_text("-----BEGIN X-----\nabc\n-----END X-----\n")
+    token = tmp_path / "token"
+    token.write_text("ghp_example\n")
+    config = Config.from_env(
+        {
+            "GITHUB_APP_CLIENT_ID": "1",
+            "GITHUB_APP_INSTALLATION_ID": "2",
+            "GITHUB_APP_PRIVATE_KEY_FILE": str(key),
+            "GITHUB_TOKEN_FILE": str(token),
+        }
+    )
+    assert config.github_app_private_key == "-----BEGIN X-----\nabc\n-----END X-----"
+    assert config.github_token == "ghp_example"
+
+    with pytest.raises(ConfigError, match="not both"):
+        Config.from_env({"GITHUB_TOKEN": "t", "GITHUB_TOKEN_FILE": str(token)})
+    with pytest.raises(ConfigError, match="could not be read"):
+        Config.from_env({"GITHUB_TOKEN_FILE": str(tmp_path / "missing")})
+    (tmp_path / "empty").write_text("\n")
+    with pytest.raises(ConfigError, match="empty file"):
+        Config.from_env({"GITHUB_TOKEN_FILE": str(tmp_path / "empty")})
+    key.write_text("not a key")
+    with pytest.raises(ConfigError, match="PEM"):
+        Config.from_env(
+            {
+                "GITHUB_APP_CLIENT_ID": "1",
+                "GITHUB_APP_INSTALLATION_ID": "2",
+                "GITHUB_APP_PRIVATE_KEY_FILE": str(key),
+            }
+        )
 
 
 def test_post_preview_opens_byte_sources_and_preserves_spaces(

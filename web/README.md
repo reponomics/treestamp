@@ -18,7 +18,7 @@ make web-fake
 
 In a second terminal, run `make web-serve` and open `http://127.0.0.1:8000`. The fake GitHub API serves this checkout on port 8100; any `owner/repo` names the same local fixture. This transport is for development only. Use `FAKE_FLAGS=--truncated`, `FAKE_FLAGS="--rate-limit-after 3"`, `FAKE_FLAGS="--delay 5"`, `FAKE_FLAGS=--empty`, or `FAKE_FLAGS="--only owner/repo"` to exercise failure cases.
 
-To use real GitHub, set `GITHUB_TOKEN` or all three GitHub App variables: `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY`. Then run `make web-serve GITHUB_API_URL=https://api.github.com`. Keep credentials in the process environment or host secret store.
+To use real GitHub, set `GITHUB_TOKEN` or all three GitHub App variables: `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY`. Then run `make web-serve GITHUB_API_URL=https://api.github.com`. To read the token or private key from a separate file instead, set `GITHUB_TOKEN_FILE` or `GITHUB_APP_PRIVATE_KEY_FILE` to its path; each file can be replaced without other configuration changes and takes effect on restart. Keep credentials in a host secret store or a file readable only by the service, never in the repository.
 
 ## Test and build
 
