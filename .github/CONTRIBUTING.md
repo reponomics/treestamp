@@ -35,7 +35,7 @@ Dependencies are obtained from PyPI through uv. For intentional dependency chang
 
 ## Tests for changes
 
-Treestamp maintains a high level of code coverage. Non-trivial changes must add or update automated tests in the same pull request. High-impact changes must be accompanied by thorough testing.
+Treestamp maintains a high level of code coverage. Changes introduced in a PR should avoid reducing coverage by more than 1%, if at all, and a strict threshold of 90% coverage is enforced. Non-trivial changes must add or update automated tests in the same pull request. High-impact changes must be accompanied by thorough testing.
 
 Tests belong in the suite that covers the changed area, described under [Check changes](#check-changes), and should assert the changed behavior itself, not only exercise the code (test coverage as well as code coverage). Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the suites, need no new tests. Avoid brittle tests that depend on specific string literals, and, especially when working with coding agents, avoid excessive testing that provides no durable benefit.
 
