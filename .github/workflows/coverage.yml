@@ -45,6 +45,7 @@ jobs:
           version-file: .tool-versions
       - name: Install development environment
         run: make install
+      # Both suites fail below the hard 90% coverage threshold (--cov-fail-under=90).
       - name: Measure core suite coverage
         run: make cov COV_ARGS=--cov-report=xml
       - name: Measure hosted editor coverage
