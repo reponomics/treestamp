@@ -169,6 +169,40 @@ def test_document_location_does_not_rebase_root_or_hidden(repo: Repo) -> None:
         editor.prepare_new("../outside")
 
 
+@pytest.mark.parametrize(
+    ("entered", "canonical"),
+    [
+        ("./src", "src"),
+        ("./src/", "src"),
+        ("././src", "src"),
+        ("src/./pkg/", "src/pkg"),
+        ("src//pkg", "src/pkg"),
+        ("./", "."),
+    ],
+)
+def test_new_root_normalizes_dialog_spelling(
+    repo: Repo, entered: str, canonical: str
+) -> None:
+    editor = make_editor(repo)
+    candidate = editor.prepare_new(entered)
+    assert candidate.session.settings.root == canonical
+    assert candidate.root == repo.path / canonical
+    editor.adopt(candidate)
+    document = parse_document(editor.region_text().encode())
+    assert document.settings.root == canonical
+
+
+@pytest.mark.parametrize("root", ["", "/src", "../src", "./../src", "src/../src"])
+def test_new_root_normalization_still_rejects_invalid_paths(
+    repo: Repo, root: str
+) -> None:
+    editor = make_editor(repo)
+    state = editor.state
+    with pytest.raises(MarkerError):
+        editor.prepare_new(root)
+    assert editor.state is state
+
+
 @pytest.mark.parametrize("operation", ["open", "new"])
 def test_root_selection_cannot_enter_initialized_submodule(
     repo: Repo, operation: str

@@ -39,4 +39,4 @@ jobs:
       - name: Install Treestamp from this checkout
         run: make install
       - name: Check the README without writing
-        run: venv/bin/treestamp check README.md
+        run: make integration-check

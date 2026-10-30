@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from treestamp.codec import render_tree
@@ -132,7 +133,9 @@ class EditorController:
         return _prepare_state(snapshot, document.settings, document, saved.path, saved)
 
     def prepare_new(self, root: str) -> EditorState:
-        settings = Settings(root=root)
+        # Accept ordinary dialog spellings while retaining canonical Git paths.
+        # PurePosixPath leaves '..' intact so validation still rejects traversal.
+        settings = Settings(root=PurePosixPath(root).as_posix() if root else root)
         # Validate before joining; an absolute or escaping path cannot select
         # another repository through a root-selection control.
         repo_path("", settings.root)

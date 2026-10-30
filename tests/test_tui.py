@@ -70,7 +70,7 @@ def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
             )
             assert "relative to the repository root" in description
             assert "Use . for the repository root (the default)" in description
-            field.value = "src"
+            field.value = "./src"
             await press(pilot, "enter")
             assert not isinstance(app.screen, PromptScreen | ConfirmScreen)
             assert app.session.settings.root == "src"
@@ -646,13 +646,13 @@ def test_new_root_and_style_controls(editor: EditorController) -> None:
             await press(pilot, "s")
             assert app.session.settings.style == "ascii" and app.editor.dirty
             field = await prompt(pilot, "N")
-            field.value = "src"
+            field.value = "./src"
             await press(pilot, "enter")
             assert isinstance(app.screen, ConfirmScreen)
             await press(pilot, "n")
             assert app.session.settings.root == "."
             field = await prompt(pilot, "N")
-            field.value = "src"
+            field.value = "./src/"
             await press(pilot, "enter", "y")
             assert app.session.settings.root == "src"
             assert app.session.settings.style == "unicode"

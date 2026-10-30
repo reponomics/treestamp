@@ -111,6 +111,28 @@ def test_request_has_only_creation_and_document_inputs() -> None:
 
 
 @pytest.mark.parametrize(
+    ("entered", "canonical"),
+    [
+        ("./sub", "sub"),
+        ("./sub/", "sub"),
+        ("././sub", "sub"),
+        ("sub/.", "sub"),
+        ("./", "."),
+    ],
+)
+def test_new_root_normalizes_input_and_preserves_canonical_state(
+    fake: FakeGitHub, entered: str, canonical: str
+) -> None:
+    service, _ = service_for(fake)
+    result = preview(service, root=entered, document="")
+    assert result.root == canonical
+    assert result.state["source"]["root"] == canonical
+    assert parse_document(result.region.encode()).settings.root == canonical
+    edited = op(service, result, "annotate", "", "note")
+    assert edited.root == canonical and "note" in edited.tree
+
+
+@pytest.mark.parametrize(
     "params",
     [
         {},
@@ -124,6 +146,9 @@ def test_request_has_only_creation_and_document_inputs() -> None:
         {"url": "o/r", "style": "ascii"},
         {"url": "o/r", "hide_root_files": "false"},
         {"url": "o/r", "root": ".."},
+        {"url": "o/r", "root": "./../sub"},
+        {"url": "o/r", "root": "sub/../sub"},
+        {"url": "o/r", "root": "/sub"},
         {"url": "o/r", "document": "../tree.md"},
     ],
 )

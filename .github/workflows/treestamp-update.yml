@@ -69,6 +69,9 @@ jobs:
         run: |
           status=0
           venv/bin/treestamp check README.md || status=$?
+          if [ "$status" -eq 0 ]; then
+            venv/bin/python scripts/readme_styles.py || status=$?
+          fi
           case "$status" in
             0)
               echo "needs_update=false" >> "$GITHUB_OUTPUT"
@@ -77,8 +80,8 @@ jobs:
             1) ;; # Drift: update must still validate bounds before publication.
             *) exit "$status" ;; # Invalid input/environment is not a repair request.
           esac
-          venv/bin/treestamp update README.md
-          venv/bin/treestamp check README.md
+          make readme-update
+          make integration-check
           echo "needs_update=true" >> "$GITHUB_OUTPUT"
       - name: Create or refresh one documentation PR
         id: pr
