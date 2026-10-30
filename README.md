@@ -101,7 +101,7 @@ Choose **Write to existing** in the terminal editor and enter `README.md`. Trees
 ```yaml
 - name: Check the README tree
   run: |
-    python -m pip install "treestamp==0.2.0"
+    python -m pip install "treestamp==0.3.0"
     treestamp check README.md
 ```
 <!-- x-release-please-end -->
@@ -112,7 +112,7 @@ Choose **Write to existing** in the terminal editor and enter `README.md`. Trees
 ```yaml
 repos:
   - repo: https://github.com/reponomics/treestamp
-    rev: v0.2.0
+    rev: v0.3.0
     hooks:
       - id: treestamp-check
 ```

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/reponomics/treestamp/compare/v0.2.0...v0.3.0) (2026-10-29)
+
+
+### Features
+
+* add opt-in attribution trailer to both editors ([#20](https://github.com/reponomics/treestamp/issues/20)) ([9053a5e](https://github.com/reponomics/treestamp/commit/9053a5e99a897757cb33e59b168c7bc0e1003db1))
+
+
+### Documentation
+
+* pin README examples to the latest release ([#18](https://github.com/reponomics/treestamp/issues/18)) ([5694389](https://github.com/reponomics/treestamp/commit/5694389a51139b1d0b6c1e497d5dbdce071c2dc8))
+
 ## [0.2.0](https://github.com/reponomics/treestamp/compare/v0.1.2...v0.2.0) (2026-10-29)
 
 
