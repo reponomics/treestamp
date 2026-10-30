@@ -11,3 +11,4 @@ These feature proposals are not prerequisites for 1.0.
 - [ ] **Define shared recovery confidence and feedback for both editors.** Keep transfers conservative when paths have been reused, copied, or renamed multiple times; conflicting candidate histories should not silently select an annotation destination. Preserve existing destination annotations and respect subtree scope, hidden entries, and collapsed directories. Report successful transfers and annotated paths that could not be matched, rather than silently dropping unresolved notes from the updated draft.
 - [ ] **Codefences optional for all display modes.**
 - [ ] **Align annotations at specified column-number.**
+- [ ] **Add protection against linters/formatters for filenames with trailing whitespace.**
