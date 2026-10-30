@@ -706,5 +706,5 @@ def _clipboard_command() -> list[str] | None:
     return None
 
 
-def explore(editor: EditorController, *, startup_document: Path) -> bool:
+def explore(editor: EditorController, *, startup_document: Path | None = None) -> bool:
     return bool(TreestampApp(editor, startup_document=startup_document).run())

@@ -1,21 +1,21 @@
 # ADR 0001: Coherence of CLI paths and repository selection
 
-- Status: Accepted direction for 1.0; implementation pending, with remaining details listed below
+- Status: Accepted and implemented for the next release
 - Date: 2026-10-29
 - Decision updated: 2026-10-30
 - Scope: `treestamp [tui]`, `--load` (replacing `--document`), removal of positional `PATH`, `--print`, and the document arguments to `check` and `update`
 
 ## Context
 
-Treestamp distinguishes the Git repository, the subtree being documented, and the document containing the treestamp. The CLI currently exposes these concepts through arguments whose path semantics are easy to confuse.
+Treestamp distinguishes the Git repository, the subtree being documented, and the document containing the treestamp. Before this decision, the CLI exposed these concepts through arguments whose path semantics were easy to confuse.
 
-Currently, `treestamp [tui] [PATH]` treats `PATH` as a filesystem location from which to discover the containing Git repository. It does not select that location as the tree root. The tree root dialog independently defaults to `.`. Passing a subdirectory of the current repository can therefore appear to do nothing, while passing a location in another checkout selects that checkout.
+In 0.3.x, `treestamp [tui] [PATH]` treated `PATH` as a filesystem location from which to discover the containing Git repository. It did not select that location as the tree root. The tree root dialog independently defaulted to `.`. Passing a subdirectory of the current repository could therefore appear to do nothing, while passing a location in another checkout selected that checkout.
 
-The current `--document` argument and the positional document arguments to `check` and `update` are repository-root-relative. This is coherent with stored document identities and the editor's explicitly repository-relative dialogs, but conflicts with normal shell expectations. From `docs/`, `treestamp check README.md` currently refers to the repository's top-level README, while `cat README.md` refers to `docs/README.md`.
+The former `--document` argument and the positional document arguments to `check` and `update` were repository-root-relative. This was coherent with stored document identities and the editor's explicitly repository-relative dialogs, but conflicted with normal shell expectations. From `docs/`, `treestamp check README.md` referred to the repository's top-level README, while `cat README.md` referred to `docs/README.md`.
 
 A treestamp documents the repository in which its containing document resides, optionally displaying a subtree of that repository. Cross-repository documentation is not an intended use case. Copying or printing output does not itself establish a destination document.
 
-The implemented contract remains documented in [Design](../design.md#command-line) and the [CLI reference](../cli-reference.md). This ADR records the agreed future contract; it does not indicate that the CLI has changed yet.
+The implemented contract is documented in [Design](../design.md#command-line) and the [CLI reference](../cli-reference.md). This ADR records the decisions and their rationale.
 
 ## Decision
 
@@ -71,15 +71,18 @@ Tree roots and document paths entered within the editor, and paths stored in tre
 
 `--load` was chosen over `--document` because it names the opening-dialog action and distinguishes loading an existing treestamp from choosing a write destination.
 
-## Remaining implementation decisions
+## Defaults, discovery, and compatibility
 
-- Decide whether omitted document arguments to `check` and `update` mean `README.md` in cwd or the repository's top-level README. No-load interactive startup is settled: use cwd's repository and show New/Load.
-- Decide whether absolute CLI document paths are accepted, and specify symlink and nested-repository/submodule handling during document-based discovery. Existing protections for repository-relative identities and writes must be preserved.
-- Specify `--print` behavior with and without `--load`, including default document discovery. Printing remains a headless operation and does not establish a write destination.
-- Choose migration diagnostics and whether any temporary compatibility alias for `--document` is warranted. The intended 1.0 interface uses `--load` and has no positional repository locator.
+Omitted document arguments to `check` and `update` retain the repository-root `README.md` default in cwd's repository. Explicit paths resolve from cwd. This deliberately preserves convenient repository-wide checks from subdirectories while making explicit paths match filesystem conventions.
+
+Absolute CLI document paths are accepted. Symlinks are refused, including path components traversed before `..` normalization. A document in an initialized nested repository or submodule selects that repository as its owner; an uninitialized submodule is still a boundary and cannot supply a document within its parent repository. Once the repository is selected, existing checks protect repository-relative identities and writes.
+
+`--load DOCUMENT --print` requires a valid existing treestamp and prints its updated draft. Bare `--print` retains the repository-root README default: it loads a valid treestamp, or starts a new tree if the README is absent or unmarked. Malformed or empty marked regions are errors. Printing is headless and does not establish a write destination.
+
+There is no compatibility alias for `--document`, and positional repository arguments are rejected. Migration guidance names `--load` as the replacement and explains that explicit document paths now resolve from cwd. This change is made before the stable 1.0 interface.
 
 ## Consequences and acceptance criteria
 
-Implementation needs coordinated CLI help, documentation, regression tests, and a breaking-change release note. Changing document resolution can select a different existing file when invoked from a subdirectory; that compatibility impact must be explained alongside the removed and renamed arguments.
+The implementation includes coordinated CLI help, documentation, regression tests, and a breaking-change release note. Changing document resolution can select a different existing file when invoked from a subdirectory; that compatibility impact must be explained alongside the removed and renamed arguments.
 
-Verify that explicit `--load` bypasses the opening choice, restores the existing treestamp, and selects the document's repository; omitted `--load` retains the chooser in cwd's repository; and positional repository arguments are rejected. Cover root and subdirectory invocation, paths into another checkout, invalid documents, explicit `check`/`update` paths, and the remaining defaults once decided. Verify that editor paths, stored identities, repository boundaries, and `--target`/`--compare` semantics remain intact.
+Verify that explicit `--load` bypasses the opening choice, restores the existing treestamp, and selects the document's repository; omitted `--load` retains the chooser in cwd's repository; and positional repository arguments are rejected. Cover root and subdirectory invocation, paths into another checkout, invalid documents, explicit `check`/`update` paths, and repository-root defaults when arguments are omitted. Verify that editor paths, stored identities, repository boundaries, and `--target`/`--compare` semantics remain intact.

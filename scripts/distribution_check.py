@@ -86,12 +86,12 @@ def journey(artifact: Path, work: Path) -> None:
     run([*command, "update"], repo)
     run([*command, "check"], repo)
     run([*command, "check"], repo / "src")
-    assert "src/" in run(
-        [*command, str(repo), "--document", "README.md", "--print"], work
-    )
-    assert (
-        run([*command, "--document", str(repo / "README.md"), "--print"], repo, 2) == ""
-    )
+    run([*command, "check", "../README.md"], repo / "src")
+    run([*command, "check", "repo/README.md"], work)
+    assert "src/" in run([*command, "--load", "repo/README.md", "--print"], work)
+    assert "src/" in run([*command, "--load", str(repo / "README.md"), "--print"], work)
+    run([*command, str(repo), "--print"], work, 2)
+    run([*command, "--document", "README.md", "--print"], repo, 2)
     first = (repo / "README.md").read_bytes()
     (repo / "src" / "extra.py").write_text("# new\n")
     run(["git", "add", "src/extra.py"], repo)

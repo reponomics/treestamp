@@ -46,12 +46,10 @@ async def prompt(pilot: Pilot[bool], key: str) -> Input:
     return pilot.app.screen.query_one("#prompt-input", Input)
 
 
-@pytest.mark.parametrize("explicit_document", [False, True])
 def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
     repo: Repo,
     editor: EditorController,
     monkeypatch: pytest.MonkeyPatch,
-    explicit_document: bool,
 ) -> None:
     invalid = "<!-- treestamp:start -->\n<!-- treestamp:end -->\n"
     repo.write("README.md", invalid)
@@ -84,8 +82,7 @@ def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
         return app.return_value
 
     monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
-    arguments = ("--document", "README.md") if explicit_document else ()
-    assert run_cli(*arguments) == (0, "", "")
+    assert run_cli() == (0, "", "")
     assert repo.read("README.md") == invalid
 
 
@@ -729,3 +726,31 @@ def test_count_toggle_without_collapsed_folders_does_not_prompt_on_quit(
         assert app.return_value is False
 
     asyncio.run(journey())
+
+
+def test_cli_explicit_load_opens_document_without_startup_dialogs(
+    repo: Repo, editor: EditorController, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    editor.adopt(editor.prepare_new("src"))
+    (repo.path / "docs").mkdir()
+    editor.create("docs/tree.md")
+    before = repo.read_bytes("docs/tree.md")
+    monkeypatch.chdir(repo.path / "docs")
+
+    async def journey(app: TreestampApp) -> bool | None:
+        async with app.run_test() as pilot:
+            assert not isinstance(app.screen, DocumentChoiceScreen | PromptScreen)
+            assert app.startup_document is None
+            assert app.editor.state.document_path == repo.path / "docs/tree.md"
+            assert app.editor.state.snapshot.repo == repo.path
+            assert app.session.settings.root == "src"
+            assert app.tree_view.children
+            assert not app.editor.dirty
+            field = await prompt(pilot, "w")
+            assert field.value == "docs/tree.md"
+            await press(pilot, "escape", "q")
+        return app.return_value
+
+    monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
+    assert run_cli("--load", "tree.md") == (0, "", "")
+    assert repo.read_bytes("docs/tree.md") == before

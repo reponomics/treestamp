@@ -90,13 +90,17 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
-[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records provisional alternatives to the current interface described below; it is not an accepted change.
+[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) includes examples and migration guidance.
 
-`treestamp [tui] [PATH] [--document PATH] [--print]` opens the terminal editor on the repository at `PATH` (default `.`). With `--print`, it writes the complete treestamp for `--document` (default `README.md`) to standard output and exits without opening the editor or writing a file. `treestamp` with no command is equivalent to `treestamp tui`.
+`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents New/Load. There is no positional repository argument. `treestamp` with no command is equivalent to `treestamp tui`.
 
-`treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` (default `README.md`, relative to the repository root) to match the snapshot. `--target` selects a Git ref instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
+With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new tree if the README is absent or unmarked; malformed or empty marked regions remain errors.
 
-`treestamp check [DOCUMENT] [--target REF] [--compare REF]` reports whether `update` would change the document, printing a unified diff if so.
+`treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` to match the snapshot. An explicit document path resolves from cwd (or is absolute) and selects its containing repository. An omitted document selects the repository-root README in cwd's repository. `--target` selects a Git ref in the document's repository instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
+
+`treestamp check [DOCUMENT] [--target REF] [--compare REF]` uses the same document and repository selection as `update` and reports whether it would change the document, printing a unified diff if so.
+
+CLI document discovery rejects symlinks, including traversed components before `..` normalization. An explicitly selected document in an initialized nested repository or submodule uses that repository; an uninitialized submodule remains a boundary. Within an editing session, tree roots and document paths remain repository-relative, and document operations cannot cross into another repository.
 
 `treestamp --version` prints the installed version.
 
