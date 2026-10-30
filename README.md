@@ -190,7 +190,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── .github/ (8 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
 ├── docs/ (8 files, 1 folder)
-├── scripts/ (6 files)  # Installed-package acceptance
+├── scripts/ (7 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
 │       ├── cli.py
@@ -205,7 +205,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── sources.py
 │       ├── tui.py
 │       └── tui_dialogs.py
-├── tests/ (16 files)  # Contract and integration tests
+├── tests/ (17 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)
@@ -222,19 +222,18 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
 <!-- treestamp:end -->
 
+The alternate styles below are generated from the same tree and checked for freshness in CI.
+
+<!-- readme-styles:start -->
 <details>
 <summary>View ASCII style</summary>
 
-<!-- treestamp:start -->
-<!-- treestamp:config
-hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml", ".python-version", ".tool-versions", "CHANGELOG.md", "LICENSE", "Makefile", "PRIVACY.md", "osv-scanner.toml", "pyproject.toml", "src/treestamp/__init__.py", "src/treestamp/__main__.py", "src/treestamp/py.typed", "uv.lock", "vex"]
--->
 ```sh
 ./
 |-- .github/ (8 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
 |-- docs/ (8 files, 1 folder)
-|-- scripts/ (6 files)  # Installed-package acceptance
+|-- scripts/ (7 files)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
 |       |-- cli.py
@@ -249,7 +248,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 |       |-- sources.py
 |       |-- tui.py
 |       `-- tui_dialogs.py
-|-- tests/ (16 files)  # Contract and integration tests
+|-- tests/ (17 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (3 files)
 |   |-- src/ (1 folder)
@@ -264,20 +263,18 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ```
 
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
-<!-- treestamp:end -->
+
 </details>
 
 <details>
 <summary>View list style</summary>
-<!-- treestamp:start -->
-<!-- treestamp:config
-hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml", ".python-version", ".tool-versions", "CHANGELOG.md", "LICENSE", "Makefile", "PRIVACY.md", "osv-scanner.toml", "pyproject.toml", "src/treestamp/__init__.py", "src/treestamp/__main__.py", "src/treestamp/py.typed", "uv.lock", "vex"]
--->
+
 ./
+
 - .github/ (8 files, 2 folders)
 - assets/ (2 files, 1 folder)
 - docs/ (8 files, 1 folder)
-- scripts/ (6 files)  # Installed-package acceptance
+- scripts/ (7 files)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
     - cli.py
@@ -292,7 +289,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
     - sources.py
     - tui.py
     - tui_dialogs.py
-- tests/ (16 files)  # Contract and integration tests
+- tests/ (17 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (3 files)
   - src/ (1 folder)
@@ -306,8 +303,9 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 - README.md
 
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
-<!-- treestamp:end -->
+
 </details>
+<!-- readme-styles:end -->
 
 ## Development and support
 

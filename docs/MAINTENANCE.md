@@ -88,3 +88,9 @@ Deploy a clean, committed revision so its build identifier describes the deploye
 - [ ] Enable Cloudflare proxying with Full (strict) TLS, then verify cache behavior and rerun the domain and smoke checks.
 - [ ] Configure credentials for `reponomics-treestamp-preview` and deploy it before using it for previews.
 - [ ] Publish the product page and demos from the separate `reponomics-web` repository, then link them from this project.
+
+## README tree and alternate styles
+
+The README contains one managed treestamp. Its ASCII and list previews are generated from that tree by `scripts/readme_styles.py`, preserving its curation, annotations, counts, and footer setting. The preview region has separate `readme-styles` markers so the normal document parser still sees only one managed treestamp.
+
+After editing the tree or changing tracked paths, run `make readme-update` to refresh the main tree and both previews. Stage new files first because the tree uses the Git index. `make integration-check` verifies both the repository tree and the generated previews without writing. The README freshness workflow, local pre-commit check, and automatic README update workflow use these same commands.

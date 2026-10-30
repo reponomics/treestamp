@@ -62,8 +62,15 @@ build: install ## Sync locked build tools and build wheel and sdist without isol
 	$(PY) -m build --no-isolation
 distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
 	$(PY) scripts/distribution_check.py
-integration-check: ## Verify the repository's treestamped README
+.PHONY: readme-styles-check readme-update
+readme-styles-check: ## Verify alternate README styles match its managed tree
+	$(PY) scripts/readme_styles.py
+readme-update: ## Refresh the managed README tree and all style previews
+	$(CLI) update README.md
+	$(PY) scripts/readme_styles.py --write
+integration-check: ## Verify the README tree and all alternate style previews
 	$(CLI) check README.md
+	$(PY) scripts/readme_styles.py
 workflow-check: ## Validate GitHub Actions workflows (requires actionlint)
 	$(ACTIONLINT)
 hook-check: ## Exercise installed repository hooks at HEAD
