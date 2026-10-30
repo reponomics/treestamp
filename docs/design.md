@@ -90,6 +90,8 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
+[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records provisional alternatives to the current interface described below; it is not an accepted change.
+
 `treestamp [tui] [PATH] [--document PATH] [--print]` opens the terminal editor on the repository at `PATH` (default `.`). With `--print`, it writes the complete treestamp for `--document` (default `README.md`) to standard output and exits without opening the editor or writing a file. `treestamp` with no command is equivalent to `treestamp tui`.
 
 `treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` (default `README.md`, relative to the repository root) to match the snapshot. `--target` selects a Git ref instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.

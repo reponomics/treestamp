@@ -152,7 +152,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ./
 ├── .github/ (8 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (6 files)
+├── docs/ (6 files, 1 folder)
 ├── scripts/ (6 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
