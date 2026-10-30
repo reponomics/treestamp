@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "treestamp-web"
-version = "0.3.1"
+version = "0.4.0"
 description = "Online editor for creating and maintaining directory trees for project documentation"
 readme = "README.md"
 license = "MIT"

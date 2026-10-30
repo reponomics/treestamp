@@ -8,6 +8,17 @@
 * Remove positional repository `PATH`; load a document in the desired repository or change directories first.
 * Resolve explicit document paths from cwd (absolute paths also work). From `docs/`, use `check ../README.md` for the root README. Bare `check`, `update`, and `--print` keep the repository-root README default; editor and stored paths stay repository-relative.
 
+## [0.4.0](https://github.com/reponomics/treestamp/compare/v0.3.1...v0.4.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* refactor and simplify CLI and loading paths ([#26](https://github.com/reponomics/treestamp/issues/26))
+
+### Features
+
+* refactor and simplify CLI and loading paths ([#26](https://github.com/reponomics/treestamp/issues/26)) ([33d96d7](https://github.com/reponomics/treestamp/commit/33d96d759b9315f7446e1d2f2149567606aa44af))
+
 ## [0.3.1](https://github.com/reponomics/treestamp/compare/v0.3.0...v0.3.1) (2026-10-30)
 
 
