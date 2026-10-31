@@ -8,7 +8,12 @@
 
 ![OSSF-Scorecard Score](https://img.shields.io/ossf-scorecard/github.com/reponomics/treestamp?style=flat&label=OpenSSF%20Scorecard)
 [![OpenSSF Baseline](https://www.bestpractices.dev/projects/15900/baseline)](https://www.bestpractices.dev/projects/15900)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15900/badge)](https://www.bestpractices.dev/projects/15900)
+
 [![CodeQL](https://github.com/reponomics/treestamp/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/reponomics/treestamp/actions/workflows/github-code-scanning/codeql)
+[![OSV dependency scan](https://github.com/reponomics/treestamp/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/reponomics/treestamp/actions/workflows/osv-scanner.yml)
+[![codecov](https://codecov.io/gh/reponomics/treestamp/graph/badge.svg?token=78VE3E2VZ0)](https://codecov.io/gh/reponomics/treestamp)
+[![Dependabot Updates](https://github.com/reponomics/treestamp/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/reponomics/treestamp/actions/workflows/dependabot/dependabot-updates)
 
 
 # treestamp
