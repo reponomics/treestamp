@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/reponomics/treestamp/compare/v0.4.0...v0.5.0) (2026-10-31)
+
+
+### Features
+
+* **web:** read credentials from separate files ([#30](https://github.com/reponomics/treestamp/issues/30)) ([9766c81](https://github.com/reponomics/treestamp/commit/9766c81c8b4ba3881429139a6076f68651f754a8))
+
+
+### Documentation
+
+* add badges to README ([#29](https://github.com/reponomics/treestamp/issues/29)) ([2ecd4d7](https://github.com/reponomics/treestamp/commit/2ecd4d7b4afedb3b43576f91ea96b2a357e7aa76))
+
 ## [0.4.0](https://github.com/reponomics/treestamp/compare/v0.3.1...v0.4.0) (2026-10-30)
 
 
