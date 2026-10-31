@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 from functools import cached_property
 from ipaddress import IPv4Network, IPv6Network, ip_network
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from treestamp_web.routing import MAX_REPLAY_BODY, valid_machine_id
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _LOG_LEVELS = ("debug", "info", "warning", "error")
+# Credentials that can instead be read from the file named by NAME_FILE.
+_SECRET_FIELDS = ("github_token", "github_app_private_key")
 
 
 class ConfigError(ValueError):
@@ -88,6 +91,11 @@ class Config:
         for field in fields(cls):
             name = field.name.upper()
             raw = env.get(name)
+            if field.name in _SECRET_FIELDS and env.get(f"{name}_FILE"):
+                if raw:
+                    raise ConfigError(f"Set {name} or {name}_FILE, not both")
+                values[field.name] = _read_secret(name, env[f"{name}_FILE"])
+                continue
             if raw is None or raw == "":
                 continue
             values[field.name] = _convert(name, raw, field.type)
@@ -139,6 +147,16 @@ class Config:
             ("http://", "https://")
         ):
             raise ConfigError("PUBLIC_BASE_URL must be an http or https URL")
+
+
+def _read_secret(name: str, path: str) -> str:
+    try:
+        secret = Path(path).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConfigError(f"{name}_FILE could not be read: {exc}") from exc
+    if not secret:
+        raise ConfigError(f"{name}_FILE names an empty file")
+    return secret
 
 
 def _convert(name: str, raw: str, annotation: object) -> object:
