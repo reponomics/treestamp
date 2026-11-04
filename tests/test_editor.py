@@ -569,7 +569,7 @@ def test_editor_preserves_authored_toml_until_hidden_paths_change(
         editor.state.session.hide(path)
     editor.create("tree.md")
     destination = repo.path / "tree.md"
-    region = destination.read_text()
+    region = destination.read_bytes().decode("utf-8")
     start = region.index("<!-- treestamp:config")
     end = region.index("-->", start) + 3
     authored = (

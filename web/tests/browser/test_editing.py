@@ -363,7 +363,7 @@ def test_attribution_toggle_updates_copy_and_survives_reload(
     page.locator("#copy").click()
     page.wait_for_function("window.copiedBlocks.length === 1")
     assert page.evaluate("window.copiedBlocks[0]").endswith(
-        f"\n\n{trailer}\n<!-- treestamp:end -->\n"
+        f"\n\n{trailer}\n\n<!-- treestamp:end -->\n"
     )
     page.reload()
     page.wait_for_selector("#rows .row")

@@ -117,7 +117,7 @@ def test_check_accepts_optional_blank_lines_but_detects_stale_tree(
     eol: bytes,
 ) -> None:
     path = stamp(repo, hidden=frozenset({"README.md"}))
-    original = path.read_bytes()
+    original = path.read_bytes().replace(b"\r\n", b"\n")
     boundaries = [
         b"<!-- treestamp:start -->\n\n",
         b"-->\n\n```sh",
@@ -157,7 +157,8 @@ def test_check_accepts_authored_toml_without_hiding_tree_drift(
 ) -> None:
     path = stamp(repo, hidden=frozenset({"README.md"}))
     payload = b"root = '.'\nhidden = [\n  'README.md', # intentionally hidden\n]\n"
-    original = path.read_bytes().replace(b'hidden = ["README.md"]\n', payload)
+    original = path.read_bytes().replace(b"\r\n", b"\n")
+    original = original.replace(b'hidden = ["README.md"]\n', payload)
     original = original.replace(b"\n", eol)
     path.write_bytes(original)
     assert run_cli("check")[0] == 0
@@ -256,9 +257,12 @@ def test_unicode_subtree_root_is_repository_relative(repo: Repo) -> None:
     write_document(document, path, create=True)
     assert load_document(path)[0] == document
     assert run_cli("check", str(path.relative_to(repo.path)))[0] == 0
-    assert run_cli("--load", str(path.relative_to(repo.path)), "--print")[
-        1
-    ] == path.read_text(encoding="utf-8")
+    assert (
+        run_cli("--load", str(path.relative_to(repo.path)), "--print")[1].encode(
+            "utf-8"
+        )
+        == path.read_bytes()
+    )
 
 
 def test_explicit_ref_ignores_staged_addition(repo: Repo) -> None:
@@ -418,7 +422,7 @@ def test_interactive_open_print_and_write_share_controller(
 
     monkeypatch.setattr("treestamp.tui.explore", load_then_print)
     code, output, error = run_cli("--load", str(path.relative_to(repo.path)))
-    assert code == 0 and output == path.read_text(encoding="utf-8") and not error
+    assert code == 0 and output.encode("utf-8") == path.read_bytes() and not error
     monkeypatch.setattr("treestamp.tui.explore", lambda editor, **kwargs: False)
     assert run_cli("tui")[1] == ""
 
@@ -453,7 +457,7 @@ def test_omitted_document_keeps_root_readme_but_explicit_document_uses_cwd(
     monkeypatch.chdir(nested.parent)
     assert run_cli("check")[0] == 0
     assert run_cli("update")[0] == 0
-    assert run_cli("--print")[1] == path.read_text(encoding="utf-8")
+    assert run_cli("--print")[1].encode("utf-8") == path.read_bytes()
     assert run_cli("check", "README.md")[0] == 2
     assert run_cli("--load", "README.md", "--print")[0] == 2
     assert run_cli("check", "../README.md")[0] == 0

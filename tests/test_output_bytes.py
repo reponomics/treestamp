@@ -101,6 +101,20 @@ def test_a_crlf_document_keeps_its_carriage_returns_through_update(
     assert b"\n" not in content.replace(b"\r\n", b"")
 
 
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"], ids=["lf", "crlf"])
+def test_print_loaded_document_preserves_line_endings_as_bytes(
+    repo: Repo, eol: bytes
+) -> None:
+    stamped(repo)
+    destination = repo.path / "README.md"
+    destination.write_bytes(cli_bytes(repo, "--print").replace(b"\n", eol))
+    repo.add("README.md")
+    cli(repo, "update", "README.md")
+    before = destination.read_bytes()
+    assert cli_bytes(repo, "--load", "README.md", "--print") == before
+    assert destination.read_bytes() == before
+
+
 def test_headless_hash_collision_update_and_check_preserve_authored_notes(
     repo: Repo,
 ) -> None:
