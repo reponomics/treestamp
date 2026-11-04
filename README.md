@@ -186,6 +186,8 @@ treestamp's ability to track changes when updating a document and comparing it t
 
 New output includes a blank line after the start marker, between the configuration comment (when present) and the tree, and before the end marker. `treestamp check` accepts either zero or one blank line at each of these boundaries, independently. The terminal and web editors preserve this spacing when loading and exporting an existing treestamp; writes and `treestamp update` preserve the destination document's spacing and line endings. Newly created documents use the default blank lines. This allows Markdown formatters to adjust these boundaries without making an otherwise current tree fail its check.
 
+Configuration arrays use compact wrapping with an 80-character target: short arrays stay inline, and longer arrays fit several entries per line where possible. Individual entries are never split, so a long path or record may exceed the target. Existing TOML formatting, including comments and multiline arrays, is preserved while the configuration values remain unchanged and does not cause `check` to fail. When those values change, the configuration is regenerated using the default layout; comments within that configuration are not retained. The configuration must still use supported settings and valid values inside the `treestamp:config` comment wrapper.
+
 ## Project Structure
 
 <!-- treestamp:start -->

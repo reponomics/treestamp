@@ -151,6 +151,27 @@ def test_explicit_hidden_survives_maintenance(repo: Repo) -> None:
     }
 
 
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_check_accepts_authored_toml_without_hiding_tree_drift(
+    repo: Repo, eol: bytes
+) -> None:
+    path = stamp(repo, hidden=frozenset({"README.md"}))
+    payload = b"root = '.'\nhidden = [\n  'README.md', # intentionally hidden\n]\n"
+    original = path.read_bytes().replace(b'hidden = ["README.md"]\n', payload)
+    original = original.replace(b"\n", eol)
+    path.write_bytes(original)
+    assert run_cli("check")[0] == 0
+    assert run_cli("update")[0] == 0
+    assert path.read_bytes() == original
+    repo.write("new.py")
+    repo.add("new.py")
+    assert run_cli("check")[0] == 1
+    assert path.read_bytes() == original
+    assert run_cli("update")[0] == 0
+    assert payload.replace(b"\n", eol) in path.read_bytes()
+    assert run_cli("check")[0] == 0
+
+
 def test_attribution_survives_check_update_and_print(repo: Repo) -> None:
     path = stamp(repo)
     document, _ = load_document(path)

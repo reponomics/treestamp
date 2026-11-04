@@ -551,3 +551,63 @@ def test_copy_omits_file_bom_but_write_preserves_it(repo: Repo) -> None:
     assert editor.region_text().encode() == region
     editor.write("tree.md")
     assert destination.read_bytes() == original
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_editor_preserves_authored_toml_until_hidden_paths_change(
+    repo: Repo, eol: str
+) -> None:
+    hidden = (
+        "release-checklist-for-project-maintainers.md",
+        "supporting-documentation-for-release-process.md",
+        "development-environment-setup-instructions.md",
+    )
+    for path in hidden:
+        repo.write(path)
+    editor = make_editor(repo)
+    for path in hidden:
+        editor.state.session.hide(path)
+    editor.create("tree.md")
+    destination = repo.path / "tree.md"
+    region = destination.read_text()
+    start = region.index("<!-- treestamp:config")
+    end = region.index("-->", start) + 3
+    authored = (
+        "<!-- treestamp:config\n"
+        "# Keep the maintainer's explanation and preferred ordering.\n"
+        "root = '.'\n"
+        "hidden = [\n"
+        + "".join(f"    '{path}',  # Maintainer-only notes\n" for path in hidden)
+        + "]\n-->"
+    )
+    original = (region[:start] + authored + region[end:]).replace("\n", eol)
+    destination.write_bytes(original.encode())
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty
+    assert editor.region_text() == original
+
+    editor.state.session.set_annotation("src/a", "note")
+    edited = original.replace(" a" + eol, " a  # note" + eol)
+    assert edited != original
+    assert editor.region_text() == edited
+    editor.write("tree.md")
+    assert destination.read_bytes() == edited.encode()
+    assert not editor.dirty
+
+    editor.state.session.hide("src/b")
+    changed = editor.region_text()
+    payload = changed.split("<!-- treestamp:config" + eol, 1)[1].split(eol + "-->", 1)[
+        0
+    ]
+    assert "Maintainer-only notes" not in payload
+    assert all(len(line) <= 80 for line in payload.splitlines())
+    assert len(payload.splitlines()) > 2
+    parsed = parse_document(changed.encode())
+    assert parsed.hidden == frozenset((*hidden, "src/b"))
+    assert region_metadata(changed.replace(eol, "\n"))["hidden"] == sorted(
+        parsed.hidden
+    )
+    editor.write("tree.md")
+    assert destination.read_bytes() == changed.encode()
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty

@@ -1,5 +1,6 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
+import tomllib
 from dataclasses import replace
 from itertools import product
 from pathlib import Path
@@ -352,6 +353,96 @@ def test_adding_metadata_uses_default_gap(document: Document) -> None:
     assert parse_document(result) == edited
 
 
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "hidden=['b.txt','a.txt']",
+        '"hidden" = [\n  "a.txt", # keep this comment\n\n  "b.txt",\n]',
+        'hidden = ["""a.\\\n  txt""", \'b.txt\']',
+        "root = '.'\nhidden = ['a.txt', 'b.txt']\nspecial_paths = []",
+    ],
+)
+def test_equivalent_toml_layout_survives_tree_edits(
+    document: Document, eol: str, payload: str
+) -> None:
+    source = replace(document, hidden=frozenset({"a.txt", "b.txt"}))
+    text = render_region(source).replace('hidden = ["a.txt", "b.txt"]', payload)
+    original = text.replace("\n", eol).encode()
+    assert parse_document(original) == source
+    assert prepare_content(source, ".", original) == original
+    edited = replace(source, tree=replace(source.tree, annotation="updated"))
+    result = prepare_content(edited, ".", original)
+    assert result.replace(b"  # updated", b"") == original
+    assert parse_document(result) == edited
+
+
+@pytest.mark.parametrize(
+    "payload", ["", "# optional config\n", "root = '.'\n", "hidden = []\n"]
+)
+def test_explicit_default_metadata_is_preserved(
+    document: Document, payload: str
+) -> None:
+    original = (
+        render_region(document)
+        .replace("```sh", "<!-- treestamp:config\n" + payload + "-->\n\n```sh", 1)
+        .encode()
+    )
+    assert parse_document(original) == document
+    assert prepare_content(document, ".", original) == original
+
+
+def test_array_of_tables_metadata_is_preserved() -> None:
+    source = Document(build_tree([Entry("name  # literal")]))
+    original = (
+        render_region(source)
+        .replace(
+            'special_paths = [{row = 1, path = "name  # literal"}]',
+            "[[special_paths]]\nrow = 1\npath = 'name  # literal'",
+        )
+        .encode()
+    )
+    assert b"[[special_paths]]" in original
+    assert parse_document(original) == source
+    assert prepare_content(source, ".", original) == original
+
+
+def test_generated_arrays_use_compact_wrapping(document: Document) -> None:
+    hidden = frozenset(f"file-{index:02}.txt" for index in range(18))
+    source = replace(document, hidden=hidden)
+    region = render_region(source)
+    payload = region.partition("<!-- treestamp:config\n")[2].partition("\n-->")[0]
+    lines = payload.splitlines()
+    assert lines[0] == "hidden = [" and lines[-1] == "]"
+    assert all(len(line) <= 80 for line in lines)
+    assert any(line.count(",") > 1 for line in lines[1:-1])
+    assert set(tomllib.loads(payload)["hidden"]) == hidden
+    assert parse_document(region.encode()) == source
+
+
+@pytest.mark.parametrize("size,wrapped", [(66, False), (67, False), (68, True)])
+def test_array_wrap_threshold(document: Document, size: int, wrapped: bool) -> None:
+    # hidden = ["..."] contributes 13 characters around its sole entry.
+    source = replace(document, hidden=frozenset({"x" * size}))
+    region = render_region(source)
+    assert ("hidden = [\n" in region) == wrapped
+    assert parse_document(region.encode()) == source
+
+
+def test_long_entries_and_special_records_are_never_split(document: Document) -> None:
+    path = "x" * 100
+    source = replace(document, hidden=frozenset({path}))
+    region = render_region(source)
+    assert f'    "{path}",\n' in region
+    assert parse_document(region.encode()) == source
+    special = Document(
+        build_tree([Entry(f"entry-{index}  # literal") for index in range(5)])
+    )
+    region = render_region(special)
+    assert "special_paths = [\n" in region
+    assert parse_document(region.encode()) == special
+
+
 def test_parse_document_round_trips_byte_paths(document: Document) -> None:
     document = replace(document, hidden=frozenset({"src/\udcff.bin"}))
     content = render_region(document, ".").encode("utf-8", "surrogateescape")
@@ -514,10 +605,11 @@ def test_config_is_only_curation_and_minimal_special_identities(style: str) -> N
     region = render_region(source)
     assert 'root = "src"' in region
     assert 'hidden = ["src/hidden"]' in region
-    assert (
-        'special_paths = [{row = 1, path = "src/notes  # drafts"}, '
-        '{row = 2, path = "src/notes  # drafts/a  # b"}]' in region
-    )
+    payload = region.partition("<!-- treestamp:config\n")[2].partition("\n-->")[0]
+    assert tomllib.loads(payload)["special_paths"] == [
+        {"row": 1, "path": "src/notes  # drafts"},
+        {"row": 2, "path": "src/notes  # drafts/a  # b"},
+    ]
     assert "style =" not in region and "show_counts =" not in region
     assert parse_document(region.encode()) == source
 

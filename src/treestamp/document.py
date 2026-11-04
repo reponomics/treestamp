@@ -219,7 +219,8 @@ def _split_metadata(text: str) -> tuple[str, str]:
     first, separator, rest = text.partition("\n")
     if first.strip() != CONFIG_START or not separator:
         raise MarkerError("malformed metadata wrapper")
-    payload, separator, tree = rest.partition("\n-->")
+    payload, separator, tree = ("\n" + rest).partition("\n-->")
+    payload = payload.removeprefix("\n")
     if not separator or "<!--" in payload or "-->" in payload:
         raise MarkerError("invalid or unterminated metadata wrapper")
     return payload, _trim_blank_lines(tree)
@@ -347,21 +348,56 @@ def normalized_hidden(document: Document) -> frozenset[str]:
     return frozenset(result)
 
 
+def _array_text(key: str, values: list[str]) -> str:
+    """Pack whole TOML values into lines with an 80-character target."""
+    inline = f"{key} = [{', '.join(values)}]"
+    if len(inline) <= 80:
+        return inline
+    rows = [f"{key} = ["]
+    line = "    "
+    for value in values:
+        entry = value + ","
+        if line.strip() and len(line) + 1 + len(entry) > 80:
+            rows.append(line)
+            line = "    "
+        line += (" " if line.strip() else "") + entry
+    return "\n".join([*rows, line, "]"])
+
+
 def _settings_text(document: Document, registered: dict[int, str]) -> str:
     rows = []
     if document.settings.root != ".":
         rows.append(f"root = {_path_literal(document.settings.root)}")
     hidden = normalized_hidden(document)
     if hidden:
-        values = ", ".join(_path_literal(path) for path in sorted(hidden))
-        rows.append(f"hidden = [{values}]")
+        values = [_path_literal(path) for path in sorted(hidden)]
+        rows.append(_array_text("hidden", values))
     if registered:
-        values = ", ".join(
+        values = [
             f"{{row = {row}, path = {_path_literal(path)}}}"
             for row, path in registered.items()
-        )
-        rows.append(f"special_paths = [{values}]")
+        ]
+        rows.append(_array_text("special_paths", values))
     return "".join(row + "\n" for row in rows)
+
+
+def _config_text(payload: str, previous: bytes | None) -> str:
+    """Retain equivalent TOML verbatim; changed config uses generated formatting."""
+    generated = f"{CONFIG_START}\n{payload}-->" if payload else ""
+    if previous is None:
+        return generated
+    text = previous.decode("utf-8", "surrogateescape").replace("\r\n", "\n")
+    text = text.lstrip("\n")
+    if not text.startswith(CONFIG_START + "\n"):
+        return generated
+    try:
+        old_payload, _ = _split_metadata(text)
+        if _metadata(old_payload) == _metadata(payload):
+            return text.partition("\n-->")[0] + "\n-->"
+    except MarkerError:
+        # Writing into another document may discard invalid destination config.
+        pass
+    return generated
 
 
 @dataclass(frozen=True)
@@ -387,7 +423,11 @@ class _Spacing:
 
 
 def render_interior(
-    document: Document, root: str | None = None, *, spacing: _Spacing | None = None
+    document: Document,
+    root: str | None = None,
+    *,
+    spacing: _Spacing | None = None,
+    previous: bytes | None = None,
 ) -> str:
     """Render the interior using repository-relative config identities."""
     spacing = spacing or _Spacing()
@@ -396,9 +436,9 @@ def render_interior(
     body, registered = render_tree_with_paths(
         document.tree, document.settings, fenced=True
     )
-    payload = _settings_text(document, registered)
+    config = _config_text(_settings_text(document, registered), previous)
     gap = "\n" if spacing.after_config else ""
-    output = f"{CONFIG_START}\n{payload}-->\n{gap}{body}" if payload else body
+    output = f"{config}\n{gap}{body}" if config else body
     if document.settings.attribution:
         output += f"\n{ATTRIBUTION}\n"
     output = "\n" * spacing.after_start + output + "\n" * spacing.before_end
@@ -440,10 +480,11 @@ def prepare_content(
     region = _find_region(previous, location)
     if region is None:
         raise MarkerError("document has no treestamp marker pair", location=location)
-    spacing = _Spacing.from_interior(previous[region.start : region.end])
-    interior = render_interior(document, root, spacing=spacing).encode(
-        "utf-8", "surrogateescape"
-    )
+    old_interior = previous[region.start : region.end]
+    spacing = _Spacing.from_interior(old_interior)
+    interior = render_interior(
+        document, root, spacing=spacing, previous=old_interior
+    ).encode("utf-8", "surrogateescape")
     interior = interior.replace(b"\n", region.eol)
     return previous[: region.start] + interior + previous[region.end :]
 
