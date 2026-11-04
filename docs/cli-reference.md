@@ -77,13 +77,15 @@ treestamp check README.md --target HEAD --compare HEAD~1
 
 Both commands require an existing, valid treestamp. `check` computes the same replacement as `update` without writing it. It prints `Current: …` and exits `0` when unchanged, or a unified diff and exits `1` when an update would change the document, including generated formatting. `update` replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
 
+Supported formatting differences are preserved before that comparison: zero or one blank line after the start marker, between configuration and tree, and before the end marker, plus equivalent TOML configuration formatting when its validated values are unchanged. These differences alone do not fail `check`. When configuration values change, `update` regenerates the configuration with compact array wrapping at an 80-character target and discards its comments. Oversized individual entries stay intact. See [ADR 0002](adr/0002-formatter-compatible-documents.md) for the rationale and limits.
+
 `--target REF` selects a local Git revision in the document's repository instead of its captured index. `--compare REF` supplies the earlier revision for Git rename detection. For example, `--compare HEAD` can preserve annotations across staged renames; after committing a rename, select an appropriate earlier comparison revision.
 
 Annotation transfer is best effort: supported moves must remain within the selected subtree, destination annotations take precedence, and hiding and collapse choices are respected. Directory annotations are not transferred by rename detection. Without `--compare`, annotations are preserved at unchanged paths but do not follow moves. TUI loading and `--print` do not perform rename detection.
 
 ## Output and exit status
 
-Printed output uses UTF-8 and LF line endings. Writing into an existing document preserves its line-ending convention. Diagnostic errors go to stderr.
+Output uses UTF-8. New regions use LF line endings; printing or copying a loaded region preserves its LF or CRLF convention and supported formatting. Exported snippets omit a file-level UTF-8 BOM. Writing into an existing document preserves its line-ending convention and any original BOM. Diagnostic errors go to stderr.
 
 | Exit status | Meaning |
 | --- | --- |

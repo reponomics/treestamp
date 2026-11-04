@@ -42,6 +42,8 @@ Row 1 is the file `x  # y` with annotation `z`; row 2 is the directory `x  # y  
 
 `row` is the zero-based index of a physical tree row, with the root at 0. Boundary markers, metadata, and code fences are excluded. Unicode, ASCII, and list styles use the same indexing. Paths remain repository-relative and retain the existing string or `git_bytes` representation.
 
+The array layout above is illustrative. Equivalent TOML formatting is accepted and preserved while the registrations remain unchanged; newly generated or changed arrays use compact wrapping at an 80-character target. Wrapping metadata does not change tree row numbers. See [ADR 0002](adr/0002-formatter-compatible-documents.md).
+
 The parser builds a lookup by row and visits the tree rows once. On a registered row, it validates the full path against the parent established by indentation, matches that path's filename using the current style's escaping, and parses only the suffix as type information, counts, and annotation. It does not try another filename interpretation. Unregistered rows use the ordinary row parser. The parser rejects duplicate row or path registrations, invalid indices (including the root), nonexistent rows, parent or filename mismatches, and registrations whose filenames do not contain the delimiter. Metadata selects an interpretation; it never bypasses validation.
 
 The renderer generates row indices and registrations from the same traversal that emits the rows. The round-trip check still verifies exact identities and facts. Row-based resolution replaces the backtracking resolver, its branch limit, and the 100-registration ceiling. This removes combinatorial identity search; it is not a claim that every parser operation has linear complexity.
