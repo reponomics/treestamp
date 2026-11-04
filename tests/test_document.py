@@ -1,6 +1,7 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
 from dataclasses import replace
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from treestamp.document import (
     load_document,
     normalized_hidden,
     parse_document,
+    prepare_content,
     prepare_write,
     publish_write,
     render_interior,
@@ -296,11 +298,58 @@ def test_render_region_matches_created_file_bytes(
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
-def test_region_carries_no_blank_lines(document: Document, style: str) -> None:
+def test_region_defaults_to_blank_lines_between_blocks(
+    document: Document, style: str
+) -> None:
     document = replace(document, settings=replace(document.settings, style=style))
     region = render_region(document, ".")
-    assert region.endswith("\n")
-    assert "" not in region[:-1].split("\n")
+    assert region.startswith(START.decode() + "\n\n")
+    assert region.endswith("\n\n" + END.decode() + "\n")
+    configured = render_region(replace(document, hidden=frozenset({"hidden.txt"})))
+    assert "-->\n\n" in configured.split("treestamp:config", 1)[1]
+
+
+@pytest.mark.parametrize("gaps", list(product((False, True), repeat=3)))
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("attribution", [False, True])
+def test_write_preserves_each_optional_blank_line(
+    document: Document,
+    gaps: tuple[bool, bool, bool],
+    eol: str,
+    style: str,
+    attribution: bool,
+) -> None:
+    source = replace(
+        document,
+        settings=Settings(style=style, attribution=attribution),
+        hidden=frozenset({"hidden.txt"}),
+    )
+    region = render_region(source)
+    for boundary, keep in zip(
+        [START.decode() + "\n\n", "-->\n\n", "\n\n" + END.decode()],
+        gaps,
+        strict=True,
+    ):
+        if not keep:
+            region = region.replace(boundary, boundary.replace("\n\n", "\n"))
+    original = ("Before\n" + region + "After\n").replace("\n", eol).encode()
+    assert parse_document(original) == source
+    assert prepare_content(source, ".", original) == original
+    edited = replace(source, tree=replace(source.tree, annotation="updated"))
+    result = prepare_content(edited, ".", original)
+    assert parse_document(result) == edited
+    assert result.replace(b"  # updated", b"") == original
+
+
+def test_adding_metadata_uses_default_gap(document: Document) -> None:
+    compact = render_region(document).replace("\n\n", "\n").encode()
+    edited = replace(document, hidden=frozenset({"hidden.txt"}))
+    result = prepare_content(edited, ".", compact)
+    assert result.startswith(START + b"\n<!-- treestamp:config\n")
+    assert b"-->\n\n```sh\n" in result
+    assert result.endswith(b"```\n" + END + b"\n")
+    assert parse_document(result) == edited
 
 
 def test_parse_document_round_trips_byte_paths(document: Document) -> None:
@@ -383,7 +432,7 @@ def test_attribution_round_trip_and_removal(
         hidden=frozenset({"hidden.txt"}),
     )
     region = render_region(source)
-    assert region.endswith(f"\n\n{ATTRIBUTION}\n{END.decode()}\n")
+    assert region.endswith(f"\n\n{ATTRIBUTION}\n\n{END.decode()}\n")
     if style != "list":
         assert f"```\n\n{ATTRIBUTION}" in region
     path = tmp_path / "README.md"

@@ -346,7 +346,7 @@ def test_attribution_is_opt_in_and_survives_loading_and_editing(
     original.state["curation"]["settings"].update(attribution=True, style=style)
     enabled = op(service, original, "present")
     trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
-    assert enabled.region.endswith(f"\n\n{trailer}\n<!-- treestamp:end -->\n")
+    assert enabled.region.endswith(f"\n\n{trailer}\n\n<!-- treestamp:end -->\n")
     assert parse_document(enabled.region.encode()).settings.attribution is True
     repo.write("README.md", enabled.region)
     repo.commit("document with attribution")
@@ -592,3 +592,62 @@ def test_byte_root_permalink_restores_exact_snapshot_state(
         )
     )
     assert restored.region == result.region
+
+
+@pytest.mark.parametrize("after_start", [False, True])
+@pytest.mark.parametrize("after_config", [False, True])
+@pytest.mark.parametrize("before_end", [False, True])
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_loaded_preview_preserves_optional_spacing_in_copy_and_restore(
+    fake: FakeGitHub,
+    repo: Repo,
+    after_start: bool,
+    after_config: bool,
+    before_end: bool,
+    eol: bytes,
+) -> None:
+    from treestamp.document import extract_region
+
+    stamp(repo, hidden=("README.md",))
+    path = repo.path / "README.md"
+    original = path.read_bytes()
+    for marker, keep in (
+        (b"<!-- treestamp:start -->\n", after_start),
+        (b"\n-->\n", after_config),
+    ):
+        if not keep:
+            original = original.replace(marker + b"\n", marker)
+    if not before_end:
+        original = original.replace(
+            b"\n\n<!-- treestamp:end -->", b"\n<!-- treestamp:end -->"
+        )
+    original = original.replace(b"\n", eol)
+    path.write_bytes(original)
+    repo.commit("optional block spacing")
+    service, _ = service_for(fake)
+    result = preview(service)
+    region = extract_region(original)
+    assert not result.dirty and result.notice is None
+    assert result.region.encode() == region
+    restored = op(service, result, "restore")
+    assert not restored.dirty
+    assert restored.region.encode() == region
+    edited = op(service, restored, "annotate", "", "edited")
+    assert edited.dirty
+    assert edited.region.encode() == region.replace(b"# repository", b"# edited")
+    assert path.read_bytes() == original
+
+
+def test_preview_copy_omits_file_bom(fake: FakeGitHub, repo: Repo) -> None:
+    from treestamp.document import extract_region
+
+    region = extract_region(stamp(repo).encode())
+    path = repo.path / "README.md"
+    original = b"\xef\xbb\xbf" + region
+    path.write_bytes(original)
+    repo.commit("BOM at start marker")
+    service, _ = service_for(fake)
+    result = preview(service)
+    assert not result.dirty
+    assert result.region.encode() == region
+    assert path.read_bytes() == original

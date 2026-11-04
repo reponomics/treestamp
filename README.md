@@ -182,7 +182,9 @@ Currently, there is also the potential for a treestamp to be corrupted if it con
 
 The TUI and web editor do not currently detect moves or renames, so annotations on moved entries may be dropped when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
 
-treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on the treestamp's content (whatever is between the boundary markers) remaining unchanged and not manually edited (with one exception: manual edits of annotations are tolerable). This establishes an informal contract that the user must agree not to manually edit the other contents of the treestamp outside of the editor, if they want the application to be able to reliably parse and recognize the treestamp in the way it was authored previously.
+treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on preserving the generated tree and configuration between its boundary markers. Manual edits to annotations are supported. Other changes to the tree or configuration should be made through the editor so treestamp can reliably reload the document.
+
+New output includes a blank line after the start marker, between the configuration comment (when present) and the tree, and before the end marker. `treestamp check` accepts either zero or one blank line at each of these boundaries, independently. The terminal and web editors preserve this spacing when loading and exporting an existing treestamp; writes and `treestamp update` preserve the destination document's spacing and line endings. Newly created documents use the default blank lines. This allows Markdown formatters to adjust these boundaries without making an otherwise current tree fail its check.
 
 ## Project Structure
 

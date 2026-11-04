@@ -672,13 +672,14 @@ class PreviewService:
         )
         printed = Document(tree, session.settings, hidden)
         try:
-            region = render_region(printed)
+            if envelope.baseline is None:
+                region = render_region(printed)
+                dirty = True
+            else:
+                content = prepare_content(printed, target.root, envelope.baseline)
+                region = extract_region(content).decode("utf-8-sig", "surrogateescape")
+                dirty = content != envelope.baseline
             rendered_tree = render_tree(printed.tree, printed.settings)
-            dirty = (
-                envelope.baseline is None
-                or prepare_content(printed, target.root, envelope.baseline)
-                != envelope.baseline
-            )
         except MarkerError as exc:
             raise PreviewError(422, "curation", str(exc)) from None
         return Preview(

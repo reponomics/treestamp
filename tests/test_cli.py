@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -86,21 +87,58 @@ def test_check_update_idempotence_and_unbounded_additions(repo: Repo) -> None:
 
 
 @pytest.mark.parametrize("eol", [b"\n", b"\r\n"], ids=["lf", "crlf"])
-def test_formatting_changes_participate_in_check(repo: Repo, eol: bytes) -> None:
-    path = stamp(repo)
+@pytest.mark.parametrize(
+    "boundary",
+    [b"<!-- treestamp:start -->\n\n", b"-->\n\n```sh", b"\n\n<!-- treestamp:end -->"],
+)
+def test_excess_blank_lines_still_participate_in_check(
+    repo: Repo, eol: bytes, boundary: bytes
+) -> None:
+    path = stamp(repo, hidden=frozenset({"README.md"}))
     baseline = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", eol)
     path.write_bytes(baseline)
     assert run_cli("check")[0] == 0
-    original = baseline.replace(
-        b"<!-- treestamp:start -->" + eol,
-        b"<!-- treestamp:start -->" + eol * 2,
-    )
+    boundary = boundary.replace(b"\n", eol)
+    original = baseline.replace(boundary, boundary.replace(eol * 2, eol * 3))
     assert original != baseline
     path.write_bytes(original)
     assert run_cli("check")[0] == 1
     assert path.read_bytes() == original
     assert run_cli("update")[0] == 0
     assert path.read_bytes() != original
+    assert run_cli("check")[0] == 0
+
+
+@pytest.mark.parametrize("gaps", list(product((False, True), repeat=3)))
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_check_accepts_optional_blank_lines_but_detects_stale_tree(
+    repo: Repo,
+    gaps: tuple[bool, bool, bool],
+    eol: bytes,
+) -> None:
+    path = stamp(repo, hidden=frozenset({"README.md"}))
+    original = path.read_bytes()
+    boundaries = [
+        b"<!-- treestamp:start -->\n\n",
+        b"-->\n\n```sh",
+        b"\n\n<!-- treestamp:end -->",
+    ]
+    for boundary, keep in zip(boundaries, gaps, strict=True):
+        if not keep:
+            original = original.replace(boundary, boundary.replace(b"\n\n", b"\n"))
+    original = original.replace(b"\n", eol)
+    path.write_bytes(original)
+    assert run_cli("check")[0] == 0
+    assert run_cli("update")[0] == 0
+    assert path.read_bytes() == original
+    repo.write("new.py")
+    repo.add("new.py")
+    assert run_cli("check")[0] == 1
+    assert path.read_bytes() == original
+    assert run_cli("update")[0] == 0
+    updated = path.read_bytes()
+    for boundary, keep in zip(boundaries, gaps, strict=True):
+        assert (boundary.replace(b"\n", eol) in updated) == keep
     assert run_cli("check")[0] == 0
 
 

@@ -195,3 +195,17 @@ test("preview candidates validate before adoption, including bundled examples", 
     }
   }
 });
+
+test("region metadata stays quiet across optional spacing and CRLF", () => {
+  for (const gap of ["", "\n"]) {
+    for (const eol of ["\n", "\r\n"]) {
+      const text = (`<!-- treestamp:start -->\n${gap}<!-- treestamp:config\nroot = "src"\n-->\n${gap}\`\`\`sh\n./\n\`\`\`\n${gap}<!-- treestamp:end -->\n`).replace(/\n/g, eol);
+      const segments = regionSegments(text);
+      assert.equal(segments.map((segment) => segment.text).join(""), text);
+      assert.deepEqual(segments.map((segment) => segment.quiet), [true, false, true]);
+      assert.ok(segments[0].text.includes('root = "src"'));
+      assert.ok(!segments[1].text.includes('root = "src"'));
+      assert.ok(segments[1].text.includes("./"));
+    }
+  }
+});

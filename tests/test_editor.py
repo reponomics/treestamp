@@ -8,6 +8,7 @@ import pytest
 from treestamp.document import (
     ATTRIBUTION,
     Document,
+    extract_region,
     load_document,
     parse_document,
     render_region,
@@ -160,7 +161,7 @@ def test_document_location_does_not_rebase_root_or_hidden(repo: Repo) -> None:
     assert document.hidden == frozenset({"src/b"})
     assert destination.read_text(encoding="utf-8").startswith("Before\n")
     assert destination.read_text(encoding="utf-8").endswith("After\n")
-    assert editor.region_text() == render_region(document)
+    assert editor.region_text().encode() == extract_region(destination.read_bytes())
     reopened = editor.prepare_load(str(destination.relative_to(repo.path)))
     assert reopened.root == repo.path / "src"
     with pytest.raises(MarkerError):
@@ -485,3 +486,68 @@ def test_preflight_only_checks_selected_subtree(repo: Repo) -> None:
     editor = EditorController(snapshot, Settings(root="good"))
     editor.create("tree.md")
     assert "leaf" in repo.read("tree.md")
+
+
+@pytest.mark.parametrize("after_start", [False, True])
+@pytest.mark.parametrize("after_config", [False, True])
+@pytest.mark.parametrize("before_end", [False, True])
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_loaded_editor_preserves_optional_spacing_in_copy_and_write(
+    repo: Repo, after_start: bool, after_config: bool, before_end: bool, eol: bytes
+) -> None:
+    editor = make_editor(repo)
+    editor.state.session.hide("src/b")
+    editor.state.session.settings = replace(
+        editor.state.session.settings, attribution=True
+    )
+    editor.create("tree.md")
+    destination = repo.path / "tree.md"
+    region = destination.read_bytes()
+    for marker, keep in (
+        (b"<!-- treestamp:start -->\n", after_start),
+        (b"\n-->\n", after_config),
+    ):
+        if not keep:
+            region = region.replace(marker + b"\n", marker)
+    if not before_end:
+        region = region.replace(
+            b"\n\n<!-- treestamp:end -->", b"\n<!-- treestamp:end -->"
+        )
+    region = region.replace(b"\n", eol)
+    original = b"# Intro" + eol + region + b"Other prose." + eol
+    destination.write_bytes(original)
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty
+    assert editor.state.status == "Treestamp is up to date"
+    assert editor.region_text().encode() == region
+    assert destination.read_bytes() == original
+
+    editor.state.session.set_annotation("src/a", "note")
+    expected = region.replace(b" a" + eol, b" a  # note" + eol)
+    assert expected != region
+    assert editor.dirty
+    assert editor.region_text().encode() == expected
+    editor.write("tree.md")
+    assert (
+        destination.read_bytes() == b"# Intro" + eol + expected + b"Other prose." + eol
+    )
+    assert not editor.dirty
+
+    editor.create("new.md")
+    assert (repo.path / "new.md").read_bytes() == render_region(
+        editor.document()
+    ).encode()
+
+
+def test_copy_omits_file_bom_but_write_preserves_it(repo: Repo) -> None:
+    editor = make_editor(repo)
+    editor.create("tree.md")
+    destination = repo.path / "tree.md"
+    region = destination.read_bytes()
+    original = b"\xef\xbb\xbf" + region
+    destination.write_bytes(original)
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty
+    assert editor.region_text().encode() == region
+    editor.write("tree.md")
+    assert destination.read_bytes() == original
