@@ -51,7 +51,7 @@ Credentials have no fixed rotation schedule. Rotate a credential immediately if 
 
 ## Homebrew distribution
 
-The [Homebrew tap setup plan](https://github.com/reponomics/treestamp/blob/main/docs/homebrew-tap.md) describes packaging published PyPI releases in a separate `reponomics/homebrew-tap` repository, validating installations, and maintaining formula updates. The plan records proposed work; verify its completion criteria before advertising Homebrew as an available installation channel.
+The [Homebrew distribution runbook](https://github.com/reponomics/treestamp/blob/main/docs/homebrew-tap.md) records the v1.0.0 packaging and publication status and describes maintaining the formula in the separate [Reponomics tap](https://github.com/reponomics/homebrew-tap). Formula updates are reviewed manually after PyPI publication and validated by source installation on macOS and Linux. Prebuilt bottles and automatic formula updates are not enabled.
 
 ## Production deployment
 

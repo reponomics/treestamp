@@ -1,104 +1,64 @@
-# Homebrew tap setup plan
+# Homebrew distribution
 
-This plan distributes Treestamp's command-line interface and terminal editor through `reponomics/homebrew-tap`, using the published PyPI source distribution. Users will install it with `brew install reponomics/tap/treestamp`. The hosted web editor remains independently deployed.
+Treestamp's command-line interface and terminal editor are packaged in the separate [Reponomics Homebrew tap](https://github.com/reponomics/homebrew-tap). The formula uses the published PyPI source distribution and installs the application's Python dependencies in a private environment. The hosted web editor remains independently deployed.
 
-Status: proposed setup, not an existing distribution channel. The PyPI metadata and local Homebrew commands were checked on 2026-10-28; the formula has not been built or installed. The initial release below is `0.1.2`. Recheck PyPI before implementation if a later release should be packaged.
+Published on 2026-11-05: the v1.0.0 formula passed local source installation, its functional test, style, strict online audit, livecheck, and the installed-editor journey. Clean macOS and Linux source-install CI also passed before [the formula PR](https://github.com/reponomics/homebrew-tap/pull/1) was merged. Homebrew resolves the published formula as version 1.0.0.
 
-The tap is a separate Git repository. This Treestamp worktree holds the plan and any eventual installation documentation or release integration, while `Formula/treestamp.rb` and the Homebrew workflows belong in the tap.
+## Installation and ownership
 
-## Prerequisites and release source
+Install and update it with:
 
-- Homebrew and GitHub CLI are installed, and `gh auth status` confirms an account that can create repositories in `reponomics`.
-- The intended tap repository is `reponomics/homebrew-tap`; its Homebrew shorthand is `reponomics/tap`. If that repository already exists, clone or tap it instead of running the creation commands below.
-- Test on the Python minor version selected by Homebrew. Treestamp declares Python 3.11 or newer; that declaration alone does not establish compatibility with every newer interpreter.
-- Use the normal published application dependencies, without the `dev` extra or the hosted package.
+```sh
+brew install reponomics/tap/treestamp
+brew update
+brew upgrade reponomics/tap/treestamp
+```
 
-The [PyPI 0.1.2 release](https://pypi.org/project/treestamp/0.1.2/#files) has this source distribution:
+Homebrew installs Python, Git, and the Python dependencies needed by the terminal editor. The initial distribution installs from source; prebuilt bottles and automatic formula updates are not enabled.
+
+The [tap README](https://github.com/reponomics/homebrew-tap#readme) contains the user-facing installation instructions and formula maintenance commands. The tap owns `Formula/treestamp.rb` and its GitHub workflows. This repository owns application releases, the PyPI artifact, and the public Treestamp documentation. Changes to the tap do not require republishing the application.
+
+## Initial release record
+
+The formula targets [Treestamp 1.0.0 on PyPI](https://pypi.org/project/treestamp/1.0.0/#files):
 
 ```text
-URL: https://files.pythonhosted.org/packages/ca/de/7b5a4476488a7e161bda280da6e36a88a3435a67fc2f07328a32095b34c9/treestamp-0.1.2.tar.gz
-SHA-256: 846b301000d98bdc9ce2e33f6634bc287faf75b9fe74ab8c57d6a1f86e5c33e2
+URL: https://files.pythonhosted.org/packages/ef/9e/8fa7f2f3712bccc8a7b0820494b9309d52e2536368f82386eecf5f94aa62/treestamp-1.0.0.tar.gz
+SHA-256: 753f6f4b80227bb7121b835fcdca6f8965b302fff9d0edde745d53ca368aefbb
 ```
 
-## 1. Create and publish the tap scaffold
+The initial formula declares `git` and `python@3.15`, includes `Language::Python::Virtualenv`, and installs with `virtualenv_install_with_resources`. It packages the normal application dependencies without the `dev` extra or the hosted package. The nine checksummed Python resources resolved for this release are:
 
-```sh
-brew update
-brew tap-new --branch=main reponomics/tap
-cd "$(brew --repository reponomics/tap)"
-```
+| Resource | Version |
+| --- | --- |
+| linkify-it-py | 2.2.0 |
+| markdown-it-py | 4.2.0 |
+| mdit-py-plugins | 0.6.1 |
+| mdurl | 0.1.2 |
+| platformdirs | 4.14.4 |
+| pygments | 2.21.0 |
+| rich | 15.0.0 |
+| textual | 8.2.8 |
+| typing-extensions | 4.16.0 |
 
-`tap-new` initializes and commits a local Git repository containing `Formula/`, a README, and generated GitHub configuration. All subsequent tap commands run in this directory, independently of the Treestamp checkout.
+These versions record the initial packaging decision; consult the [current formula](https://github.com/reponomics/homebrew-tap/blob/main/Formula/treestamp.rb) for subsequent changes. Homebrew resolves the published dependency ranges for its selected Python independently of `uv.lock`, which also covers this repository's development and hosted environments. The pinned Hatchling build backend is handled by Homebrew's Python build machinery and was exercised by the local source installation.
 
-Review the generated workflows before publishing them:
+## Updating the formula
 
-- Pin each action to the full commit SHA of its reviewed current release, with a version comment.
-- Keep top-level permissions read-only, normally `contents: read`; grant write permissions only to the jobs that need them.
-- Keep tests for supported macOS and Linux environments. Do not advertise platforms that have not passed installation tests.
-- Initially disable or remove the generated scheduled autobump workflow. Start with reviewed manual formula updates and enable automation only after the release path works.
-- Review the generated bottle-publishing workflow before enabling or dispatching it. An initial installation from source does not require published bottles.
+Start from an up-to-date checkout of the tap's `main` branch and create a dedicated update branch. Confirm that the intended Treestamp version has been published to PyPI before editing the formula.
 
-Update the tap README to describe its purpose and mark Treestamp as pending until the formula is merged. Commit any scaffold changes, then create the GitHub repository:
-
-```sh
-git add README.md .github
-git commit -m "chore: configure Homebrew tap workflows"
-gh repo create reponomics/homebrew-tap \
-  --public \
-  --source=. \
-  --remote=origin \
-  --push
-git switch -c codex/add-treestamp
-```
-
-Configure the default branch and PR protections after CI has reported its check names. This bootstrap establishes `main` so the first formula can be reviewed in a pull request. See [Homebrew's tap setup documentation](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap).
-
-## 2. Generate the formula
-
-```sh
-brew create --python \
-  --tap=reponomics/tap \
-  --set-name=treestamp \
-  --set-license=MIT \
-  "https://files.pythonhosted.org/packages/ca/de/7b5a4476488a7e161bda280da6e36a88a3435a67fc2f07328a32095b34c9/treestamp-0.1.2.tar.gz"
-```
-
-The command writes `Formula/treestamp.rb`, attempts automatic Python resource resolution, and then opens the editor. Resource resolution can fail before the editor opens, including when the newly published release is still subject to Homebrew's cooldown. If the file was already written, open that existing file in your editor and continue with the edits below and step 3's resource-resolution procedure. Do not rerun `brew create` against the existing file. If no file was written, resolve the reported creation error before retrying.
-
-Verify the formula's source URL and checksum against the release information above, and set:
-
-```ruby
-desc "Generate and maintain directory trees for project documentation"
-homepage "https://treestamp.reponomics.org"
-license "MIT"
-```
-
-Keep the generated versioned Python dependency, `include Language::Python::Virtualenv`, and any generated dependency resources. Add `depends_on "git"`. Keep the installation method:
-
-```ruby
-def install
-  virtualenv_install_with_resources
-end
-```
-
-The helper creates the application environment under `libexec` and links the installed command into Homebrew's `bin`. The formula packages the PyPI artifact using Homebrew's Python helpers; it does not need the repository's development environment or `make install`. See [Python formula guidance](https://docs.brew.sh/Language-Specific-Formulae#python).
-
-## 3. Resolve and review dependencies
-
-The local Homebrew version checked for this plan is 7.0.10 and supports formula-specific trust and the resource options below. Check `brew help` if an older installation does not recognize them.
+1. Obtain the source archive URL and SHA-256 from that exact PyPI release. Update the formula's `url` and `sha256`; the version is inferred from the archive name.
+2. Resolve the Python resources with the command below and inspect every version, URL, and checksum. Resolve all errors before proceeding.
+3. Reinstall from source and run the validation commands below. Exercise the installed terminal editor as well as the headless CLI.
+4. Update the tap README if installation behavior or supported platforms changed, then submit a pull request.
+5. Merge after review and successful source-install CI on both runners. Confirm installation from the published tap in a clean Homebrew environment before announcing the release.
 
 ```sh
 brew trust --formula reponomics/tap/treestamp
-brew update-python-resources \
-  --install-dependencies \
-  reponomics/tap/treestamp
+brew update-python-resources --install-dependencies reponomics/tap/treestamp
 ```
 
-Inspect the generated `resource` blocks for Textual and its transitive runtime dependencies. Each source must have a fixed version and SHA-256 checksum. Resolve reported errors before proceeding; do not publish an incomplete resource list. Homebrew manages installation of the build backend through its Python build machinery. Confirm that the pinned Hatchling backend and dependency builds succeed in the actual source installation.
-
-Homebrew resolves the published dependency ranges for its selected interpreter. The formula's resource set is reviewed separately from `uv.lock`, which also covers this repository's development and hosted environments.
-
-If resource resolution specifically rejects the newly published Treestamp release because of its age, the maintainer can either wait for the cooldown or, after reviewing that release, use the third-party-tap exception:
+The initial v1.0.0 package was published on the day it was packaged. Homebrew's release cooldown rejected automatic resource resolution, so the maintainer reviewed the release and used `--ignore-main-package-cooldown`. This third-party-tap exception applies only to the main package during resource resolution; dependency cooldowns remain in force. For future releases, either wait for the cooldown or use the same targeted exception after reviewing the release:
 
 ```sh
 brew update-python-resources \
@@ -107,99 +67,36 @@ brew update-python-resources \
   reponomics/tap/treestamp
 ```
 
-This exception applies to the main package during resource resolution; dependency cooldowns still apply. See [Homebrew's dependency resource documentation](https://docs.brew.sh/Language-Specific-Formulae#python-dependency-and-resources).
+If dependency fixes require repackaging an unchanged Treestamp version, increment the formula's `revision` so installed copies become eligible for an upgrade. Never change the published PyPI artifact in place. The tap uses manual updates; cross-repository release automation requires a separate reviewed change and appropriately scoped credentials.
 
-## 4. Add a functional test
+## Validation and CI
 
-Replace the generated `test do` block with the following. It adapts [the existing distribution checks](../scripts/distribution_check.py), including the expected nonzero exit status for a stale tree. The Textual import checks that the terminal editor's runtime dependency is installed even though the CLI loads it lazily.
-
-````ruby
-test do
-  assert_match "treestamp #{version}",
-               shell_output("#{bin}/treestamp --version")
-  system libexec/"bin/python", "-c", "import textual"
-
-  system "git", "init", "-q"
-  (testpath/"src").mkpath
-  (testpath/"src/app.py").write "print('hello')\n"
-  (testpath/"README.md").write <<~MARKDOWN
-    # Fixture
-
-    <!-- treestamp:start -->
-    ```text
-    .
-    └── src/ (99 files)
-    ```
-    <!-- treestamp:end -->
-  MARKDOWN
-  system "git", "add", "."
-
-  assert_match "src/ (1 file)",
-               shell_output("#{bin}/treestamp --print")
-  shell_output("#{bin}/treestamp check README.md", 1)
-  system bin/"treestamp", "update", "README.md"
-  system bin/"treestamp", "check", "README.md"
-end
-````
-
-## 5. Validate and publish the formula
+From the tap checkout, validate the formula against the selected Homebrew Python:
 
 ```sh
 brew style reponomics/tap/treestamp
-brew install --build-from-source reponomics/tap/treestamp
+brew reinstall --build-from-source reponomics/tap/treestamp
 brew test reponomics/tap/treestamp
 brew audit --strict --online reponomics/tap/treestamp
 brew livecheck reponomics/tap/treestamp
 ```
 
-If Treestamp is already installed through Homebrew, use `brew reinstall --build-from-source reponomics/tap/treestamp` after formula edits, then repeat the test. Resolve install, test, style, and audit failures. Confirm that `livecheck` identifies the PyPI version, adding a supported PyPI livecheck configuration if automatic detection fails. Manually launch the installed terminal editor in a fixture Git repository and verify navigation and a basic editing operation.
+Use `brew install --build-from-source` for a first installation. `brew livecheck` must identify the intended PyPI version. A declaration of Python 3.11 or newer does not replace testing the interpreter selected by Homebrew.
 
-Update the tap README with the installation command, then submit the formula:
+The formula's functional test checks the installed version, imports `treestamp.tui`, creates and stages a fixture Git repository, renders its tree, confirms that a stale document exits with status 1, updates the document, and confirms a clean check. An import alone does not exercise editor behavior: also run the installed-editor journey or manually open the installed terminal editor and verify navigation, annotation, hiding, and writing.
 
-```sh
-git add Formula/treestamp.rb README.md
-git commit -m "feat: add treestamp Homebrew formula"
-git push -u origin codex/add-treestamp
-gh pr create --base main --title "feat: add treestamp Homebrew formula" \
-  --body "Package the published Treestamp release with its Python runtime dependencies and a functional Git repository test."
-```
+Use `scripts/installed_editor_check.py` from the exact published source release for the installed-editor journey, together with the fixture in that release's `scripts/distribution_check.py`. For v1.0.0, the driver invokes `--load README.md`; earlier drivers using `--document` and a startup loading sequence are incompatible. Run it with the Homebrew formula's `libexec/bin/python`, from a temporary fixture repository outside the source checkout, with `PYTHONPATH` unset so it tests the installed application.
 
-Have the PR reviewed and confirm that source installation and tests pass on the intended macOS and Linux CI runners. For the initial source-only release, merge the reviewed formula without adding a bottle stanza. If publishing bottles instead, follow the generated Homebrew publishing workflow and supply the reviewed PR head SHA where supported; verify the resulting bottle metadata and installation before advertising bottles. See [the Formula Cookbook](https://docs.brew.sh/Formula-Cookbook) and [tap publishing instructions](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap).
+The [Formula CI workflow](https://github.com/reponomics/homebrew-tap/blob/main/.github/workflows/tests.yml) tests source installation on `macos-26` and `ubuntu-24.04`. Its Homebrew setup action is pinned to a full commit SHA and checks out the tested commit. Workflow permissions are read-only; the jobs run style, source installation, the formula test, and strict online audit. Dependabot proposes action updates. Scheduled formula autobumping and bottle publication are disabled. Check both `Source install` jobs before merging.
 
-After the formula reaches the tap's default branch, verify installation from another clean Homebrew environment:
+## Recovery during initial formula creation
+
+The tap scaffold already exists, so ordinary release updates edit the existing formula rather than recreating the tap or running `brew create` again. For a new formula setup, grant formula-specific trust before creating and loading the formula:
 
 ```sh
-brew install reponomics/tap/treestamp
-treestamp --version
+brew trust --formula reponomics/tap/treestamp
 ```
 
-The direct install command adds the tap automatically. Follow Homebrew's formula-specific trust prompt if one is shown.
+With Homebrew 7.0.12, the initial `brew create --python` invocation wrote `Formula/treestamp.rb` but failed while loading it because trust had not yet been granted. Resource resolution can also fail after the file is written and before the editor opens. If the formula file exists after an error, open and complete that file, grant formula-specific trust if required, and rerun `brew update-python-resources`. Do not rerun `brew create` against the existing file. If no file was written, resolve the reported creation error before retrying.
 
-## 6. Document the available channel and maintain releases
-
-Once the published formula is verified, update Treestamp's README with the Homebrew installation command and replace the obsolete text about waiting for the first PyPI release. Those application documentation changes belong in the Treestamp repository. Do not describe the tap as available before publication and installation have succeeded.
-
-For each subsequent PyPI release:
-
-1. Start a new formula-update branch from the tap's current `main`.
-2. Obtain the new source archive URL and SHA-256 from that exact PyPI release and update the formula. Remove any old bottle stanza when preparing a source-only update; otherwise regenerate bottles through the publishing workflow.
-3. Run `brew update-python-resources reponomics/tap/treestamp` and review the dependency changes.
-4. Reinstall from source, run the formula test, style and audit checks, and verify the terminal editor. Run the supported platform CI matrix.
-5. Review and merge the tap PR, or use the reviewed bottle-publication workflow when distributing bottles.
-
-Users receive new formula versions with:
-
-```sh
-brew update
-brew upgrade reponomics/tap/treestamp
-```
-
-If dependency fixes require repackaging an unchanged Treestamp version, increment the formula's `revision` so installed copies are eligible for an upgrade. Never change the published PyPI artifact in place. Future automation should prepare a reviewed tap PR only after PyPI publication succeeds; design its cross-repository credentials and workflow permissions as a separate follow-up.
-
-## Completion criteria
-
-- The public tap contains a reviewed formula whose source and dependencies have verified checksums.
-- Source installation, the functional test, and the terminal editor work with the selected Homebrew Python on the advertised platforms.
-- A clean environment can install the published formula with the documented command.
-- The tap README and application README describe the verified installation channel.
-- A maintainer can repeat the update procedure for a subsequent PyPI release.
+See [Homebrew's Python formula guidance](https://docs.brew.sh/Language-Specific-Formulae#python), [Formula Cookbook](https://docs.brew.sh/Formula-Cookbook), and [tap maintenance documentation](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap) when adapting these procedures to later Homebrew versions.
