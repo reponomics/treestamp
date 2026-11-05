@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/reponomics/treestamp/compare/v0.5.0...v0.6.0) (2026-11-05)
+
+
+### Features
+
+* improve compatibility with formatters ([#32](https://github.com/reponomics/treestamp/issues/32)) ([6654a92](https://github.com/reponomics/treestamp/commit/6654a9219b94d71f4ac4efa87c5adbd4ac6f0010))
+
 ## [0.5.0](https://github.com/reponomics/treestamp/compare/v0.4.0...v0.5.0) (2026-10-31)
 
 
