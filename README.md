@@ -41,6 +41,12 @@ python -m pip install treestamp
 treestamp
 ```
 
+Homebrew users on macOS or Linux can install from the [Reponomics tap](https://github.com/reponomics/homebrew-tap). Homebrew manages Python, Git, and the application's dependencies:
+
+```bash
+brew install reponomics/tap/treestamp
+```
+
 Invoke it directly from anywhere within a Git repository. You can also run it directly without a persistent installation:
 
 ```
@@ -202,7 +208,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ./
 ├── .github/ (8 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (8 files, 1 folder)
+├── docs/ (9 files, 1 folder)
 ├── scripts/ (7 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -245,7 +251,7 @@ The alternate styles below are generated from the same tree and checked for fres
 ./
 |-- .github/ (8 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
-|-- docs/ (8 files, 1 folder)
+|-- docs/ (9 files, 1 folder)
 |-- scripts/ (7 files)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
@@ -286,7 +292,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 - .github/ (8 files, 2 folders)
 - assets/ (2 files, 1 folder)
-- docs/ (8 files, 1 folder)
+- docs/ (9 files, 1 folder)
 - scripts/ (7 files)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor

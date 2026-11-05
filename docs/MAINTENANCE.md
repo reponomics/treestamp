@@ -49,6 +49,10 @@ Only the maintainer can read or change these secrets (see [GOVERNANCE.md](GOVERN
 
 Credentials have no fixed rotation schedule. Rotate a credential immediately if it may have been exposed, and rotate the affected credentials whenever the people with access to them change. After rotating, revoke the old credential and confirm that the workflow or service using it still works.
 
+## Homebrew distribution
+
+The [Homebrew distribution runbook](https://github.com/reponomics/treestamp/blob/main/docs/homebrew-tap.md) records the v1.0.0 packaging and publication status and describes maintaining the formula in the separate [Reponomics tap](https://github.com/reponomics/homebrew-tap). Formula updates are reviewed manually after PyPI publication and validated by source installation on macOS and Linux. Prebuilt bottles and automatic formula updates are not enabled.
+
 ## Production deployment
 
 [`web/fly.toml`](https://github.com/reponomics/treestamp/blob/main/web/fly.toml) configures production at `https://treestamp.reponomics.org`, served by the Fly app `treestamp-preview`; test deployments use a separate app (see [Preview deployment](#preview-deployment)). [`deploy.yml`](https://github.com/reponomics/treestamp/blob/main/.github/workflows/deploy.yml) deploys every push to `main`, including merged PRs. Required PR checks are the merge gate; deployment does not wait for post-merge CI and never runs on PR events. Leave Fly-native auto-deployment disabled to avoid duplicate rollouts.
