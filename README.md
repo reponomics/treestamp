@@ -209,7 +209,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── .github/ (8 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
 ├── docs/ (9 files, 1 folder)
-├── scripts/ (7 files)  # Installed-package acceptance
+├── scripts/ (8 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
 │       ├── cli.py
@@ -224,7 +224,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── sources.py
 │       ├── tui.py
 │       └── tui_dialogs.py
-├── tests/ (17 files)  # Contract and integration tests
+├── tests/ (18 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)
@@ -252,7 +252,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- .github/ (8 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
 |-- docs/ (9 files, 1 folder)
-|-- scripts/ (7 files)  # Installed-package acceptance
+|-- scripts/ (8 files)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
 |       |-- cli.py
@@ -267,7 +267,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- sources.py
 |       |-- tui.py
 |       `-- tui_dialogs.py
-|-- tests/ (17 files)  # Contract and integration tests
+|-- tests/ (18 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (3 files)
 |   |-- src/ (1 folder)
@@ -293,7 +293,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 - .github/ (8 files, 2 folders)
 - assets/ (2 files, 1 folder)
 - docs/ (9 files, 1 folder)
-- scripts/ (7 files)  # Installed-package acceptance
+- scripts/ (8 files)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
     - cli.py
@@ -308,7 +308,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - sources.py
     - tui.py
     - tui_dialogs.py
-- tests/ (17 files)  # Contract and integration tests
+- tests/ (18 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (3 files)
   - src/ (1 folder)

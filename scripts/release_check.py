@@ -29,6 +29,7 @@ SDIST_FILES = {
     ".pre-commit-hooks.yaml",
     "scripts/changed_tests.py",
     "scripts/check_docs.py",
+    "scripts/check_toolchain.py",
     "scripts/distribution_check.py",
     "scripts/hook_check.py",
     "scripts/installed_editor_check.py",

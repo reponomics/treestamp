@@ -26,10 +26,12 @@ SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
 # Extra pytest-cov options for cov and web-cov, e.g. COV_ARGS=--cov-report=xml
 COV_ARGS ?=
-.PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check
+.PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check toolchain-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+toolchain-check: ## Verify that development/CI and Docker uv pins agree
+	$(PYTHON) scripts/check_toolchain.py
 uv-check: ## Check that uv matches the pinned development tool version
 	@test "$$($(UV) --version | awk '{print $$2}')" = "$(UV_VERSION)" || \
 	  { echo "Install uv $(UV_VERSION), as pinned in .tool-versions."; exit 1; }
@@ -104,7 +106,7 @@ web-serve: ## Run the web editor locally against GITHUB_API_URL
 	GITHUB_API_URL=$(GITHUB_API_URL) GITHUB_RATE_RESERVE=0 $(VENV)/bin/uvicorn --factory treestamp_web.app:create_app --host 127.0.0.1 --port 8000 --reload
 tls-check: ## Check Python TLS package versions and certificate trust stores
 	$(PY) web/scripts/check_tls.py
-web-image: ## Build the web editor container image
+web-image: toolchain-check ## Build the web editor container image
 	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
 fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
 	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
