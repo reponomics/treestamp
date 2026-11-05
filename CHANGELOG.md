@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/reponomics/treestamp/compare/v0.6.0...v1.0.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* prep v1 ([#34](https://github.com/reponomics/treestamp/issues/34))
+
+### Features
+
+* prep v1 ([#34](https://github.com/reponomics/treestamp/issues/34)) ([4a7c60a](https://github.com/reponomics/treestamp/commit/4a7c60ab4eba1e3f28326a082de0550aab17dcb7))
+
 ## [0.6.0](https://github.com/reponomics/treestamp/compare/v0.5.0...v0.6.0) (2026-11-05)
 
 
