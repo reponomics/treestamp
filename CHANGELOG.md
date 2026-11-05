@@ -1,5 +1,79 @@
 # Changelog
 
+## [1.0.0](https://github.com/reponomics/treestamp/compare/v0.6.0...v1.0.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* prep v1 ([#34](https://github.com/reponomics/treestamp/issues/34))
+
+### Features
+
+* prep v1 ([#34](https://github.com/reponomics/treestamp/issues/34)) ([4a7c60a](https://github.com/reponomics/treestamp/commit/4a7c60ab4eba1e3f28326a082de0550aab17dcb7))
+
+## [0.6.0](https://github.com/reponomics/treestamp/compare/v0.5.0...v0.6.0) (2026-11-05)
+
+
+### Features
+
+* improve compatibility with formatters ([#32](https://github.com/reponomics/treestamp/issues/32)) ([6654a92](https://github.com/reponomics/treestamp/commit/6654a9219b94d71f4ac4efa87c5adbd4ac6f0010))
+
+## [0.5.0](https://github.com/reponomics/treestamp/compare/v0.4.0...v0.5.0) (2026-10-31)
+
+
+### Features
+
+* **web:** read credentials from separate files ([#30](https://github.com/reponomics/treestamp/issues/30)) ([9766c81](https://github.com/reponomics/treestamp/commit/9766c81c8b4ba3881429139a6076f68651f754a8))
+
+
+### Documentation
+
+* add badges to README ([#29](https://github.com/reponomics/treestamp/issues/29)) ([2ecd4d7](https://github.com/reponomics/treestamp/commit/2ecd4d7b4afedb3b43576f91ea96b2a357e7aa76))
+
+## [0.4.0](https://github.com/reponomics/treestamp/compare/v0.3.1...v0.4.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* refactor and simplify CLI and loading paths ([#26](https://github.com/reponomics/treestamp/issues/26))
+
+### Features
+
+* refactor and simplify CLI and loading paths ([#26](https://github.com/reponomics/treestamp/issues/26)) ([33d96d7](https://github.com/reponomics/treestamp/commit/33d96d759b9315f7446e1d2f2149567606aa44af))
+
+## [0.3.1](https://github.com/reponomics/treestamp/compare/v0.3.0...v0.3.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* normalize relative paths in editor ([#24](https://github.com/reponomics/treestamp/issues/24)) ([23484e2](https://github.com/reponomics/treestamp/commit/23484e25ac833f76eb188af8aae6689c1f3e7c46))
+
+## [0.3.0](https://github.com/reponomics/treestamp/compare/v0.2.0...v0.3.0) (2026-10-29)
+
+
+### Features
+
+* add opt-in attribution trailer to both editors ([#20](https://github.com/reponomics/treestamp/issues/20)) ([9053a5e](https://github.com/reponomics/treestamp/commit/9053a5e99a897757cb33e59b168c7bc0e1003db1))
+
+
+### Documentation
+
+* pin README examples to the latest release ([#18](https://github.com/reponomics/treestamp/issues/18)) ([5694389](https://github.com/reponomics/treestamp/commit/5694389a51139b1d0b6c1e497d5dbdce071c2dc8))
+
+## [0.2.0](https://github.com/reponomics/treestamp/compare/v0.1.2...v0.2.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* Documents with path-only special_paths registrations must be regenerated; documents without special registrations remain supported.
+
+
+### Bug Fixes
+
+* Replace special-path identity backtracking with direct row-number-plus-path registrations.
+
+* fix potential DoS threat and improve docs ([#15](https://github.com/reponomics/treestamp/issues/15)) ([f3c77eb](https://github.com/reponomics/treestamp/commit/f3c77eb03a45d22fa47c9fcd7a8fe02339587dd6))
+
 ## [0.1.2](https://github.com/reponomics/treestamp/compare/v0.1.1...v0.1.2) (2026-10-28)
 
 

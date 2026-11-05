@@ -19,6 +19,10 @@
           "type": "toml",
           "path": "uv.lock",
           "jsonpath": "$.package[?(@.name.value == 'treestamp' || @.name.value == 'treestamp-web')].version"
+        },
+        {
+          "type": "generic",
+          "path": "README.md"
         }
       ]
     }

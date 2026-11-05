@@ -609,6 +609,7 @@ pre {
   width: max-content;
   min-width: 100%;
 }
+.tree-attribution { margin: var(--s3) var(--s4) 0; color: var(--ink-secondary); }
 .row { display: flex; align-items: center; gap: var(--s1); padding: 0 var(--s4); white-space: nowrap; }
 .row.dir:not([data-path=""]) { cursor: pointer; }
 .row:hover, .row:focus-within { background: var(--row-hover); }

@@ -1,0 +1,27 @@
+# Codecov reports coverage only. The 90% minimum is enforced by `make cov` and
+# `make web-cov` in CI, so Codecov's own status checks are informational.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "condensed_header, diff, flags"
+  require_changes: true
+
+flags:
+  core:
+    paths: [src/treestamp/]
+    carryforward: true
+  web:
+    paths: [web/src/treestamp_web/]
+    carryforward: true
+
+# The hosted editor's report is generated from web/ and lists files as
+# src/treestamp_web/...; map them to their repository paths.
+fixes:
+  - "src/treestamp_web/::web/src/treestamp_web/"

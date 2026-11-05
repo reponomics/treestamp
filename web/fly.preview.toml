@@ -1,6 +1,6 @@
 # Dedicated preview app configuration; see MAINTENANCE.md.
 # Deploy from the repository root so both projects are in the build context:
-#   fly deploy --config web/fly.preview.toml --dockerfile web/Dockerfile
+#   flyctl deploy --config web/fly.preview.toml --dockerfile web/Dockerfile
 app = "reponomics-treestamp-preview"
 primary_region = "ewr"
 

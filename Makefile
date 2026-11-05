@@ -4,7 +4,7 @@ PYTHON ?= python3
 UV ?= uv
 UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
-FLY ?= fly
+FLY ?= flyctl
 ACTIONLINT ?= actionlint
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
@@ -24,6 +24,8 @@ SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
+# Extra pytest-cov options for cov and web-cov, e.g. COV_ARGS=--cov-report=xml
+COV_ARGS ?=
 .PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
@@ -51,7 +53,7 @@ typecheck: ## Check strict Python types
 test: ## Run the regression suite, including headless TUI journeys
 	$(PY) -m pytest
 cov: ## Run tests with branch coverage
-	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=90
+	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
 ci: format-check lint typecheck cov ## Run all local quality gates
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
@@ -62,8 +64,15 @@ build: install ## Sync locked build tools and build wheel and sdist without isol
 	$(PY) -m build --no-isolation
 distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
 	$(PY) scripts/distribution_check.py
-integration-check: ## Verify the repository's treestamped README
+.PHONY: readme-styles-check readme-update
+readme-styles-check: ## Verify alternate README styles match its managed tree
+	$(PY) scripts/readme_styles.py
+readme-update: ## Refresh the managed README tree and all style previews
+	$(CLI) update README.md
+	$(PY) scripts/readme_styles.py --write
+integration-check: ## Verify the README tree and all alternate style previews
 	$(CLI) check README.md
+	$(PY) scripts/readme_styles.py
 workflow-check: ## Validate GitHub Actions workflows (requires actionlint)
 	$(ACTIONLINT)
 hook-check: ## Exercise installed repository hooks at HEAD
@@ -73,7 +82,7 @@ pre-commit-check: ## Run the repository development hooks
 tui: ## Open the editor
 	$(CLI)
 clean: ## Remove generated build and coverage artifacts
-	rm -rf dist/ build/ .coverage htmlcov/
+	rm -rf dist/ build/ .coverage htmlcov/ coverage.xml web/.coverage web/coverage.xml
 web-install: install ## Sync the locked workspace, including hosted development dependencies
 web-browser-install: install ## Sync the locked browser test dependencies (install Chromium separately)
 web-lint: ## Lint the web editor project
@@ -83,7 +92,7 @@ web-typecheck: ## Check strict types for the web editor project
 web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
 web-cov: ## Run the web editor tests with branch coverage
-	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
+	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
 web-ci: web-lint web-typecheck web-cov web-js-test ## Run all web editor quality gates
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs

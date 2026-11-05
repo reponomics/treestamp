@@ -1,0 +1,70 @@
+name: Coverage report
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  coverage:
+    name: Measure and upload coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Codecov authenticates the upload with a GitHub OIDC token, not a stored secret.
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Pull requests from forks receive no OIDC token; Codecov accepts their
+      # uploads without one because the repository is public.
+      USE_OIDC: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - name: Check out the requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+      - name: Set up the pinned uv version
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version-file: .tool-versions
+      - name: Install development environment
+        run: make install
+      - name: Measure core suite coverage
+        run: make cov COV_ARGS=--cov-report=xml
+      - name: Measure hosted editor coverage
+        # Writes web/coverage.xml, with paths relative to web/ (see codecov.yml).
+        run: make web-cov COV_ARGS=--cov-report=xml
+      - name: Upload core coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage.xml
+          disable_search: true
+          flags: core
+          name: core
+          use_oidc: ${{ env.USE_OIDC }}
+          fail_ci_if_error: true
+      - name: Upload hosted editor coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: web/coverage.xml
+          disable_search: true
+          flags: web
+          name: web
+          use_oidc: ${{ env.USE_OIDC }}
+          fail_ci_if_error: true

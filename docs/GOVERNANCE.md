@@ -26,4 +26,4 @@ Contributors propose changes through issues and pull requests, following [CONTRI
 
 ## Decisions and changes to access
 
-The maintainer makes project decisions, discussing significant changes in public issues or discussions before adopting them. Access to the resources above is granted only by the maintainer and is recorded in this file when it changes.
+The maintainer makes project decisions, discussing significant changes in public issues or discussions before adopting them. Access to the resources above is granted only by the maintainer, taking into account the individual's prior contributions, level of commitment, and availability, and changes are recorded in this file. Access is limited to what the person's role requires.

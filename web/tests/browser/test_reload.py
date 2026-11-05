@@ -66,14 +66,15 @@ def test_failed_explicit_open_preserves_draft_and_cannot_initialize_new(
     add_note(page, "work after failed open")
 
 
+@pytest.mark.parametrize("root", ["src", "./src", "./src/"])
 def test_new_root_is_repository_relative_and_initial_depth_is_one(
-    page: Page, service: str
+    page: Page, service: str, root: str
 ) -> None:
     page.goto(f"{service}/fixture/repo")
     expect(page.locator("#rows .row")).to_have_count(9)
     page.locator("#submit").click()
     page.locator("#load-tab-new").click()
-    page.locator("#root").fill("src")
+    page.locator("#root").fill(root)
     with page.expect_response("**/api/preview*") as response:
         page.locator("#reload").click()
     assert response.value.ok
@@ -83,7 +84,7 @@ def test_new_root_is_repository_relative_and_initial_depth_is_one(
     assert data["document"] == ""
     assert response.value.request.post_data_json == {
         "url": "fixture/repo",
-        "root": "src",
+        "root": root,
         "document": "",
     }
     expect(page.locator("#rows .row")).to_have_count(3)

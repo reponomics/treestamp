@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "treestamp"
-version = "0.1.2"
+version = "1.0.0"
 description = "Generate and maintain directory trees for project documentation"
 readme = "README.md"
 license = "MIT"
@@ -70,6 +70,7 @@ include = [
     "/scripts/hook_check.py",
     "/scripts/installed_editor_check.py",
     "/scripts/release_check.py",
+    "/scripts/readme_styles.py",
     "/pyproject.toml",
     "/README.md",
     "/LICENSE",

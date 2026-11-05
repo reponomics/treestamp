@@ -111,6 +111,28 @@ def test_request_has_only_creation_and_document_inputs() -> None:
 
 
 @pytest.mark.parametrize(
+    ("entered", "canonical"),
+    [
+        ("./sub", "sub"),
+        ("./sub/", "sub"),
+        ("././sub", "sub"),
+        ("sub/.", "sub"),
+        ("./", "."),
+    ],
+)
+def test_new_root_normalizes_input_and_preserves_canonical_state(
+    fake: FakeGitHub, entered: str, canonical: str
+) -> None:
+    service, _ = service_for(fake)
+    result = preview(service, root=entered, document="")
+    assert result.root == canonical
+    assert result.state["source"]["root"] == canonical
+    assert parse_document(result.region.encode()).settings.root == canonical
+    edited = op(service, result, "annotate", "", "note")
+    assert edited.root == canonical and "note" in edited.tree
+
+
+@pytest.mark.parametrize(
     "params",
     [
         {},
@@ -124,6 +146,9 @@ def test_request_has_only_creation_and_document_inputs() -> None:
         {"url": "o/r", "style": "ascii"},
         {"url": "o/r", "hide_root_files": "false"},
         {"url": "o/r", "root": ".."},
+        {"url": "o/r", "root": "./../sub"},
+        {"url": "o/r", "root": "sub/../sub"},
+        {"url": "o/r", "root": "/sub"},
         {"url": "o/r", "document": "../tree.md"},
     ],
 )
@@ -173,6 +198,32 @@ def test_open_updates_before_editing_and_keeps_baseline(
     assert noted.notice is None and noted.dirty
     assert noted.state["generation"] == updated.state["generation"]
     assert noted.state["revision"] == updated.state["revision"] + 1
+
+
+def test_special_row_identity_survives_hosted_annotation_and_visibility_edits(
+    fake: FakeGitHub, repo: Repo
+) -> None:
+    repo.write("special/x")
+    repo.write("special/x  # y")
+    stamp(repo, root="special")
+    service, _ = service_for(fake)
+    loaded = preview(service)
+    assert loaded.loaded and not loaded.dirty
+    # Both rows now print the same name/annotation text, but their row metadata
+    # preserves the two distinct filenames through each API round trip.
+    annotated = op(service, loaded, "annotate", "x", "y")
+    parsed = parse_document(annotated.region.encode())
+    assert {node.path: node.annotation for node in parsed.tree.walk()} == {
+        "x": "y",
+        "x  # y": "",
+    }
+    hidden = op(service, annotated, "hide", "x  # y")
+    assert "special_paths" not in hidden.region
+    assert parse_document(hidden.region.encode()).hidden == frozenset(
+        {"special/x  # y"}
+    )
+    restored = op(service, hidden, "unhide", "x  # y")
+    assert restored.region == annotated.region
 
 
 def test_root_is_repo_relative_and_absent_subtree_is_valid(
@@ -282,6 +333,31 @@ def test_show_counts_and_style_are_session_only(fake: FakeGitHub) -> None:
     assert result.state["revision"] == first.state["revision"] + 1
     assert "|--" in result.tree and "files)" not in result.tree
     assert "show_counts" not in result.region and "style =" not in result.region
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_attribution_is_opt_in_and_survives_loading_and_editing(
+    fake: FakeGitHub, repo: Repo, style: str
+) -> None:
+    service, _ = service_for(fake)
+    original = preview(service)
+    assert original.state["curation"]["settings"]["attribution"] is False
+    assert "Maintained with" not in original.region
+    original.state["curation"]["settings"].update(attribution=True, style=style)
+    enabled = op(service, original, "present")
+    trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
+    assert enabled.region.endswith(f"\n\n{trailer}\n\n<!-- treestamp:end -->\n")
+    assert parse_document(enabled.region.encode()).settings.attribution is True
+    repo.write("README.md", enabled.region)
+    repo.commit("document with attribution")
+    loaded = preview(service, document="README.md")
+    assert loaded.state["curation"]["settings"]["attribution"] is True
+    edited = op(service, loaded, "annotate", "", "repository note")
+    assert trailer in edited.region
+    edited.state["curation"]["settings"]["attribution"] = False
+    disabled = op(service, edited, "present")
+    assert trailer not in disabled.region
+    assert parse_document(disabled.region.encode()).settings.attribution is False
 
 
 def test_byte_identity_survives_rows_state_and_operations(
@@ -516,3 +592,114 @@ def test_byte_root_permalink_restores_exact_snapshot_state(
         )
     )
     assert restored.region == result.region
+
+
+@pytest.mark.parametrize("after_start", [False, True])
+@pytest.mark.parametrize("after_config", [False, True])
+@pytest.mark.parametrize("before_end", [False, True])
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_loaded_preview_preserves_optional_spacing_in_copy_and_restore(
+    fake: FakeGitHub,
+    repo: Repo,
+    after_start: bool,
+    after_config: bool,
+    before_end: bool,
+    eol: bytes,
+) -> None:
+    from treestamp.document import extract_region
+
+    stamp(repo, hidden=("README.md",))
+    path = repo.path / "README.md"
+    original = path.read_bytes()
+    for marker, keep in (
+        (b"<!-- treestamp:start -->\n", after_start),
+        (b"\n-->\n", after_config),
+    ):
+        if not keep:
+            original = original.replace(marker + b"\n", marker)
+    if not before_end:
+        original = original.replace(
+            b"\n\n<!-- treestamp:end -->", b"\n<!-- treestamp:end -->"
+        )
+    original = original.replace(b"\n", eol)
+    path.write_bytes(original)
+    repo.commit("optional block spacing")
+    service, _ = service_for(fake)
+    result = preview(service)
+    region = extract_region(original)
+    assert not result.dirty and result.notice is None
+    assert result.region.encode() == region
+    restored = op(service, result, "restore")
+    assert not restored.dirty
+    assert restored.region.encode() == region
+    edited = op(service, restored, "annotate", "", "edited")
+    assert edited.dirty
+    assert edited.region.encode() == region.replace(b"# repository", b"# edited")
+    assert path.read_bytes() == original
+
+
+def test_preview_copy_omits_file_bom(fake: FakeGitHub, repo: Repo) -> None:
+    from treestamp.document import extract_region
+
+    region = extract_region(stamp(repo).encode())
+    path = repo.path / "README.md"
+    original = b"\xef\xbb\xbf" + region
+    path.write_bytes(original)
+    repo.commit("BOM at start marker")
+    service, _ = service_for(fake)
+    result = preview(service)
+    assert not result.dirty
+    assert result.region.encode() == region
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_preview_preserves_authored_toml_until_hidden_paths_change(
+    fake: FakeGitHub, repo: Repo, eol: str
+) -> None:
+    from treestamp.document import extract_region
+
+    hidden = (
+        "release-checklist-for-project-maintainers.md",
+        "supporting-documentation-for-release-process.md",
+        "development-environment-setup-instructions.md",
+    )
+    for path in hidden:
+        repo.write(path)
+    region = extract_region(stamp(repo, hidden=hidden).encode()).decode()
+    start = region.index("<!-- treestamp:config")
+    end = region.index("-->", start) + 3
+    authored = (
+        "<!-- treestamp:config\n"
+        "# Keep the maintainer's explanation and preferred ordering.\n"
+        "root = '.'\n"
+        "hidden = [\n"
+        + "".join(f"    '{path}',  # Maintainer-only notes\n" for path in hidden)
+        + "]\n-->"
+    )
+    original = (region[:start] + authored + region[end:]).replace("\n", eol)
+    path = repo.path / "README.md"
+    path.write_bytes(original.encode())
+    repo.commit("authored TOML formatting")
+    service, _ = service_for(fake)
+    result = preview(service)
+    assert not result.dirty and result.notice is None
+    assert result.region == original
+    restored = op(service, result, "restore")
+    assert not restored.dirty and restored.region == original
+    edited = op(service, restored, "annotate", "", "edited")
+    assert edited.region == original.replace("# repository", "# edited")
+    assert edited.dirty
+
+    changed = op(service, edited, "hide", "top.txt")
+    payload = changed.region.split("<!-- treestamp:config" + eol, 1)[1].split(
+        eol + "-->", 1
+    )[0]
+    assert "Maintainer-only notes" not in payload
+    assert all(len(line) <= 80 for line in payload.splitlines())
+    assert len(payload.splitlines()) > 2
+    assert parse_document(changed.region.encode()).hidden == frozenset(
+        (*hidden, "top.txt")
+    )
+    assert op(service, changed, "restore").region == changed.region
+    assert path.read_bytes() == original.encode()

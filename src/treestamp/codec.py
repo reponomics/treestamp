@@ -11,7 +11,6 @@ Counts and targets are regenerated facts, not saved curation.
 from __future__ import annotations
 
 import re
-from contextlib import suppress
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -31,11 +30,10 @@ from treestamp.model import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Mapping
 
 SYMLINK_ARROW = "->"
 GITLINK_TAG = "[gitlink]"
-MAX_IDENTITY_BRANCHES = 4096
 
 # A row is one line, so control characters print as C escapes, and a byte that
 # is not UTF-8 (a surrogate, from decoding with "surrogateescape") prints as its
@@ -137,13 +135,13 @@ def _row_head(node: Node, *, markdown: bool = False) -> str:
     return text
 
 
-def special_paths(tree: Node, root: str = ".") -> frozenset[str]:
-    """Full identities for visible entries whose own names reserve the delimiter."""
-    return frozenset(
-        repo_path(node.path, root)
-        for node in tree.walk()
+def special_paths(tree: Node, root: str = ".") -> dict[int, str]:
+    """Map printed row indices to exact repository-relative special identities."""
+    return {
+        row: repo_path(node.path, root)
+        for row, node in enumerate(tree.walk(), 1)
         if ANNOTATION_DELIMITER in node.name
-    )
+    }
 
 
 def _row(node: Node, *, markdown: bool = False) -> str:
@@ -159,12 +157,22 @@ def render_tree(tree: Node, settings: Settings, *, fenced: bool = False) -> str:
 
     Bare output is for display. Reading it requires its generated special paths.
     """
+    return render_tree_with_paths(tree, settings, fenced=fenced)[0]
+
+
+def render_tree_with_paths(
+    tree: Node, settings: Settings, *, fenced: bool = False
+) -> tuple[str, dict[int, str]]:
+    """Emit rows and their special-path registrations in the same traversal."""
     markdown = settings.style == "list"
     validate_tree(tree)
     rows = [_row(tree, markdown=markdown)]
+    registered: dict[int, str] = {}
 
     def visit(node: Node, prefix: str, depth: int) -> None:
         for index, child in enumerate(node.children):
+            if ANNOTATION_DELIMITER in child.name:
+                registered[len(rows)] = repo_path(child.path, settings.root)
             last = index == len(node.children) - 1
             if settings.style == "list":
                 rows.append("  " * (depth - 1) + "- " + _row(child, markdown=True))
@@ -178,12 +186,12 @@ def render_tree(tree: Node, settings: Settings, *, fenced: bool = False) -> str:
 
     visit(tree, "", 1)
     text = "\n".join(rows) + "\n"
-    _check_rendered_tree(tree, text, settings)
+    _check_rendered_tree(tree, text, settings, registered)
     if fenced and not markdown:
         # These styles prefix every physical row with './' or a connector, so
         # embedded backticks cannot close the fence. New styles own their framing.
-        return f"```sh\n{text}```\n"
-    return text
+        text = f"```sh\n{text}```\n"
+    return text, registered
 
 
 def _facts(node: Node) -> tuple[object, ...]:
@@ -197,13 +205,15 @@ def _facts(node: Node) -> tuple[object, ...]:
     )
 
 
-def _check_rendered_tree(tree: Node, text: str, settings: Settings) -> None:
+def _check_rendered_tree(
+    tree: Node, text: str, settings: Settings, registered: Mapping[int, str]
+) -> None:
     try:
         recovered = parse_tree(
             text,
             settings.style,
             root=settings.root,
-            special_paths=special_paths(tree, settings.root),
+            special_paths=registered,
         )
     except MarkerError as exc:
         raise MarkerError(
@@ -312,37 +322,42 @@ def detect_style(text: str, *, fenced: bool = False) -> str:
     return "unicode" if fenced else "list"
 
 
-def _registered_candidates(
-    text: str, parent: str, registered: frozenset[str], *, markdown: bool
-) -> list[Node]:
-    candidates = []
-    for path in sorted(registered):
-        name = path.rsplit("/", 1)[-1]
-        printed = _display(name, markdown)
-        if not text.startswith(printed):
-            continue
-        suffix = text[len(printed) :]
-        if suffix and not suffix.startswith(
-            ("/", " [gitlink]", " -> ", ANNOTATION_DELIMITER)
-        ):
-            continue
-        try:
-            node = _parse_row("entry" + suffix, parent, markdown=markdown)
-        except MarkerError:
-            continue
-        if node.name == "entry":
-            candidates.append(replace(node, name=name, path=path))
-    with suppress(MarkerError):
-        candidates.append(_parse_row(text, parent, markdown=markdown))
-    return list(dict.fromkeys(candidates))
+def _registered_row(text: str, parent: str, path: str, *, markdown: bool) -> Node:
+    """Consume one exact registered name; only its suffix remains to parse."""
+    directory, _, name = path.rpartition("/")
+    if directory != parent:
+        raise MarkerError("special-path parent does not match the row's indentation")
+    printed = _display(name, markdown)
+    if not text.startswith(printed):
+        raise MarkerError("special-path name does not match its registered row")
+    suffix = text[len(printed) :]
+    if suffix and not suffix.startswith(
+        ("/", " [gitlink]", " -> ", ANNOTATION_DELIMITER)
+    ):
+        raise MarkerError("invalid suffix after registered special-path name")
+    node = _parse_row("entry" + suffix, parent, markdown=markdown)
+    if node.name != "entry":
+        raise MarkerError("invalid suffix after registered special-path name")
+    return replace(node, name=name, path=path)
 
 
-def _registrations(paths: frozenset[str], root: str) -> frozenset[str]:
-    registered = frozenset(tree_path(path, root) for path in paths)
-    if any(ANNOTATION_DELIMITER not in path.rsplit("/", 1)[-1] for path in registered):
-        raise MarkerError(
-            "special_paths must register a name containing the annotation delimiter"
-        )
+def _registrations(
+    paths: Mapping[int, str], root: str, row_count: int
+) -> dict[int, str]:
+    registered: dict[int, str] = {}
+    seen: set[str] = set()
+    for row, path in paths.items():
+        if type(row) is not int or not 0 < row < row_count:
+            raise MarkerError("special-path row must identify an existing non-root row")
+        relative = tree_path(path, root)
+        if ANNOTATION_DELIMITER not in relative.rsplit("/", 1)[-1]:
+            raise MarkerError(
+                "special_paths must register a name containing the annotation delimiter"
+            )
+        if relative in seen:
+            raise MarkerError("special_paths contains duplicate paths")
+        seen.add(relative)
+        registered[row] = relative
     return registered
 
 
@@ -355,138 +370,16 @@ def _row_parent(stack: list[Node], depth: int) -> Node:
     return parent
 
 
-def _indexed_rows(lines: list[str], style: str) -> list[tuple[int, str]]:
-    """Resolve indentation independently of the names assigned to each row."""
-    rows = []
-    stack = [0]
-    for index, line in enumerate(lines, 1):
-        depth, text = _depth_row(line, style)
-        if depth > len(stack):
-            raise MarkerError("tree indentation skips a parent")
-        stack = stack[:depth]
-        rows.append((stack[-1], text))
-        stack.append(index)
-    return rows
-
-
-def _assembled_tree(rows: list[tuple[int, str]], chosen: list[Node]) -> Node:
-    nodes = list(chosen)
-    children: dict[int, list[int]] = {}
-    for index, (parent, _) in enumerate(rows, 1):
-        children.setdefault(parent, []).append(index)
-    for index in reversed(range(len(nodes))):
-        nodes[index] = replace(
-            nodes[index],
-            children=tuple(nodes[child] for child in children.get(index, [])),
-        )
-    validate_tree(nodes[0])
-    return nodes[0]
-
-
-class _IdentityAssignments:
-    """Bounded backtracking over complete assignments, without recursive depth.
-
-    A registered prefix may also be an ordinary name plus an annotation. Only
-    full registration usage and the complete tree can resolve that ambiguity.
-    Ordinary rows add no branches and require no copies of the accumulated tree.
-    """
-
-    def __init__(
-        self,
-        root: Node,
-        rows: list[tuple[int, str]],
-        registered: frozenset[str],
-        *,
-        markdown: bool,
-    ) -> None:
-        self.rows, self.registered, self.markdown = rows, registered, markdown
-        self.chosen = [root]
-        self.paths = {""}
-        self.branches = 0
-        self.by_parent: dict[str, set[str]] = {}
-        for path in registered:
-            self.by_parent.setdefault(path.rpartition("/")[0], set()).add(path)
-        self.choices: list[Iterator[Node]] = [self._choices()] if rows else []
-
-    def _choices(self) -> Iterator[Node]:
-        parent_index, text = self.rows[len(self.chosen) - 1]
-        parent = self.chosen[parent_index]
-        if not parent.is_dir:
-            return iter(())
-        registered = frozenset(self.by_parent.get(parent.path, ()))
-        candidates = _registered_candidates(
-            text, parent.path, registered, markdown=self.markdown
-        )
-        remaining = len(self.rows) - len(self.chosen)
-        candidates = [
-            node
-            for node in candidates
-            if node.path not in self.paths
-            and len(self.registered - self.paths - {node.path}) <= remaining
-        ]
-        if len(candidates) > 1:
-            self.branches += 1
-        if self.branches > MAX_IDENTITY_BRANCHES:
-            raise MarkerError(
-                "special-path identity resolution exceeds the search limit"
-            )
-        return iter(candidates)
-
-    def _pop(self) -> None:
-        self.paths.remove(self.chosen.pop().path)
-
-    def _advance(self) -> bool:
-        while self.choices:
-            node = next(self.choices[-1], None)
-            if node is not None:
-                self.chosen.append(node)
-                self.paths.add(node.path)
-                return True
-            self.choices.pop()
-            if len(self.chosen) > 1:
-                self._pop()
-        return False
-
-    def trees(self) -> Iterator[Node]:
-        while self._advance():
-            if len(self.chosen) <= len(self.rows):
-                self.choices.append(self._choices())
-                continue
-            try:
-                tree = _assembled_tree(self.rows, self.chosen)
-            except MarkerError:
-                tree = None
-            if tree is not None:
-                yield tree
-            self._pop()
-
-
-def _registered_tree(
-    root: Node, lines: list[str], style: str, registered: frozenset[str]
-) -> Node:
-    assignments = _IdentityAssignments(
-        root, _indexed_rows(lines, style), registered, markdown=style == "list"
-    ).trees()
-    tree = next(assignments, None)
-    if tree is None:
-        raise MarkerError(
-            "special_paths contains unused, mismatched, or invalid identities"
-        )
-    if next(assignments, None) is not None:
-        raise MarkerError("ambiguous special-path identity in printed tree")
-    return tree
-
-
 def parse_tree(
     text: str,
     style: str | None = None,
     *,
     root: str = ".",
-    special_paths: frozenset[str] = frozenset(),
+    special_paths: Mapping[int, str] | None = None,
 ) -> Node:
     """Read structured identities and facts, using registrations before rows."""
-    registered = _registrations(special_paths, root)
     lines = text.splitlines()
+    registered = _registrations(special_paths or {}, root, len(lines))
     if not lines:
         raise MarkerError("tree is empty")
     if style is None:
@@ -495,16 +388,18 @@ def parse_tree(
         raise MarkerError(f"unknown tree style: {style!r}")
     markdown = style == "list"
     root_node = _parse_row(lines[0], "", root=True, markdown=markdown)
-    if registered:
-        return _registered_tree(root_node, lines[1:], style, registered)
     nodes = {"": root_node}
     children: dict[str, list[str]] = {"": []}
     stack = [root_node]
-    for line in lines[1:]:
+    for index, line in enumerate(lines[1:], 1):
         depth, row = _depth_row(line, style)
         parent = _row_parent(stack, depth)
         stack = stack[:depth]
-        node = _parse_row(row, parent.path, markdown=markdown)
+        node = (
+            _registered_row(row, parent.path, registered[index], markdown=markdown)
+            if index in registered
+            else _parse_row(row, parent.path, markdown=markdown)
+        )
         if node.path in nodes:
             raise MarkerError(f"duplicate tree path: {node.path!r}")
         nodes[node.path] = node

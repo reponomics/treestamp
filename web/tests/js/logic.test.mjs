@@ -130,8 +130,17 @@ test("new source parameters only select repository-relative root and document", 
 
 test("one count toggle edits presentation and retains the selected root", () => {
   const settings = { root: "docs", style: "unicode", show_counts: true };
-  assert.deepEqual(settingsFromValues(settings, { style: "list", show_counts: false }), { root: "docs", style: "list", show_counts: false });
-  assert.deepEqual(valuesFromSettings(settings), settings);
+  assert.deepEqual(settingsFromValues(settings, { style: "list", show_counts: false }), { root: "docs", style: "list", show_counts: false, attribution: false });
+  assert.deepEqual(valuesFromSettings(settings), { ...settings, attribution: false });
+});
+
+test("attribution defaults off for old drafts and survives form and shared state round trips", () => {
+  const original = { root: "docs", style: "unicode", show_counts: true };
+  const enabled = settingsFromValues(original, { ...valuesFromSettings(original), attribution: true });
+  assert.deepEqual(enabled, { ...original, attribution: true });
+  const restored = decodeState(encodeState({ settings: enabled })).settings;
+  assert.equal(valuesFromSettings(restored).attribution, true);
+  assert.deepEqual(settingsFromValues(restored, { ...valuesFromSettings(restored), attribution: false }), { ...original, attribution: false });
 });
 
 test("operation bodies retain the captured source and baseline while editing curation", () => {
@@ -176,12 +185,27 @@ test("preview candidates validate before adoption, including bundled examples", 
     for (const mutate of [
       candidate => { candidate.region = null; },
       candidate => { candidate.state.curation.settings = null; },
+      candidate => { candidate.state.curation.settings.attribution = "true"; },
       candidate => { candidate.rows[0].path = null; },
       candidate => { candidate.rows[0].depth = -1; },
     ]) {
       const candidate = structuredClone(data);
       mutate(candidate);
       assert.throws(() => preparePreview(candidate, "https://example.org"), /previous draft is unchanged/);
+    }
+  }
+});
+
+test("region metadata stays quiet across optional spacing and CRLF", () => {
+  for (const gap of ["", "\n"]) {
+    for (const eol of ["\n", "\r\n"]) {
+      const text = (`<!-- treestamp:start -->\n${gap}<!-- treestamp:config\nroot = "src"\n-->\n${gap}\`\`\`sh\n./\n\`\`\`\n${gap}<!-- treestamp:end -->\n`).replace(/\n/g, eol);
+      const segments = regionSegments(text);
+      assert.equal(segments.map((segment) => segment.text).join(""), text);
+      assert.deepEqual(segments.map((segment) => segment.quiet), [true, false, true]);
+      assert.ok(segments[0].text.includes('root = "src"'));
+      assert.ok(!segments[1].text.includes('root = "src"'));
+      assert.ok(segments[1].text.includes("./"));
     }
   }
 });

@@ -90,11 +90,17 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
-`treestamp [tui] [PATH] [--document PATH] [--print]` opens the terminal editor on the repository at `PATH` (default `.`). With `--print`, it writes the complete treestamp for `--document` (default `README.md`) to standard output and exits without opening the editor or writing a file. `treestamp` with no command is equivalent to `treestamp tui`.
+[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) documents command usage, path rules, and defaults.
 
-`treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` (default `README.md`, relative to the repository root) to match the snapshot. `--target` selects a Git ref instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
+`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents New/Load. `treestamp` with no command is equivalent to `treestamp tui`.
 
-`treestamp check [DOCUMENT] [--target REF] [--compare REF]` reports whether `update` would change the document, printing a unified diff if so.
+With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new tree if the README is absent or unmarked; malformed or empty marked regions remain errors.
+
+`treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` to match the snapshot. An explicit document path resolves from cwd (or is absolute) and selects its containing repository. An omitted document selects the repository-root README in cwd's repository. `--target` selects a Git ref in the document's repository instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
+
+`treestamp check [DOCUMENT] [--target REF] [--compare REF]` uses the same document and repository selection as `update` and reports whether it would change the document, printing a unified diff if so.
+
+CLI document discovery rejects symlinks, including traversed components before `..` normalization. An explicitly selected document in an initialized nested repository or submodule uses that repository; an uninitialized submodule remains a boundary. Within an editing session, tree roots and document paths remain repository-relative, and document operations cannot cross into another repository.
 
 `treestamp --version` prints the installed version.
 
@@ -112,13 +118,21 @@ Errors are written to standard error, prefixed with `treestamp:`.
 
 ### Terminal editor
 
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
+The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
 
 ### Document format
 
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
-The optional config comment holds TOML with three keys, each written only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, the full paths of entries whose names contain the annotation delimiter, so they parse unambiguously. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
+The optional config comment holds TOML with three keys, each generated only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Equivalent authored configuration may include explicit defaults. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
+
+[ADR 0002: Formatter-compatible documents](adr/0002-formatter-compatible-documents.md) records the formatting contract. New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
+
+`prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports, while writes to a different existing document preserve that destination's formatting. No formatting preference is added to persisted session state.
+
+Both editors offer an attribution toggle, off by default. When enabled, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
+
+[Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and metadata values. Equivalent TOML formatting and the supported boundary spacing may be changed by users or formatters without changing those values.
 
 ### Pre-commit hooks
 

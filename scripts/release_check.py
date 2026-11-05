@@ -33,6 +33,7 @@ SDIST_FILES = {
     "scripts/hook_check.py",
     "scripts/installed_editor_check.py",
     "scripts/release_check.py",
+    "scripts/readme_styles.py",
 }
 
 

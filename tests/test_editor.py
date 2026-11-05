@@ -1,10 +1,19 @@
 """Fixed-snapshot editor journeys and transactional document writes."""
 
+import tomllib
 from dataclasses import replace
 
 import pytest
 
-from treestamp.document import Document, load_document, render_region, write_document
+from treestamp.document import (
+    ATTRIBUTION,
+    Document,
+    extract_region,
+    load_document,
+    parse_document,
+    render_region,
+    write_document,
+)
 from treestamp.editor import OPEN_UPDATED_NOTICE, EditorController
 from treestamp.errors import MarkerError
 from treestamp.gitio import capture_snapshot
@@ -21,6 +30,23 @@ def make_editor(repo: Repo) -> EditorController:
     editor.state.session.expand("src")
     editor.state.session.expand("src/pkg")
     return editor
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_preview_includes_attribution_without_changing_draft(
+    repo: Repo, style: str
+) -> None:
+    editor = make_editor(repo)
+    session = editor.state.session
+    session.settings = replace(session.settings, style=style)
+    without_trailer = editor.preview()
+    assert ATTRIBUTION not in without_trailer
+    session.settings = replace(session.settings, attribution=True)
+    before = session.draft_signature()
+    assert editor.preview() == without_trailer + f"\n{ATTRIBUTION}\n"
+    assert session.draft_signature() == before
+    session.settings = replace(session.settings, attribution=False)
+    assert editor.preview() == without_trailer
 
 
 def test_write_collapse_expand_keeps_session_only_curation(repo: Repo) -> None:
@@ -135,13 +161,47 @@ def test_document_location_does_not_rebase_root_or_hidden(repo: Repo) -> None:
     assert document.hidden == frozenset({"src/b"})
     assert destination.read_text(encoding="utf-8").startswith("Before\n")
     assert destination.read_text(encoding="utf-8").endswith("After\n")
-    assert editor.region_text() == render_region(document)
+    assert editor.region_text().encode() == extract_region(destination.read_bytes())
     reopened = editor.prepare_load(str(destination.relative_to(repo.path)))
     assert reopened.root == repo.path / "src"
     with pytest.raises(MarkerError):
         editor.create(str(destination.relative_to(repo.path)))
     with pytest.raises(MarkerError):
         editor.prepare_new("../outside")
+
+
+@pytest.mark.parametrize(
+    ("entered", "canonical"),
+    [
+        ("./src", "src"),
+        ("./src/", "src"),
+        ("././src", "src"),
+        ("src/./pkg/", "src/pkg"),
+        ("src//pkg", "src/pkg"),
+        ("./", "."),
+    ],
+)
+def test_new_root_normalizes_dialog_spelling(
+    repo: Repo, entered: str, canonical: str
+) -> None:
+    editor = make_editor(repo)
+    candidate = editor.prepare_new(entered)
+    assert candidate.session.settings.root == canonical
+    assert candidate.root == repo.path / canonical
+    editor.adopt(candidate)
+    document = parse_document(editor.region_text().encode())
+    assert document.settings.root == canonical
+
+
+@pytest.mark.parametrize("root", ["", "/src", "../src", "./../src", "src/../src"])
+def test_new_root_normalization_still_rejects_invalid_paths(
+    repo: Repo, root: str
+) -> None:
+    editor = make_editor(repo)
+    state = editor.state
+    with pytest.raises(MarkerError):
+        editor.prepare_new(root)
+    assert editor.state is state
 
 
 @pytest.mark.parametrize("operation", ["open", "new"])
@@ -190,21 +250,113 @@ def test_noncanonical_open_is_dirty_even_when_semantics_unchanged(repo: Repo) ->
     assert destination.read_bytes() == before
 
 
-def test_special_paths_derive_from_printed_entries(repo: Repo) -> None:
-    repo.write("docs  # drafts/notes  # draft.md")
+def region_metadata(region: str) -> dict[str, object]:
+    _, separator, remainder = region.partition("<!-- treestamp:config\n")
+    return tomllib.loads(remainder.partition("-->\n")[0]) if separator else {}
+
+
+def test_special_rows_follow_expansion_hiding_and_selected_root(repo: Repo) -> None:
+    for path in (
+        "src/docs  # drafts/a.txt",
+        "src/docs  # drafts/notes  # draft.md",
+        "src/z  # last.txt",
+    ):
+        repo.write(path)
+    repo.add(".")
+    editor = EditorController(
+        capture_snapshot(repo.path / "src", repository=repo.path),
+        Settings(root="src"),
+    )
+    session = editor.state.session
+    collapsed_rows = [
+        {"row": 1, "path": "src/docs  # drafts"},
+        {"row": 2, "path": "src/z  # last.txt"},
+    ]
+    assert region_metadata(editor.region_text())["special_paths"] == collapsed_rows
+    with editor.edit():
+        session.expand("docs  # drafts")
+        session.set_annotation("docs  # drafts/notes  # draft.md", "Keep  # literal")
+    expanded = editor.region_text()
+    assert region_metadata(expanded)["special_paths"] == [
+        {"row": 1, "path": "src/docs  # drafts"},
+        {"row": 3, "path": "src/docs  # drafts/notes  # draft.md"},
+        {"row": 4, "path": "src/z  # last.txt"},
+    ]
+    with editor.edit():
+        session.collapse("docs  # drafts")
+    assert region_metadata(editor.region_text())["special_paths"] == collapsed_rows
+    with editor.edit():
+        session.expand("docs  # drafts")
+    assert editor.region_text() == expanded
+    with editor.edit():
+        session.hide("docs  # drafts/notes  # draft.md")
+    hidden = region_metadata(editor.region_text())
+    assert hidden["hidden"] == ["src/docs  # drafts/notes  # draft.md"]
+    assert hidden["special_paths"] == [
+        {"row": 1, "path": "src/docs  # drafts"},
+        {"row": 3, "path": "src/z  # last.txt"},
+    ]
+    session.show_hidden = True
+    assert region_metadata(editor.region_text()) == hidden
+    with editor.edit():
+        session.unhide("docs  # drafts/notes  # draft.md")
+    assert editor.region_text() == expanded
+    with editor.edit():
+        session.hide("docs  # drafts")
+    hidden_parent = region_metadata(editor.region_text())
+    assert hidden_parent["hidden"] == ["src/docs  # drafts"]
+    assert hidden_parent["special_paths"] == [{"row": 1, "path": "src/z  # last.txt"}]
+    with editor.edit():
+        session.unhide("docs  # drafts")
+    assert editor.region_text() == expanded
+
+
+def test_new_editor_preflights_and_expands_more_than_100_special_entries(
+    repo: Repo,
+) -> None:
+    names = [f"docs/file{i:03d}  # draft" for i in range(101)]
+    for name in names:
+        repo.write(name)
     repo.add(".")
     editor = EditorController(capture_snapshot(repo.path), Settings())
-    session = editor.state.session
-    session.expand("docs  # drafts")
-    session.set_annotation("docs  # drafts/notes  # draft.md", "Keep # and ##")
-    expanded = editor.region_text()
-    assert '"docs  # drafts/notes  # draft.md"' in expanded
-    session.collapse("docs  # drafts")
-    assert '"docs  # drafts/notes  # draft.md"' not in editor.region_text()
-    session.expand("docs  # drafts")
-    assert editor.region_text() == expanded
-    session.hide("docs  # drafts")
-    assert "special_paths" not in editor.region_text()
+    assert "special_paths" not in region_metadata(editor.region_text())
+    with editor.edit():
+        editor.state.session.expand("docs")
+    assert region_metadata(editor.region_text())["special_paths"] == [
+        {"row": row, "path": path} for row, path in enumerate(names, 2)
+    ]
+    editor.create("tree.md")
+    loaded, _ = load_document(repo.path / "tree.md")
+    assert loaded == editor.document()
+
+
+def test_load_reindexes_special_rows_after_new_source_entries(repo: Repo) -> None:
+    repo.write("z  # draft.md")
+    repo.add(".")
+    editor = EditorController(capture_snapshot(repo.path), Settings())
+    with editor.edit():
+        editor.state.session.set_annotation("z  # draft.md", "retain  # this")
+    editor.create("tree.md")
+    original = repo.read("tree.md")
+    assert region_metadata(original)["special_paths"] == [
+        {"row": 1, "path": "z  # draft.md"}
+    ]
+    repo.write("a  # new.md")
+    repo.add("a  # new.md")
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert repo.read("tree.md") == original
+    assert region_metadata(editor.region_text())["special_paths"] == [
+        {"row": 1, "path": "a  # new.md"},
+        {"row": 2, "path": "z  # draft.md"},
+    ]
+    parsed = parse_document(editor.region_text().encode())
+    assert {node.path: node.annotation for node in parsed.tree.walk()} == {
+        "a  # new.md": "",
+        "z  # draft.md": "retain  # this",
+    }
+    assert editor.dirty
+    editor.write("tree.md")
+    assert not editor.prepare_load("tree.md").dirty
 
 
 @pytest.mark.parametrize("changed", ["count", "target"])
@@ -301,16 +453,29 @@ def test_failed_source_preflight_preserves_loaded_draft(repo: Repo) -> None:
     assert repo.read("tree.md") == before
 
 
-def test_candidate_annotation_rolls_back_complete_session(repo: Repo) -> None:
+def test_annotation_can_duplicate_a_special_filename_without_changing_identity(
+    repo: Repo,
+) -> None:
     repo.write("x")
     repo.write("x  # y")
     repo.add(".")
     editor = EditorController(capture_snapshot(repo.path), Settings())
     session = editor.state.session
-    before = editor.region_text()
-    with pytest.raises(MarkerError, match="ambiguous special-path"), editor.edit():
+    with editor.edit():
         session.set_annotation("x", "y")
-    assert editor.region_text() == before and not session.annotations
+    parsed = parse_document(editor.region_text().encode())
+    assert {node.path: node.annotation for node in parsed.tree.walk()} == {
+        "x": "y",
+        "x  # y": "",
+    }
+    assert region_metadata(editor.region_text())["special_paths"] == [
+        {"row": 2, "path": "x  # y"}
+    ]
+    before = editor.region_text()
+    with pytest.raises(MarkerError, match="single line"), editor.edit():
+        session.hide("x")
+        session.set_annotation("x  # y", "invalid\nannotation")
+    assert editor.region_text() == before
 
 
 def test_preflight_only_checks_selected_subtree(repo: Repo) -> None:
@@ -321,3 +486,128 @@ def test_preflight_only_checks_selected_subtree(repo: Repo) -> None:
     editor = EditorController(snapshot, Settings(root="good"))
     editor.create("tree.md")
     assert "leaf" in repo.read("tree.md")
+
+
+@pytest.mark.parametrize("after_start", [False, True])
+@pytest.mark.parametrize("after_config", [False, True])
+@pytest.mark.parametrize("before_end", [False, True])
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_loaded_editor_preserves_optional_spacing_in_copy_and_write(
+    repo: Repo, after_start: bool, after_config: bool, before_end: bool, eol: bytes
+) -> None:
+    editor = make_editor(repo)
+    editor.state.session.hide("src/b")
+    editor.state.session.settings = replace(
+        editor.state.session.settings, attribution=True
+    )
+    editor.create("tree.md")
+    destination = repo.path / "tree.md"
+    region = destination.read_bytes()
+    for marker, keep in (
+        (b"<!-- treestamp:start -->\n", after_start),
+        (b"\n-->\n", after_config),
+    ):
+        if not keep:
+            region = region.replace(marker + b"\n", marker)
+    if not before_end:
+        region = region.replace(
+            b"\n\n<!-- treestamp:end -->", b"\n<!-- treestamp:end -->"
+        )
+    region = region.replace(b"\n", eol)
+    original = b"# Intro" + eol + region + b"Other prose." + eol
+    destination.write_bytes(original)
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty
+    assert editor.state.status == "Treestamp is up to date"
+    assert editor.region_text().encode() == region
+    assert destination.read_bytes() == original
+
+    editor.state.session.set_annotation("src/a", "note")
+    expected = region.replace(b" a" + eol, b" a  # note" + eol)
+    assert expected != region
+    assert editor.dirty
+    assert editor.region_text().encode() == expected
+    editor.write("tree.md")
+    assert (
+        destination.read_bytes() == b"# Intro" + eol + expected + b"Other prose." + eol
+    )
+    assert not editor.dirty
+
+    editor.create("new.md")
+    assert (repo.path / "new.md").read_bytes() == render_region(
+        editor.document()
+    ).encode()
+
+
+def test_copy_omits_file_bom_but_write_preserves_it(repo: Repo) -> None:
+    editor = make_editor(repo)
+    editor.create("tree.md")
+    destination = repo.path / "tree.md"
+    region = destination.read_bytes()
+    original = b"\xef\xbb\xbf" + region
+    destination.write_bytes(original)
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty
+    assert editor.region_text().encode() == region
+    editor.write("tree.md")
+    assert destination.read_bytes() == original
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_editor_preserves_authored_toml_until_hidden_paths_change(
+    repo: Repo, eol: str
+) -> None:
+    hidden = (
+        "release-checklist-for-project-maintainers.md",
+        "supporting-documentation-for-release-process.md",
+        "development-environment-setup-instructions.md",
+    )
+    for path in hidden:
+        repo.write(path)
+    editor = make_editor(repo)
+    for path in hidden:
+        editor.state.session.hide(path)
+    editor.create("tree.md")
+    destination = repo.path / "tree.md"
+    region = destination.read_bytes().decode("utf-8")
+    start = region.index("<!-- treestamp:config")
+    end = region.index("-->", start) + 3
+    authored = (
+        "<!-- treestamp:config\n"
+        "# Keep the maintainer's explanation and preferred ordering.\n"
+        "root = '.'\n"
+        "hidden = [\n"
+        + "".join(f"    '{path}',  # Maintainer-only notes\n" for path in hidden)
+        + "]\n-->"
+    )
+    original = (region[:start] + authored + region[end:]).replace("\n", eol)
+    destination.write_bytes(original.encode())
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty
+    assert editor.region_text() == original
+
+    editor.state.session.set_annotation("src/a", "note")
+    edited = original.replace(" a" + eol, " a  # note" + eol)
+    assert edited != original
+    assert editor.region_text() == edited
+    editor.write("tree.md")
+    assert destination.read_bytes() == edited.encode()
+    assert not editor.dirty
+
+    editor.state.session.hide("src/b")
+    changed = editor.region_text()
+    payload = changed.split("<!-- treestamp:config" + eol, 1)[1].split(eol + "-->", 1)[
+        0
+    ]
+    assert "Maintainer-only notes" not in payload
+    assert all(len(line) <= 80 for line in payload.splitlines())
+    assert len(payload.splitlines()) > 2
+    parsed = parse_document(changed.encode())
+    assert parsed.hidden == frozenset((*hidden, "src/b"))
+    assert region_metadata(changed.replace(eol, "\n"))["hidden"] == sorted(
+        parsed.hidden
+    )
+    editor.write("tree.md")
+    assert destination.read_bytes() == changed.encode()
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert not editor.dirty

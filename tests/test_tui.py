@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Input, Static, TextArea
 
-from treestamp.document import parse_document
+from treestamp.document import ATTRIBUTION, parse_document
 from treestamp.editor import EditorController
 from treestamp.gitio import Snapshot, capture_snapshot
 from treestamp.model import Entry, Settings, build_tree
@@ -46,12 +46,10 @@ async def prompt(pilot: Pilot[bool], key: str) -> Input:
     return pilot.app.screen.query_one("#prompt-input", Input)
 
 
-@pytest.mark.parametrize("explicit_document", [False, True])
 def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
     repo: Repo,
     editor: EditorController,
     monkeypatch: pytest.MonkeyPatch,
-    explicit_document: bool,
 ) -> None:
     invalid = "<!-- treestamp:start -->\n<!-- treestamp:end -->\n"
     repo.write("README.md", invalid)
@@ -70,7 +68,7 @@ def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
             )
             assert "relative to the repository root" in description
             assert "Use . for the repository root (the default)" in description
-            field.value = "src"
+            field.value = "./src"
             await press(pilot, "enter")
             assert not isinstance(app.screen, PromptScreen | ConfirmScreen)
             assert app.session.settings.root == "src"
@@ -84,8 +82,7 @@ def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
         return app.return_value
 
     monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
-    arguments = ("--document", "README.md") if explicit_document else ()
-    assert run_cli(*arguments) == (0, "", "")
+    assert run_cli() == (0, "", "")
     assert repo.read("README.md") == invalid
 
 
@@ -520,17 +517,22 @@ def test_invalid_annotation_keeps_draft_and_prompt_for_correction(repo: Repo) ->
         async with app.run_test() as pilot:
             await press(pilot, "down")
             field = await prompt(pilot, "a")
-            field.value = "y"
+            field.value = "invalid\x00note"
             await press(pilot, "enter")
             assert isinstance(app.screen, PromptScreen)
-            assert app.screen.query_one(Input).value == "y"
+            assert app.screen.query_one(Input).value == "invalid\x00note"
             assert "draft retained" in rendered_text(app.status_widget)
             assert editor.region_text() == before
             assert app.cursor.path == "x"
-            app.screen.query_one(Input).value = "valid note"
+            app.screen.query_one(Input).value = "y"
             await press(pilot, "enter")
             assert not isinstance(app.screen, PromptScreen)
-            assert editor.state.session.annotations["x"] == "valid note"
+            assert editor.state.session.annotations["x"] == "y"
+            loaded = parse_document(editor.region_text().encode())
+            assert {node.path: node.annotation for node in loaded.tree.walk()} == {
+                "x": "y",
+                "x  # y": "",
+            }
 
     asyncio.run(journey())
 
@@ -555,6 +557,7 @@ def test_rejected_style_change_preserves_draft_and_controls(
             await press(pilot, "s")
             assert app.session.settings.style == "unicode"
             assert "Style: Unicode" in rendered_text(app.summary_widget)
+            assert "Attribution: off" in rendered_text(app.summary_widget)
             assert "draft retained" in rendered_text(app.status_widget)
             assert original() == before
 
@@ -574,7 +577,11 @@ def test_controls_remain_visible_and_reflect_view_settings(
                 assert widget.virtual_size.width <= size[0]
             assert "Counts: on" in rendered_text(app.summary_widget)
             assert "Style: Unicode" in rendered_text(app.summary_widget)
-            await press(pilot, "down", "h", "H", "c", "s")
+            await press(pilot, "down", "h", "H", "c", "s", "t")
+            assert app.attribution_widget.display
+            assert app.attribution_widget.region.bottom <= size[1]
+            for widget in app.query(".controls, #summary"):
+                assert widget.region.bottom <= size[1]
             summary = rendered_text(app.summary_widget)
             assert "Counts: off" in summary
             assert "Style: ASCII" in summary
@@ -589,6 +596,46 @@ def test_controls_remain_visible_and_reflect_view_settings(
     asyncio.run(journey())
 
 
+def test_attribution_toggle_write_load_and_print(editor: EditorController) -> None:
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test() as pilot:
+            assert not app.session.settings.attribution
+            assert not app.attribution_widget.display
+            await press(pilot, "t")
+            assert app.editor.dirty
+            assert "Attribution: on" in rendered_text(app.summary_widget)
+            assert ATTRIBUTION in app.editor.region_text()
+            assert app.attribution_widget.display
+            assert "Maintained with treestamp" in rendered_text(app.attribution_widget)
+            await press(pilot, "v")
+            assert app.screen.query_one(TextArea).text.endswith(f"\n\n{ATTRIBUTION}\n")
+            await press(pilot, "escape")
+            field = await prompt(pilot, "n")
+            field.value = "attributed.md"
+            await press(pilot, "enter")
+            assert not app.editor.dirty
+            await press(pilot, "t")
+            assert ATTRIBUTION not in app.editor.region_text()
+            assert not app.attribution_widget.display
+            await press(pilot, "v")
+            assert ATTRIBUTION not in app.screen.query_one(TextArea).text
+            await press(pilot, "escape")
+            assert app.editor.dirty
+            # Restore the saved choice through the editor's load flow.
+            field = await prompt(pilot, "l")
+            field.value = "attributed.md"
+            await press(pilot, "enter", "y")
+            assert app.session.settings.attribution
+            assert app.attribution_widget.display
+            assert not app.editor.dirty
+            await press(pilot, "t", "p")
+        assert app.return_value is True
+        assert ATTRIBUTION not in app.editor.region_text()
+
+    asyncio.run(journey())
+
+
 def test_new_root_and_style_controls(editor: EditorController) -> None:
     async def journey() -> None:
         app = TreestampApp(editor)
@@ -596,13 +643,13 @@ def test_new_root_and_style_controls(editor: EditorController) -> None:
             await press(pilot, "s")
             assert app.session.settings.style == "ascii" and app.editor.dirty
             field = await prompt(pilot, "N")
-            field.value = "src"
+            field.value = "./src"
             await press(pilot, "enter")
             assert isinstance(app.screen, ConfirmScreen)
             await press(pilot, "n")
             assert app.session.settings.root == "."
             field = await prompt(pilot, "N")
-            field.value = "src"
+            field.value = "./src/"
             await press(pilot, "enter", "y")
             assert app.session.settings.root == "src"
             assert app.session.settings.style == "unicode"
@@ -679,3 +726,31 @@ def test_count_toggle_without_collapsed_folders_does_not_prompt_on_quit(
         assert app.return_value is False
 
     asyncio.run(journey())
+
+
+def test_cli_explicit_load_opens_document_without_startup_dialogs(
+    repo: Repo, editor: EditorController, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    editor.adopt(editor.prepare_new("src"))
+    (repo.path / "docs").mkdir()
+    editor.create("docs/tree.md")
+    before = repo.read_bytes("docs/tree.md")
+    monkeypatch.chdir(repo.path / "docs")
+
+    async def journey(app: TreestampApp) -> bool | None:
+        async with app.run_test() as pilot:
+            assert not isinstance(app.screen, DocumentChoiceScreen | PromptScreen)
+            assert app.startup_document is None
+            assert app.editor.state.document_path == repo.path / "docs/tree.md"
+            assert app.editor.state.snapshot.repo == repo.path
+            assert app.session.settings.root == "src"
+            assert app.tree_view.children
+            assert not app.editor.dirty
+            field = await prompt(pilot, "w")
+            assert field.value == str(Path("docs") / "tree.md")
+            await press(pilot, "escape", "q")
+        return app.return_value
+
+    monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
+    assert run_cli("--load", "tree.md") == (0, "", "")
+    assert repo.read_bytes("docs/tree.md") == before

@@ -1,16 +1,20 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
+import tomllib
 from dataclasses import replace
+from itertools import product
 from pathlib import Path
 
 import pytest
 
 from treestamp.codec import parse_tree
 from treestamp.document import (
+    ATTRIBUTION,
     Document,
     load_document,
     normalized_hidden,
     parse_document,
+    prepare_content,
     prepare_write,
     publish_write,
     render_interior,
@@ -295,11 +299,148 @@ def test_render_region_matches_created_file_bytes(
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
-def test_region_carries_no_blank_lines(document: Document, style: str) -> None:
+def test_region_defaults_to_blank_lines_between_blocks(
+    document: Document, style: str
+) -> None:
     document = replace(document, settings=replace(document.settings, style=style))
     region = render_region(document, ".")
-    assert region.endswith("\n")
-    assert "" not in region[:-1].split("\n")
+    assert region.startswith(START.decode() + "\n\n")
+    assert region.endswith("\n\n" + END.decode() + "\n")
+    configured = render_region(replace(document, hidden=frozenset({"hidden.txt"})))
+    assert "-->\n\n" in configured.split("treestamp:config", 1)[1]
+
+
+@pytest.mark.parametrize("gaps", list(product((False, True), repeat=3)))
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("attribution", [False, True])
+def test_write_preserves_each_optional_blank_line(
+    document: Document,
+    gaps: tuple[bool, bool, bool],
+    eol: str,
+    style: str,
+    attribution: bool,
+) -> None:
+    source = replace(
+        document,
+        settings=Settings(style=style, attribution=attribution),
+        hidden=frozenset({"hidden.txt"}),
+    )
+    region = render_region(source)
+    for boundary, keep in zip(
+        [START.decode() + "\n\n", "-->\n\n", "\n\n" + END.decode()],
+        gaps,
+        strict=True,
+    ):
+        if not keep:
+            region = region.replace(boundary, boundary.replace("\n\n", "\n"))
+    original = ("Before\n" + region + "After\n").replace("\n", eol).encode()
+    assert parse_document(original) == source
+    assert prepare_content(source, ".", original) == original
+    edited = replace(source, tree=replace(source.tree, annotation="updated"))
+    result = prepare_content(edited, ".", original)
+    assert parse_document(result) == edited
+    assert result.replace(b"  # updated", b"") == original
+
+
+def test_adding_metadata_uses_default_gap(document: Document) -> None:
+    compact = render_region(document).replace("\n\n", "\n").encode()
+    edited = replace(document, hidden=frozenset({"hidden.txt"}))
+    result = prepare_content(edited, ".", compact)
+    assert result.startswith(START + b"\n<!-- treestamp:config\n")
+    assert b"-->\n\n```sh\n" in result
+    assert result.endswith(b"```\n" + END + b"\n")
+    assert parse_document(result) == edited
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "hidden=['b.txt','a.txt']",
+        '"hidden" = [\n  "a.txt", # keep this comment\n\n  "b.txt",\n]',
+        'hidden = ["""a.\\\n  txt""", \'b.txt\']',
+        "root = '.'\nhidden = ['a.txt', 'b.txt']\nspecial_paths = []",
+    ],
+)
+def test_equivalent_toml_layout_survives_tree_edits(
+    document: Document, eol: str, payload: str
+) -> None:
+    source = replace(document, hidden=frozenset({"a.txt", "b.txt"}))
+    text = render_region(source).replace('hidden = ["a.txt", "b.txt"]', payload)
+    original = text.replace("\n", eol).encode()
+    assert parse_document(original) == source
+    assert prepare_content(source, ".", original) == original
+    edited = replace(source, tree=replace(source.tree, annotation="updated"))
+    result = prepare_content(edited, ".", original)
+    assert result.replace(b"  # updated", b"") == original
+    assert parse_document(result) == edited
+
+
+@pytest.mark.parametrize(
+    "payload", ["", "# optional config\n", "root = '.'\n", "hidden = []\n"]
+)
+def test_explicit_default_metadata_is_preserved(
+    document: Document, payload: str
+) -> None:
+    original = (
+        render_region(document)
+        .replace("```sh", "<!-- treestamp:config\n" + payload + "-->\n\n```sh", 1)
+        .encode()
+    )
+    assert parse_document(original) == document
+    assert prepare_content(document, ".", original) == original
+
+
+def test_array_of_tables_metadata_is_preserved() -> None:
+    source = Document(build_tree([Entry("name  # literal")]))
+    original = (
+        render_region(source)
+        .replace(
+            'special_paths = [{row = 1, path = "name  # literal"}]',
+            "[[special_paths]]\nrow = 1\npath = 'name  # literal'",
+        )
+        .encode()
+    )
+    assert b"[[special_paths]]" in original
+    assert parse_document(original) == source
+    assert prepare_content(source, ".", original) == original
+
+
+def test_generated_arrays_use_compact_wrapping(document: Document) -> None:
+    hidden = frozenset(f"file-{index:02}.txt" for index in range(18))
+    source = replace(document, hidden=hidden)
+    region = render_region(source)
+    payload = region.partition("<!-- treestamp:config\n")[2].partition("\n-->")[0]
+    lines = payload.splitlines()
+    assert lines[0] == "hidden = [" and lines[-1] == "]"
+    assert all(len(line) <= 80 for line in lines)
+    assert any(line.count(",") > 1 for line in lines[1:-1])
+    assert set(tomllib.loads(payload)["hidden"]) == hidden
+    assert parse_document(region.encode()) == source
+
+
+@pytest.mark.parametrize("size,wrapped", [(66, False), (67, False), (68, True)])
+def test_array_wrap_threshold(document: Document, size: int, wrapped: bool) -> None:
+    # hidden = ["..."] contributes 13 characters around its sole entry.
+    source = replace(document, hidden=frozenset({"x" * size}))
+    region = render_region(source)
+    assert ("hidden = [\n" in region) == wrapped
+    assert parse_document(region.encode()) == source
+
+
+def test_long_entries_and_special_records_are_never_split(document: Document) -> None:
+    path = "x" * 100
+    source = replace(document, hidden=frozenset({path}))
+    region = render_region(source)
+    assert f'    "{path}",\n' in region
+    assert parse_document(region.encode()) == source
+    special = Document(
+        build_tree([Entry(f"entry-{index}  # literal") for index in range(5)])
+    )
+    region = render_region(special)
+    assert "special_paths = [\n" in region
+    assert parse_document(region.encode()) == special
 
 
 def test_parse_document_round_trips_byte_paths(document: Document) -> None:
@@ -371,6 +512,64 @@ def test_default_document_has_no_config_noise(document: Document) -> None:
     assert parse_document(region.encode()) == document
 
 
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_attribution_round_trip_and_removal(
+    document: Document, tmp_path: Path, style: str, eol: str
+) -> None:
+    source = replace(
+        document,
+        settings=Settings(style=style, attribution=True),
+        hidden=frozenset({"hidden.txt"}),
+    )
+    region = render_region(source)
+    assert region.endswith(f"\n\n{ATTRIBUTION}\n\n{END.decode()}\n")
+    if style != "list":
+        assert f"```\n\n{ATTRIBUTION}" in region
+    path = tmp_path / "README.md"
+    original = ("Before\n" + region + "After\n").replace("\n", eol).encode()
+    path.write_bytes(original)
+    loaded, snapshot = load_document(path)
+    assert loaded == source
+    assert prepare_write(loaded, path, expected=snapshot).content == original
+    disabled = replace(source, settings=replace(source.settings, attribution=False))
+    result = write_document(disabled, path, expected=snapshot)
+    expected = original.replace(
+        ("\n" + ATTRIBUTION + "\n").replace("\n", eol).encode(), b""
+    )
+    assert result.content == expected
+    assert load_document(path)[0] == disabled
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_attribution_in_annotation_does_not_enable_trailer(
+    document: Document, style: str
+) -> None:
+    source = replace(
+        document,
+        settings=Settings(style=style),
+        tree=replace(document.tree, annotation=ATTRIBUTION),
+    )
+    assert parse_document(render_region(source).encode()) == source
+
+
+@pytest.mark.parametrize("trailer", [ATTRIBUTION + "\n" + ATTRIBUTION, "Other prose"])
+def test_invalid_trailing_prose_is_not_silently_discarded(
+    document: Document, trailer: str
+) -> None:
+    content = render_region(document).replace(
+        END.decode(), trailer + "\n" + END.decode()
+    )
+    with pytest.raises(MarkerError):
+        parse_document(content.encode())
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "true"])
+def test_attribution_requires_boolean(value: object) -> None:
+    with pytest.raises(MarkerError, match="attribution must be a boolean"):
+        Settings(attribution=value)  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize("ending", [b"\n", b"\r\n"])
 def test_unrepresentable_output_preserves_the_entire_existing_document(
     tmp_path: Path, ending: bytes
@@ -406,10 +605,11 @@ def test_config_is_only_curation_and_minimal_special_identities(style: str) -> N
     region = render_region(source)
     assert 'root = "src"' in region
     assert 'hidden = ["src/hidden"]' in region
-    assert (
-        'special_paths = ["src/notes  # drafts", "src/notes  # drafts/a  # b"]'
-        in region
-    )
+    payload = region.partition("<!-- treestamp:config\n")[2].partition("\n-->")[0]
+    assert tomllib.loads(payload)["special_paths"] == [
+        {"row": 1, "path": "src/notes  # drafts"},
+        {"row": 2, "path": "src/notes  # drafts/a  # b"},
+    ]
     assert "style =" not in region and "show_counts =" not in region
     assert parse_document(region.encode()) == source
 
@@ -422,6 +622,15 @@ def test_root_only_style_and_count_inference(style: str) -> None:
     loaded = parse_document(render_region(document).encode())
     assert loaded.settings.style == ("list" if style == "list" else "unicode")
     assert loaded.settings.show_counts is True
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+def test_more_than_100_special_entries_roundtrip(style: str) -> None:
+    names = [f"file{i:03d}  # suffix" for i in range(120)]
+    document = Document(
+        build_tree([Entry(name) for name in names]), Settings(style=style)
+    )
+    assert parse_document(render_region(document).encode()) == document
 
 
 def test_count_visibility_inferred_without_config() -> None:
@@ -455,6 +664,75 @@ def test_invalid_metadata_never_reconstructs_another_identity(payload: str) -> N
         parse_document(content.encode())
 
 
+@pytest.mark.parametrize(
+    "records",
+    [
+        '[{row = 1, path = "x  # y"}, {row = 1, path = "z  # q"}]',
+        '[{row = 1, path = "x  # y"}, {row = 2, path = "x  # y"}]',
+        '[{row = true, path = "x  # y"}]',
+        '[{row = 1.0, path = "x  # y"}]',
+        '[{row = "1", path = "x  # y"}]',
+        '[{row = 0, path = "x  # y"}]',
+        '[{row = -1, path = "x  # y"}]',
+        '[{row = 3, path = "x  # y"}]',
+        "[{row = 1}]",
+        '[{path = "x  # y"}]',
+        '[{row = 1, path = "x  # y", extra = 0}]',
+        "[{row = 1, path = 4}]",
+        '[{row = 1, path = {git_bytes = "invalid"}}]',
+        '[{row = 1, path = "other  # name"}]',
+        '[{row = 1, path = "parent/x  # y"}]',
+        '[{row = 1, path = "../x  # y"}]',
+        '[{row = 1, path = "ordinary"}]',
+        "[4]",
+        '{row = 1, path = "x  # y"}',
+    ],
+)
+def test_invalid_special_row_metadata_is_rejected(records: str) -> None:
+    content = (
+        f"<!-- treestamp:start -->\n<!-- treestamp:config\nspecial_paths = {records}\n"
+        "-->\n```\n./\n├── x  # y\n└── z  # q\n```\n<!-- treestamp:end -->\n"
+    ).encode()
+    with pytest.raises(MarkerError):
+        parse_document(content)
+
+
+@pytest.mark.parametrize(
+    "records",
+    ['["x  # y"]', '[{git_bytes = "782020232079"}]'],
+)
+def test_legacy_special_metadata_requires_regeneration(records: str) -> None:
+    content = (
+        f"<!-- treestamp:start -->\n<!-- treestamp:config\nspecial_paths = {records}\n"
+        "-->\n```\n./\n└── x  # y\n```\n<!-- treestamp:end -->\n"
+    ).encode()
+    with pytest.raises(MarkerError, match="legacy special_paths format; regenerate"):
+        parse_document(content)
+
+
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_manual_annotations_preserve_registered_row_identities(
+    style: str, eol: str
+) -> None:
+    source = Document(
+        build_tree([Entry("x"), Entry("x  # y"), Entry("x  # y  # z")]),
+        Settings(style=style),
+    )
+    region = render_region(source).replace("\n", eol)
+    # Change only row annotations; leave the generated registrations untouched.
+    edited = region.replace("x" + eol, "x  # y" + eol).replace(
+        "x  # y  # z" + eol, "x  # y  # z  # another  # note" + eol
+    )
+    content = ("# Outside the region" + eol * 3 + edited + eol + "After.").encode()
+    loaded = parse_document(content)
+    assert {node.path: node.annotation for node in loaded.tree.walk()} == {
+        "x": "y",
+        "x  # y": "",
+        "x  # y  # z": "another  # note",
+    }
+
+
 def test_hidden_cannot_overlap_printed_rows_or_live_under_a_collapsed_directory() -> (
     None
 ):
@@ -474,11 +752,16 @@ def test_region_extraction_preserves_original_framing_and_endings() -> None:
         extract_region(b"ordinary document")
 
 
-def test_byte_special_paths_roundtrip_without_redundant_descendants() -> None:
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("root", [".", "src  # root"])
+def test_byte_special_paths_roundtrip_without_redundant_descendants(
+    style: str, root: str
+) -> None:
     source = Document(
         build_tree(
             [Entry("bad\udcff  # dir/plain"), Entry("bad\udcff  # dir/child  # name")]
-        )
+        ),
+        Settings(root=root, style=style),
     )
     content = render_region(source).encode()
     assert b"git_bytes" in content

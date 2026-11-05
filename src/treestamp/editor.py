@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from treestamp.codec import render_tree
 from treestamp.document import (
+    ATTRIBUTION,
     Document,
     DocumentSnapshot,
+    extract_region,
     load_document,
+    parse_document,
     prepare_content,
     render_region,
     validate_source_tree,
@@ -131,7 +135,9 @@ class EditorController:
         return _prepare_state(snapshot, document.settings, document, saved.path, saved)
 
     def prepare_new(self, root: str) -> EditorState:
-        settings = Settings(root=root)
+        # Accept ordinary dialog spellings while retaining canonical Git paths.
+        # PurePosixPath leaves '..' intact so validation still rejects traversal.
+        settings = Settings(root=PurePosixPath(root).as_posix() if root else root)
         # Validate before joining; an absolute or escaping path cannot select
         # another repository through a root-selection control.
         repo_path("", settings.root)
@@ -195,8 +201,14 @@ class EditorController:
 
     def preview(self) -> str:
         session = self.state.session
-        return render_tree(session.printed_tree(), session.settings)
+        tree = render_tree(session.printed_tree(), session.settings)
+        return tree + (f"\n{ATTRIBUTION}\n" if session.settings.attribution else "")
 
     def region_text(self) -> str:
         """Print the complete treestamp without modifying the draft or document."""
-        return render_region(self.document())
+        document = self.document()
+        saved = self.state.document_snapshot
+        if saved is None or parse_document(saved.content, allow_absent=True) is None:
+            return render_region(document)
+        content = prepare_content(document, document.settings.root, saved.content)
+        return extract_region(content).decode("utf-8-sig", "surrogateescape")

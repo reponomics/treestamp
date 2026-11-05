@@ -33,6 +33,15 @@ jobs:
       group: fly-production
       cancel-in-progress: false
     steps:
+      - name: Validate the requested revision
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: |
+          if [[ ! "$REVISION" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$ || "$REVISION" == *..* ]]; then
+            echo "::error::revision must be a branch, tag, or commit id using letters, digits, '.', '_', '-', or '/'"
+            exit 1
+          fi
       - name: Check out the selected commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

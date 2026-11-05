@@ -117,7 +117,9 @@ jobs:
       - name: Run the regression suite
         run: python -m pytest
       - name: Check the treestamped README against a CRLF working tree
-        run: python -m treestamp check README.md
+        run: |
+          python -m treestamp check README.md
+          python scripts/readme_styles.py
       - name: Build distributions
         run: python -m build --no-isolation
       - name: Verify clean headless installations
