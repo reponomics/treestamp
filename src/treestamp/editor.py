@@ -12,7 +12,9 @@ from treestamp.document import (
     ATTRIBUTION,
     Document,
     DocumentSnapshot,
+    extract_region,
     load_document,
+    parse_document,
     prepare_content,
     render_region,
     validate_source_tree,
@@ -204,4 +206,9 @@ class EditorController:
 
     def region_text(self) -> str:
         """Print the complete treestamp without modifying the draft or document."""
-        return render_region(self.document())
+        document = self.document()
+        saved = self.state.document_snapshot
+        if saved is None or parse_document(saved.content, allow_absent=True) is None:
+            return render_region(document)
+        content = prepare_content(document, document.settings.root, saved.content)
+        return extract_region(content).decode("utf-8-sig", "surrogateescape")

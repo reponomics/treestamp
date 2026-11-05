@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -86,21 +87,58 @@ def test_check_update_idempotence_and_unbounded_additions(repo: Repo) -> None:
 
 
 @pytest.mark.parametrize("eol", [b"\n", b"\r\n"], ids=["lf", "crlf"])
-def test_formatting_changes_participate_in_check(repo: Repo, eol: bytes) -> None:
-    path = stamp(repo)
+@pytest.mark.parametrize(
+    "boundary",
+    [b"<!-- treestamp:start -->\n\n", b"-->\n\n```sh", b"\n\n<!-- treestamp:end -->"],
+)
+def test_excess_blank_lines_still_participate_in_check(
+    repo: Repo, eol: bytes, boundary: bytes
+) -> None:
+    path = stamp(repo, hidden=frozenset({"README.md"}))
     baseline = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", eol)
     path.write_bytes(baseline)
     assert run_cli("check")[0] == 0
-    original = baseline.replace(
-        b"<!-- treestamp:start -->" + eol,
-        b"<!-- treestamp:start -->" + eol * 2,
-    )
+    boundary = boundary.replace(b"\n", eol)
+    original = baseline.replace(boundary, boundary.replace(eol * 2, eol * 3))
     assert original != baseline
     path.write_bytes(original)
     assert run_cli("check")[0] == 1
     assert path.read_bytes() == original
     assert run_cli("update")[0] == 0
     assert path.read_bytes() != original
+    assert run_cli("check")[0] == 0
+
+
+@pytest.mark.parametrize("gaps", list(product((False, True), repeat=3)))
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_check_accepts_optional_blank_lines_but_detects_stale_tree(
+    repo: Repo,
+    gaps: tuple[bool, bool, bool],
+    eol: bytes,
+) -> None:
+    path = stamp(repo, hidden=frozenset({"README.md"}))
+    original = path.read_bytes().replace(b"\r\n", b"\n")
+    boundaries = [
+        b"<!-- treestamp:start -->\n\n",
+        b"-->\n\n```sh",
+        b"\n\n<!-- treestamp:end -->",
+    ]
+    for boundary, keep in zip(boundaries, gaps, strict=True):
+        if not keep:
+            original = original.replace(boundary, boundary.replace(b"\n\n", b"\n"))
+    original = original.replace(b"\n", eol)
+    path.write_bytes(original)
+    assert run_cli("check")[0] == 0
+    assert run_cli("update")[0] == 0
+    assert path.read_bytes() == original
+    repo.write("new.py")
+    repo.add("new.py")
+    assert run_cli("check")[0] == 1
+    assert path.read_bytes() == original
+    assert run_cli("update")[0] == 0
+    updated = path.read_bytes()
+    for boundary, keep in zip(boundaries, gaps, strict=True):
+        assert (boundary.replace(b"\n", eol) in updated) == keep
     assert run_cli("check")[0] == 0
 
 
@@ -111,6 +149,28 @@ def test_explicit_hidden_survives_maintenance(repo: Repo) -> None:
     assert document is not None and "README.md" not in {
         n.path for n in document.tree.walk()
     }
+
+
+@pytest.mark.parametrize("eol", [b"\n", b"\r\n"])
+def test_check_accepts_authored_toml_without_hiding_tree_drift(
+    repo: Repo, eol: bytes
+) -> None:
+    path = stamp(repo, hidden=frozenset({"README.md"}))
+    payload = b"root = '.'\nhidden = [\n  'README.md', # intentionally hidden\n]\n"
+    original = path.read_bytes().replace(b"\r\n", b"\n")
+    original = original.replace(b'hidden = ["README.md"]\n', payload)
+    original = original.replace(b"\n", eol)
+    path.write_bytes(original)
+    assert run_cli("check")[0] == 0
+    assert run_cli("update")[0] == 0
+    assert path.read_bytes() == original
+    repo.write("new.py")
+    repo.add("new.py")
+    assert run_cli("check")[0] == 1
+    assert path.read_bytes() == original
+    assert run_cli("update")[0] == 0
+    assert payload.replace(b"\n", eol) in path.read_bytes()
+    assert run_cli("check")[0] == 0
 
 
 def test_attribution_survives_check_update_and_print(repo: Repo) -> None:
@@ -197,9 +257,12 @@ def test_unicode_subtree_root_is_repository_relative(repo: Repo) -> None:
     write_document(document, path, create=True)
     assert load_document(path)[0] == document
     assert run_cli("check", str(path.relative_to(repo.path)))[0] == 0
-    assert run_cli("--load", str(path.relative_to(repo.path)), "--print")[
-        1
-    ] == path.read_text(encoding="utf-8")
+    assert (
+        run_cli("--load", str(path.relative_to(repo.path)), "--print")[1].encode(
+            "utf-8"
+        )
+        == path.read_bytes()
+    )
 
 
 def test_explicit_ref_ignores_staged_addition(repo: Repo) -> None:
@@ -359,7 +422,7 @@ def test_interactive_open_print_and_write_share_controller(
 
     monkeypatch.setattr("treestamp.tui.explore", load_then_print)
     code, output, error = run_cli("--load", str(path.relative_to(repo.path)))
-    assert code == 0 and output == path.read_text(encoding="utf-8") and not error
+    assert code == 0 and output.encode("utf-8") == path.read_bytes() and not error
     monkeypatch.setattr("treestamp.tui.explore", lambda editor, **kwargs: False)
     assert run_cli("tui")[1] == ""
 
@@ -394,7 +457,7 @@ def test_omitted_document_keeps_root_readme_but_explicit_document_uses_cwd(
     monkeypatch.chdir(nested.parent)
     assert run_cli("check")[0] == 0
     assert run_cli("update")[0] == 0
-    assert run_cli("--print")[1] == path.read_text(encoding="utf-8")
+    assert run_cli("--print")[1].encode("utf-8") == path.read_bytes()
     assert run_cli("check", "README.md")[0] == 2
     assert run_cli("--load", "README.md", "--print")[0] == 2
     assert run_cli("check", "../README.md")[0] == 0

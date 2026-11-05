@@ -4,6 +4,8 @@ The web editor loads public GitHub repositories at their default-branch HEAD, ed
 
 The service is a FastAPI application using the core Treestamp package. It ships in the hosted container and is not part of the core PyPI distribution. The public web editor uses [treestamp.reponomics.org](https://treestamp.reponomics.org/); see [PRIVACY.md](../PRIVACY.md).
 
+Loaded drafts retain supported boundary spacing, line endings, and unchanged TOML configuration text when copied or restored. New regions use spaced boundaries, and new or changed configuration arrays use compact wrapping at an 80-character target. Regenerating configuration drops comments inside it. The shared policy and implementation are recorded in [ADR 0002](../docs/adr/0002-formatter-compatible-documents.md).
+
 ## Run locally
 
 From the repository root:

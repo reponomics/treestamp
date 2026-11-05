@@ -81,6 +81,7 @@ Paste the whole block, including the markers, anywhere in your project's documen
 
 ````markdown
 <!-- treestamp:start -->
+
 ```sh
 ./
 ├── docs/ (2 files)
@@ -91,6 +92,7 @@ Paste the whole block, including the markers, anywhere in your project's documen
 ├── LICENSE
 └── README.md
 ```
+
 <!-- treestamp:end -->
 ````
 
@@ -170,7 +172,7 @@ repos:
 <details>
 <summary>Windows</summary>
 
-Use a terminal and font that display Unicode tree characters, or choose ASCII output. Treestamp emits UTF-8; printed output uses LF line endings, while writing into an existing document preserves its line endings. Windows filesystem restrictions still apply. See [CONTRIBUTING](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) for development setup.
+Use a terminal and font that display Unicode tree characters, or choose ASCII output. Treestamp emits UTF-8. New output uses LF line endings; printing a loaded region or writing into an existing document preserves its LF or CRLF convention. Windows filesystem restrictions still apply. See [CONTRIBUTING](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) for development setup.
 
 </details>
 
@@ -182,7 +184,13 @@ Currently, there is also the potential for a treestamp to be corrupted if it con
 
 The TUI and web editor do not currently detect moves or renames, so annotations on moved entries may be dropped when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
 
-treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on the treestamp's content (whatever is between the boundary markers) remaining unchanged and not manually edited (with one exception: manual edits of annotations are tolerable). This establishes an informal contract that the user must agree not to manually edit the other contents of the treestamp outside of the editor, if they want the application to be able to reliably parse and recognize the treestamp in the way it was authored previously.
+treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on preserving the generated tree and configuration between its boundary markers. Manual edits to annotations are supported. Other changes to the tree or configuration should be made through the editor so treestamp can reliably reload the document.
+
+New output includes a blank line after the start marker, between the configuration comment (when present) and the tree, and before the end marker. `treestamp check` accepts either zero or one blank line at each of these boundaries, independently. The terminal and web editors preserve this spacing when loading and exporting an existing treestamp; writes and `treestamp update` preserve the destination document's spacing and line endings. Newly created documents use the default blank lines. This allows Markdown formatters to adjust these boundaries without making an otherwise current tree fail its check.
+
+Configuration arrays use compact wrapping with an 80-character target: short arrays stay inline, and longer arrays fit several entries per line where possible. Individual entries are never split, so a long path or record may exceed the target. Existing TOML formatting, including comments and multiline arrays, is preserved while the configuration values remain unchanged and does not cause `check` to fail. When those values change, the configuration is regenerated using the default layout; comments within that configuration are not retained. The configuration must still use supported settings and valid values inside the `treestamp:config` comment wrapper.
+
+[ADR 0002](https://github.com/reponomics/treestamp/blob/main/docs/adr/0002-formatter-compatible-documents.md) explains the formatting decisions, alternatives, and implementation.
 
 ## Project Structure
 
