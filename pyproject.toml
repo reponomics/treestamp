@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.32.4"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -25,7 +25,7 @@ classifiers = [
 dependencies = ["textual>=8.2.8,<9"]
 
 [dependency-groups]
-build = ["build>=1.2", "hatchling==1.32.4", "editables>=0.3,<1"]
+build = ["build>=1.2", "hatchling==1.33.0", "editables>=0.3,<1"]
 runtime-tools = ["pip>=26.2.2", "certifi>=2026.10.19"]
 
 [tool.uv]
