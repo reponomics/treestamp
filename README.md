@@ -222,7 +222,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ```sh
 ./
 ├── .github/ (8 files, 2 folders)
-├── assets/ (1 file, 1 folder)
+├── assets/ (2 files, 1 folder)
 ├── docs/ (9 files, 1 folder)
 ├── scripts/ (8 files)  # Installed-package acceptance
 ├── src/
