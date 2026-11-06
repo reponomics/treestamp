@@ -1,6 +1,6 @@
 <div align="center">
     <picture>
-        <img src="https://raw.githubusercontent.com/reponomics/treestamp/main/assets/TREESTAMP_BANNER.png" alt="treestamp banner">
+        <img src="./assets/TREESTAMP_BANNER_TITLE.png" alt="treestamp banner">
     </picture>
 </div>
 
@@ -20,7 +20,22 @@
 
 treestamp is an editor for creating and maintaining directory trees for project documentation. Easily select which files and folders to include, and add brief annotations. The application reloads your treestamp when you want to update it, and automated checks can notify you when there is any drift between treestamp and the repository, making it easy to keep documentation up to date.
 
-<p><a href="#project-structure">⏬ See this repo's treestamp ⏬</a></p>
+
+<p align="center">
+<img src="./assets/demos/quicktour.gif" alt="Quicktour of the TUI, the web editor, and how to create a new treestamp." width="600">
+</p>
+
+
+<p>
+<h3 align="center">Try it now:</h3>
+<h3 align="center"><a href="https://treestamp.reponomics.org">treestamp web editor</a></h3>
+<h3 align="center">Or go straight to a specific project:</h3>
+<h4 align="center"><code>https://treestamp.reponomics.org/USERNAME/REPO</code></h4>
+</p>
+
+<p><h3 align="center"><a href="#project-structure">See this repo's treestamp 🌲</a></h3></p>
+
+
 
 ## Quickstart
 
@@ -207,7 +222,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ```sh
 ./
 ├── .github/ (8 files, 2 folders)
-├── assets/ (2 files, 1 folder)
+├── assets/ (1 file, 1 folder)
 ├── docs/ (9 files, 1 folder)
 ├── scripts/ (8 files)  # Installed-package acceptance
 ├── src/
