@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/reponomics/treestamp/compare/v1.0.0...v1.0.1) (2026-11-07)
+
+
+### Documentation
+
+* add quicktour gif ([#44](https://github.com/reponomics/treestamp/issues/44)) ([4580ae7](https://github.com/reponomics/treestamp/commit/4580ae70a731138cb4103250b85ab71a19728df0))
+
 ## [1.0.0](https://github.com/reponomics/treestamp/compare/v0.6.0...v1.0.0) (2026-11-05)
 
 
