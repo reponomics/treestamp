@@ -22,7 +22,7 @@ treestamp is an editor for creating and maintaining directory trees for project 
 
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/reponomics/treestamp/main/assets/demos/quickour.gif" alt="Quicktour of the TUI, the web editor, and how to create a new treestamp." width="600">
+<img src="https://raw.githubusercontent.com/reponomics/treestamp/main/assets/demos/quicktour.gif" alt="Quicktour of the TUI, the web editor, and how to create a new treestamp." width="600">
 </p>
 
 
