@@ -45,27 +45,24 @@ jobs:
         with:
           version-file: .tool-versions
           python-version: ${{ matrix.python-version }}
-      - name: Install development environment
-        run: make install
-      - name: Run quality checks and regression tests on the primary version
+      - name: Install pinned actionlint
         if: matrix.python-version == '3.11'
-        run: make ci
-      - name: Run regression tests on the compatibility version
+        run: |
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+      - name: Run the shared core and package PR checkpoint
+        if: matrix.python-version == '3.11'
+        # This phase installs dependencies and builds fresh temporary artifacts.
+        run: make _check-pr-core
+      - name: Install the compatibility environment and build distributions
         if: matrix.python-version != '3.11'
-        run: make test
-      - name: Check the treestamped README
-        run: make integration-check
-      - name: Build distributions
         run: make build
-      - name: Check documentation and distribution metadata
-        if: matrix.python-version == '3.11'
-        run: make docs-check metadata-check
-      - name: Verify clean headless installations
-        if: matrix.python-version == '3.11'
-        run: make distribution-check
-      - name: Verify installed pre-commit hooks
-        if: matrix.python-version == '3.11'
-        run: make hook-check
+      - name: Run compatibility regression and README checks
+        if: matrix.python-version != '3.11'
+        run: make test integration-check
 
   windows:
     name: Regression suite (Windows, Python ${{ matrix.python-version }})
@@ -159,25 +156,10 @@ jobs:
         run: make install
       - name: Install the browser
         run: venv/bin/playwright install --with-deps chromium
-      - name: Run the quality gates and the browser suite concurrently
-        # The browser suite runs in its own process against its own service on
-        # free ports, so it overlaps the other gates instead of following them.
-        run: |
-          # The shell runs with -e; guard each command so both statuses are
-          # collected and the browser log is always printed before failing.
-          make web-browser-test > browser-suite.log 2>&1 &
-          browser=$!
-          gates=0
-          make web-ci || gates=$?
-          browser_status=0
-          wait "$browser" || browser_status=$?
-          echo "::group::Browser suite (exit $browser_status)"
-          cat browser-suite.log
-          echo "::endgroup::"
-          echo "quality gates exit $gates; browser suite exit $browser_status"
-          test "$gates" -eq 0 && test "$browser_status" -eq 0
-      - name: Build the container image
-        run: make web-image
+      - name: Run the shared hosted PR checkpoint
+        # The same phase is used by make check:pr; parallelism keeps browser
+        # journeys concurrent with the other gates, with output grouped by target.
+        run: make -j2 --output-sync=target _check-pr-web
       - name: Start the container and probe health
         run: |
           docker run -d --name treestamp-web -p 8000:8000 \

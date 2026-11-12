@@ -32,15 +32,21 @@ COV_ARGS ?=
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
 	@awk '/^[a-zA-Z_-]+(\\:[a-zA-Z_-]+)?:.*## / {name = $$0; sub(/: .*/, "", name); gsub(/\\:/, ":", name); description = $$0; sub(/.*## /, "", description); printf "%-22s %s\n", name, description}' $(MAKEFILE_LIST)
-.PHONY: check\:pre-commit check\:pr
+.PHONY: check\:pre-commit check\:pr _check-pr-core _check-pr-web
 check\:pre-commit: ## Before committing: run development hooks on staged files
 	$(VENV)/bin/pre-commit run
 check\:pr: ## Before a PR: run local CI checks, package acceptance, and container build
+	$(MAKE) _check-pr-core
+	$(MAKE) _check-pr-web
+# Shared CI phases; keep the public checkpoints above as the developer entry points.
+# The core phase syncs the environment, so finish it before starting hosted tests.
+_check-pr-core:
 	$(MAKE) toolchain-check lock-check workflow-check
 	@set -eu; check_dist=$$(mktemp -d "$${TMPDIR:-/tmp}/treestamp-check.XXXXXX"); \
 	  trap 'rm -rf "$$check_dist"' EXIT; \
 	  $(MAKE) build DIST_DIR="$$check_dist"; \
-	  $(MAKE) ci web-ci web-browser-test docs-check integration-check metadata-check distribution-check hook-check web-image DIST_DIR="$$check_dist"
+	  $(MAKE) ci docs-check integration-check metadata-check distribution-check hook-check DIST_DIR="$$check_dist"
+_check-pr-web: web-ci web-browser-test web-image
 toolchain-check: ## Verify that development/CI and Docker uv pins agree
 	$(PYTHON) scripts/check_toolchain.py
 uv-check: ## Check that uv matches the pinned development tool version
