@@ -100,7 +100,7 @@ Some excluded components have regression tests; absence from a report does not i
 
 ## Recorded verification status
 
-Snapshot: **November 12, 2026**, on macOS. These are local results, not a live CI status or evidence of a fresh Windows/Linux run. The core and hosted gates were rerun at the 95% minimum during this documentation consolidation with Python 3.11.11 and Node 24.22.1. The most recent browser run used Python 3.11.14 and verified the `httpx2` dependency change in commit `6be9d09` on the same date.
+Snapshot: **November 12, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. `make -j4 check:pr` passed on candidate `b4f6101`, including both 95% coverage gates and the browser suite. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run. `check:pre-commit` also passed against the staged checkpoint definitions.
 
 | Suite | Latest result | Coverage | Remaining measured gaps |
 | --- | --- | --- | --- |
@@ -109,7 +109,7 @@ Snapshot: **November 12, 2026**, on macOS. These are local results, not a live C
 | JavaScript logic | 23 passed | 100% lines, branches, and functions | None in `logic.js` |
 | Chromium browser | 162 passed, 1 known warning | Not collected | See coverage scope above |
 
-Formatting, lint, strict typing, lockfile consistency, and documentation checks passed during the `httpx2` verification. The earlier coverage review raised the core total from 95.97% and the hosted total from 98.11%, adding 58 core cases, 14 hosted cases, and 6 JavaScript tests. Refresh this dated snapshot when recording a new coverage audit or a material testing/dependency change; use CI results for the status of other revisions.
+The PR checkpoint also passed formatting, lint, strict typing, lockfile/toolchain consistency, workflow lint, documentation and README checks, wheel/sdist metadata and clean-install acceptance, installed-hook acceptance, and the Docker image build. Its first run exposed a copied-interpreter library lookup failure with uv-managed Python; acceptance environments now use symlinks on POSIX and retain copying on Windows. The earlier coverage review raised the core total from 95.97% and the hosted total from 98.11%, adding 58 core cases, 14 hosted cases, and 6 JavaScript tests. Refresh this dated snapshot when recording a new coverage audit or a material testing/dependency change; use CI results for the status of other revisions.
 
 ### Test dependencies and known warnings
 
