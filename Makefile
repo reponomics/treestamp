@@ -55,7 +55,7 @@ typecheck: ## Check strict Python types
 test: ## Run the regression suite, including headless TUI journeys
 	$(PY) -m pytest
 cov: ## Run tests with branch coverage
-	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
+	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
 ci: format-check lint typecheck cov ## Run all local quality gates
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
@@ -94,7 +94,7 @@ web-typecheck: ## Check strict types for the web editor project
 web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
 web-cov: ## Run the web editor tests with branch coverage
-	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
+	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
 web-ci: web-lint web-typecheck web-cov web-js-cov ## Run all web editor quality gates
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs

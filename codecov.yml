@@ -1,5 +1,5 @@
-# Codecov reports coverage only. The 90% minimum is enforced by `make cov` and
-# `make web-cov` in CI, so Codecov's own status checks are informational.
+# Codecov reports coverage only. `make cov` and `make web-cov` enforce the
+# minimum in CI; see docs/testing.md. Codecov's status checks are informational.
 coverage:
   status:
     project:

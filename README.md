@@ -221,9 +221,9 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 -->
 ```sh
 ./
-├── .github/ (8 files, 2 folders)
+├── .github/ (9 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (9 files, 1 folder)
+├── docs/ (10 files, 1 folder)
 ├── scripts/ (8 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -264,9 +264,9 @@ The alternate styles below are generated from the same tree and checked for fres
 
 ```sh
 ./
-|-- .github/ (8 files, 2 folders)
+|-- .github/ (9 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
-|-- docs/ (9 files, 1 folder)
+|-- docs/ (10 files, 1 folder)
 |-- scripts/ (8 files)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
@@ -305,9 +305,9 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ./
 
-- .github/ (8 files, 2 folders)
+- .github/ (9 files, 2 folders)
 - assets/ (2 files, 1 folder)
-- docs/ (9 files, 1 folder)
+- docs/ (10 files, 1 folder)
 - scripts/ (8 files)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
@@ -343,7 +343,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ## Development and support
 
-[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/docs/MAINTENANCE.md) · [Governance](https://github.com/reponomics/treestamp/blob/main/docs/GOVERNANCE.md) · [Design](https://github.com/reponomics/treestamp/blob/main/docs/design.md) · [Roadmap](https://github.com/reponomics/treestamp/blob/main/docs/ROADMAP.md) · [Security assessment](https://github.com/reponomics/treestamp/blob/main/docs/security-assessment.md) · [Verifying releases](https://github.com/reponomics/treestamp/blob/main/docs/verifying-releases.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
+[Contributing](https://github.com/reponomics/treestamp/blob/main/.github/CONTRIBUTING.md) · [Testing](https://github.com/reponomics/treestamp/blob/main/docs/testing.md) · [Maintenance](https://github.com/reponomics/treestamp/blob/main/docs/MAINTENANCE.md) · [Governance](https://github.com/reponomics/treestamp/blob/main/docs/GOVERNANCE.md) · [Design](https://github.com/reponomics/treestamp/blob/main/docs/design.md) · [Roadmap](https://github.com/reponomics/treestamp/blob/main/docs/ROADMAP.md) · [Security assessment](https://github.com/reponomics/treestamp/blob/main/docs/security-assessment.md) · [Verifying releases](https://github.com/reponomics/treestamp/blob/main/docs/verifying-releases.md) · [Changelog](https://github.com/reponomics/treestamp/blob/main/CHANGELOG.md) · [Privacy](https://github.com/reponomics/treestamp/blob/main/PRIVACY.md)
 
 Report bugs through [GitHub issues](https://github.com/reponomics/treestamp/issues), vulnerabilities through [private security reporting](https://github.com/reponomics/treestamp/security/advisories/new), and conduct concerns to [conduct@reponomics.org](mailto:conduct@reponomics.org).
 

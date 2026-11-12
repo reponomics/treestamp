@@ -4,46 +4,18 @@ These procedures require a full Git checkout, including the hosted application i
 
 ## Validate and build
 
+Follow the [testing guide](https://github.com/reponomics/treestamp/blob/main/docs/testing.md) for required suites, browser setup, CI, coverage policy, and recorded results before preparing a release candidate.
+
 ```bash
-make ci web-ci docs-check
-make web-browser-test
 make build metadata-check distribution-check
 make integration-check
 ```
 
-Browser checks require the separate browser dependencies described in [the web README](https://github.com/reponomics/treestamp/blob/main/web/README.md). `metadata-check` validates both distributions against the approved file set and reports their hashes. `distribution-check` installs the wheel and source archive into fresh environments and exercises headless commands and the terminal editor. After committing a candidate, `make hook-check` checks the public pre-commit hooks from that exact HEAD. Clear `dist/` before building so the checks read only the new artifacts.
+`metadata-check` validates both distributions against the approved file set and reports their hashes. `distribution-check` installs the wheel and source archive into fresh environments and exercises headless commands and the terminal editor. After committing a candidate, `make hook-check` checks the public pre-commit hooks from that exact HEAD. Clear `dist/` before building so the checks read only the new artifacts.
 
 ## Coverage reporting and review
 
-Run `make cov web-cov web-js-cov` for separate core Python, hosted Python, and pure JavaScript logic reports. Python totals combine executable statements and branch destinations; they are not line-only percentages. Reports show two decimal places so a small remaining gap is visible. The existing Python minimum remains 90% for each suite. `make web-ci` also prints the JavaScript report; it does not impose an additional JavaScript percentage gate.
-
-For machine-readable Python snapshots, run each target with `COV_ARGS=--cov-report=json:/tmp/treestamp-core.json` or `COV_ARGS=--cov-report=json:/tmp/treestamp-web.json`, respectively. Use `COV_ARGS=--cov-report=xml` to reproduce the two reports uploaded by the coverage workflow. Codecov receives Python coverage only; its core and web flags preserve the separate package scopes.
-
-Coverage includes `src/treestamp/` and `web/src/treestamp_web/` respectively. Maintenance and deployment scripts are outside those denominators, even where they have regression tests. Child processes are not instrumented: CLI subprocess tests and installed-package checks exercise behavior that is not necessarily reflected in the parent process's report. Browser tests run separately, and their Uvicorn subprocess does not contribute to the hosted Python report. The Node report measures only `static/logic.js`; `app.js`, `theme.js`, generated examples, and browser interactions are outside that report. A 100% logic report therefore does not mean 100% frontend coverage.
-
-Review snapshot, November 12, 2026 (macOS, Python 3.11.14, Node 24.22.1):
-
-| Report | Before | After | Remaining gaps |
-| --- | ---: | ---: | --- |
-| Core Python, statements and branches | 95.97% | 99.70% | 3 statements, 5 branch destinations |
-| Hosted Python, statements and branches | 98.11% | 99.28% | 10 statements, 3 branch destinations |
-| `logic.js`, lines | 99.57% | 100.00% | None in this module |
-| `logic.js`, branches | 95.14% | 100.00% | None in this module |
-
-The review added 58 core cases, 14 hosted cases, and 6 JavaScript tests. Final runs passed 1,003 core tests (one existing filesystem-dependent skip), 293 hosted tests, and 23 JavaScript tests. Both Python quality gates passed formatting, lint, and strict types; documentation link checks passed. The 162 browser cases remained outside these coverage runs and were not rerun because production code was unchanged. The Node function coverage remained 100%.
-
-The remaining core gaps are the non-entry import branch in `__main__.py`, containment/name consistency guards in `gitio.py` and `model.py`, and empty-count/rejected-browse branches in `tui.py`. Hosted gaps are missing package metadata, defensive exception handlers in `app.py`, and normalization/rendering guards in `preview.py`. These include both low-cost but low-value checks and paths dominated by earlier validation; not every remaining gap requires a complex harness.
-
-The incremental review prioritizes deterministic malformed-input tests, error recovery that preserves drafts, and existing headless UI journeys. It retains coverage scope and exclusions rather than removing difficult code from the denominator. Further work should distinguish these costs:
-
-| Area | Useful next assurance | Complexity or limitation |
-| --- | --- | --- |
-| Native clipboard and terminal OSC 52 | Verify actual delivery on macOS, Windows, Wayland, and X11 | High: OS/session integration; command-selection tests cannot prove delivery. |
-| Terminal rendering and focus | Exercise real PTYs and supported terminal emulators | High: headless Textual tests cannot establish physical terminal behavior. |
-| Full browser coverage | Instrument browser JavaScript and merge per-page results; instrument the service process separately | Medium/high: lifecycle, subprocess, and source-mapping work; keep these metrics distinct from pure logic. |
-| Defensive validation and render/reparse guards | Test realistic boundary failures when reachable | Often low yield: earlier validation can make a guard unreachable through valid public operations; corrupting internal objects or replacing several internals tests a synthetic situation. |
-| Filesystem failures and concurrent writes | Keep deterministic permission-failure stubs and prepared-write interleavings | Real OS permissions and timing-based races add platform dependence and flakiness. |
-| Package metadata fallbacks | Exercise source-only imports without installed metadata | Low implementation cost, but lower assurance value than draft recovery or parsing checks. |
+Coverage commands, measurement boundaries, current results, and remaining gaps are maintained in the [testing guide](https://github.com/reponomics/treestamp/blob/main/docs/testing.md#coverage-reporting).
 
 ## Dependencies and toolchain
 

@@ -24,15 +24,8 @@ To use real GitHub, set `GITHUB_TOKEN` or all three GitHub App variables: `GITHU
 
 ## Test and build
 
-```bash
-make web-ci
-venv/bin/playwright install chromium
-make web-browser-test
-make web-image
-```
+Follow the [testing guide](../docs/testing.md) for hosted quality gates, JavaScript coverage, browser setup and commands, fixture contracts, and known warnings. Build the hosted container with `make web-image`.
 
-`web-ci` runs lint, formatting, strict Python types, Python tests with coverage, and JavaScript tests with coverage for `static/logic.js`. Run `make web-js-cov` (or `npm --prefix web run test:coverage`) for that JavaScript report alone; it does not measure `app.js`, `theme.js`, or browser interactions. Browser tests use the fake GitHub API; pass `BROWSER_FLAGS="--browser-channel chrome"` to use an installed Chrome. Cache and quota tests use controlled clocks and transports.
-
-Bundled welcome examples are offline fixtures. Their responses in `src/treestamp_web/static/example.js` and trees in `src/treestamp_web/data/examples.json` must stay consistent; `tests/test_examples.py` checks them against the API. Opening an example's live repository follows the same public default-branch policy as any other repository.
+Bundled welcome examples are offline fixtures. Opening an example's live repository follows the same public default-branch policy as any other repository.
 
 See [MAINTENANCE.md](../docs/MAINTENANCE.md) for promoting the existing app to production, the separate test deployment, deployment from `main`, and session recovery after cache loss.
