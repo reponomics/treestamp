@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import httpx
@@ -27,6 +27,21 @@ def test_healthz_reports_versions_budget_and_cache(client: TestClient) -> None:
     }
     for name, value in SECURITY_HEADERS.items():
         assert client.get("/healthz").headers[name] == value
+
+
+def test_healthz_survives_missing_core_distribution_metadata(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from treestamp_web import app
+
+    def missing_version(name: str) -> str:
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(app, "version", missing_version)
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json()["package"] == "unknown"
+    assert response.json()["status"] == "ok"
 
 
 def test_preview_contract(client: TestClient) -> None:

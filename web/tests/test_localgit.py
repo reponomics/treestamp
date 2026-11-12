@@ -52,3 +52,21 @@ def test_fake_routes_cover_shallow_listing_base64_blobs_and_misses(
     fake.options = FakeOptions(rate_limit_after=0)
     status, headers, _ = fake.respond("/rate_limit", {}, "")
     assert status == 403 and headers["x-ratelimit-remaining"] == "0"
+
+
+def test_fake_app_rejects_missing_credential(repo_fake_with_app) -> None:
+    fake, _ = repo_fake_with_app
+    status, headers, body = fake.respond("/repos/o/r", {}, "")
+    assert status == 401
+    assert headers["content-type"] == "application/json"
+    assert json.loads(body) == {"message": "Bad credentials"}
+
+
+def test_fake_token_exchange_without_signature_verification(fake: FakeGitHub) -> None:
+    status, headers, body = fake.respond(
+        "/app/installations/12345/access_tokens", {}, "", method="POST"
+    )
+    assert status == 201
+    assert headers["content-type"] == "application/json"
+    assert json.loads(body)["token"] == "ghs_fake1"
+    assert fake.tokens_issued == 1
