@@ -95,9 +95,12 @@ web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
 web-cov: ## Run the web editor tests with branch coverage
 	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
-web-ci: web-lint web-typecheck web-cov web-js-test ## Run all web editor quality gates
+web-ci: web-lint web-typecheck web-cov web-js-cov ## Run all web editor quality gates
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs
+.PHONY: web-js-cov
+web-js-cov: ## Measure pure JavaScript logic coverage (excludes browser DOM code)
+	$(NODE) --experimental-test-coverage --test --test-coverage-include='**/static/logic.js' web/tests/js/*.test.mjs
 web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
