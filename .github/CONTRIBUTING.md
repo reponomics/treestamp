@@ -1,6 +1,20 @@
 # Contributing
 
-Discuss ordinary bugs and proposed changes in [reponomics/treestamp issues](https://github.com/reponomics/treestamp/issues). Follow the [code of conduct](CODE_OF_CONDUCT.md) and use [private reporting](SECURITY.md) for vulnerabilities.
+Discuss ordinary bugs and proposed changes in the project's [issues section](https://github.com/reponomics/treestamp/issues). For non-trivial changes, propose the change in an issue before submitting a Pull Request. Follow the [code of conduct](CODE_OF_CONDUCT.md) and use [private reporting](SECURITY.md) for vulnerabilities.
+
+## Git
+
+### Commit Messages
+
+Prefer to use [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) when committing code for this repo.
+
+### Commit Signing
+
+Please ensure that your commits are signed and appear as "Verified" on GitHub. See GitHub [docs](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification) for guidance. This is required and enforced on Pull Requests.
+
+### Commit Signoff - DCO
+
+By contributing to this project, you must agree to the [Developer Certificate of Origin (DCO) version 1.1](./DCO.txt). This is a confirmation that you have the right to submit the code changes that you propose. To make this explicit, please include a `Signed-off-by: NAME <EMAIL ADDRESS>` trailer in your commits, which you can do simpy by adding the `--signoff` flag (or `-s`) when running `git commit`; i.e., `git commit --signoff`. Unlike commit signatures, it's acceptable to omit this from some commits, and it is not enforced by CI.
 
 ## Set up
 
