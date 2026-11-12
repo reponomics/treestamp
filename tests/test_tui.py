@@ -754,3 +754,172 @@ def test_cli_explicit_load_opens_document_without_startup_dialogs(
     monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
     assert run_cli("--load", "tree.md") == (0, "", "")
     assert repo.read_bytes("docs/tree.md") == before
+
+
+@pytest.mark.parametrize(
+    ("platform", "available", "expected"),
+    [
+        ("darwin", {"pbcopy"}, ["pbcopy"]),
+        ("win32", {"clip"}, ["clip"]),
+        ("linux", {"wl-copy", "xclip"}, ["wl-copy"]),
+        ("linux", {"xclip", "xsel"}, ["xclip", "-selection", "clipboard"]),
+        ("linux", {"xsel"}, ["xsel", "--clipboard", "--input"]),
+        ("linux", set(), None),
+        ("darwin", {"xclip"}, None),
+    ],
+)
+def test_clipboard_selection_respects_platform_and_priority(
+    monkeypatch: pytest.MonkeyPatch,
+    platform: str,
+    available: set[str],
+    expected: list[str] | None,
+) -> None:
+    from treestamp import tui
+
+    monkeypatch.setattr(tui.sys, "platform", platform)
+    monkeypatch.setattr(
+        tui.shutil, "which", lambda name: name if name in available else None
+    )
+    assert tui._clipboard_command() == expected
+
+
+def test_cursor_root_and_leaf_actions_preserve_layout(editor: EditorController) -> None:
+    session = editor.state.session
+    before = session.state()
+    cursor = Cursor(session)
+    cursor.left()
+    cursor.toggle()
+    assert cursor.path == ""
+    assert cursor.toggle_hidden() == "The root always stays included."
+    cursor.move(100)
+    assert cursor.path == "readme"
+    cursor.right()
+    cursor.toggle()
+    assert cursor.path == "readme"
+    cursor.left()
+    assert cursor.path == ""
+    assert session.state() == before
+
+
+@pytest.mark.parametrize(
+    ("entry", "expected"),
+    [
+        (Entry("module", "gitlink"), "module/  # submodule"),
+        (Entry("link", "symlink", "target\nline"), 'link -> "target\\nline"'),
+        (Entry("link", "symlink"), "link -> null"),
+    ],
+)
+def test_special_entry_labels_preserve_type_and_escape_targets(
+    entry: Entry, expected: str
+) -> None:
+    from treestamp.tui import _label
+
+    assert _label(build_tree([entry]).children[0]) == expected
+
+
+@pytest.mark.parametrize(
+    ("method", "action", "message"),
+    [
+        ("preview", "action_preview", "Cannot preview tree"),
+        ("region_text", "action_copy", "Cannot copy treestamp"),
+        ("region_text", "action_print", "Cannot print tree"),
+    ],
+)
+def test_output_failure_keeps_editor_open_and_draft_unchanged(
+    editor: EditorController,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    action: str,
+    message: str,
+) -> None:
+    def fail() -> str:
+        raise OSError("output unavailable")
+
+    before = editor.state.session.state()
+    monkeypatch.setattr(editor, method, fail)
+
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test():
+            getattr(app, action)()
+            assert rendered_text(app.status_widget) == f"{message}: output unavailable"
+            assert len(app.screen_stack) == 1
+            assert app.is_running
+            assert editor.state.session.state() == before
+
+    asyncio.run(journey())
+
+
+def test_failed_native_clipboard_reports_error_without_claiming_success(
+    editor: EditorController, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from treestamp import tui
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise OSError("clipboard unavailable")
+
+    monkeypatch.setattr(tui, "_clipboard_command", lambda: ["test-clipboard"])
+    monkeypatch.setattr(tui.subprocess, "run", fail)
+    before = editor.state.session.state()
+
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test():
+            app.action_copy()
+            assert (
+                rendered_text(app.status_widget)
+                == "Cannot copy with test-clipboard: clipboard unavailable"
+            )
+            assert editor.state.session.state() == before
+
+    asyncio.run(journey())
+
+
+def test_load_cancel_and_failure_keep_current_draft(editor: EditorController) -> None:
+    before = editor.state
+
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test():
+            for value in (None, ""):
+                await app._accept_load(value)
+                assert rendered_text(app.status_widget) == "Open cancelled."
+                assert editor.state is before
+            await app._accept_load("missing.md")
+            assert "Open failed:" in rendered_text(app.status_widget)
+            assert "document does not exist" in rendered_text(app.status_widget)
+            assert editor.state is before
+
+    asyncio.run(journey())
+
+
+def test_new_clean_draft_opens_without_discard_prompt(editor: EditorController) -> None:
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test():
+            await app._accept_new("src")
+            assert app.session.settings.root == "src"
+            assert not editor.dirty
+            assert len(app.screen_stack) == 1
+
+    asyncio.run(journey())
+
+
+def test_page_navigation_clamps_and_dirty_quit_can_be_confirmed(
+    editor: EditorController,
+) -> None:
+    editor.state.session.set_annotation("readme", "unsaved")
+
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test() as pilot:
+            app.action_page(1)
+            assert app.cursor.path == "readme"
+            app.action_page(-1)
+            assert app.cursor.path == ""
+            await press(pilot, "q")
+            assert isinstance(app.screen, ConfirmScreen)
+            await press(pilot, "y")
+        assert app.return_value is False
+
+    asyncio.run(journey())

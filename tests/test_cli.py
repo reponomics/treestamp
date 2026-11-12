@@ -511,3 +511,32 @@ def test_target_and_compare_resolve_in_document_repository(
     assert nodes["src/renamed.py"].annotation == "Entry point"
     assert "src/main.py" not in nodes
     assert run_cli("check", value, "--compare", "HEAD")[0] == 0
+
+
+def test_module_entrypoint_uses_cli_arguments(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import runpy
+
+    monkeypatch.setattr(sys, "argv", ["treestamp", "--help"])
+    with pytest.raises(SystemExit) as result:
+        runpy.run_module("treestamp", run_name="__main__")
+    assert result.value.code == 0
+    captured = capsys.readouterr()
+    assert "usage: treestamp" in captured.out
+    assert captured.err == ""
+
+
+def test_binary_stdout_preserves_git_bytes_and_flushes_pending_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+
+    from treestamp.cli import _emit
+
+    output = io.BytesIO()
+    stream = io.TextIOWrapper(output, encoding="ascii", newline="\r\n")
+    stream.write("pending\n")
+    monkeypatch.setattr(sys, "stdout", stream)
+    _emit("./\n└── byte\udcff\n")
+    assert output.getvalue() == b"pending\r\n" + "./\n└── byte".encode() + b"\xff\n"
