@@ -4,6 +4,8 @@ PYTHON ?= python3
 UV ?= uv
 UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
+DOCKER ?= docker
+DIST_DIR ?= dist
 FLY ?= flyctl
 ACTIONLINT ?= actionlint
 PY := $(VENV)/bin/python
@@ -29,7 +31,16 @@ COV_ARGS ?=
 .PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check toolchain-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk '/^[a-zA-Z_-]+(\\:[a-zA-Z_-]+)?:.*## / {name = $$0; sub(/: .*/, "", name); gsub(/\\:/, ":", name); description = $$0; sub(/.*## /, "", description); printf "%-22s %s\n", name, description}' $(MAKEFILE_LIST)
+.PHONY: check\:pre-commit check\:pr
+check\:pre-commit: ## Before committing: run development hooks on staged files
+	$(VENV)/bin/pre-commit run
+check\:pr: ## Before a PR: run local CI checks, package acceptance, and container build
+	$(MAKE) toolchain-check lock-check workflow-check
+	@set -eu; check_dist=$$(mktemp -d "$${TMPDIR:-/tmp}/treestamp-check.XXXXXX"); \
+	  trap 'rm -rf "$$check_dist"' EXIT; \
+	  $(MAKE) build DIST_DIR="$$check_dist"; \
+	  $(MAKE) ci web-ci web-browser-test docs-check integration-check metadata-check distribution-check hook-check web-image DIST_DIR="$$check_dist"
 toolchain-check: ## Verify that development/CI and Docker uv pins agree
 	$(PYTHON) scripts/check_toolchain.py
 uv-check: ## Check that uv matches the pinned development tool version
@@ -60,12 +71,12 @@ ci: format-check lint typecheck cov ## Run core quality gates (see docs/testing.
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
 metadata-check: ## Check built metadata, README rendering, package contents, and hashes
-	$(PY) -m twine check --strict dist/*.whl dist/*.tar.gz
-	$(PY) scripts/release_check.py
+	$(PY) -m twine check --strict "$(DIST_DIR)"/*.whl "$(DIST_DIR)"/*.tar.gz
+	$(PY) scripts/release_check.py --dist "$(DIST_DIR)"
 build: install ## Sync locked build tools and build wheel and sdist without isolation
-	$(PY) -m build --no-isolation
+	$(PY) -m build --no-isolation --outdir "$(DIST_DIR)"
 distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
-	$(PY) scripts/distribution_check.py
+	$(PY) scripts/distribution_check.py --dist "$(DIST_DIR)"
 .PHONY: readme-styles-check readme-update
 readme-styles-check: ## Verify alternate README styles match its managed tree
 	$(PY) scripts/readme_styles.py
@@ -110,7 +121,7 @@ web-serve: ## Run the web editor locally against GITHUB_API_URL
 tls-check: ## Check Python TLS package versions and certificate trust stores
 	$(PY) web/scripts/check_tls.py
 web-image: toolchain-check ## Build the web editor container image
-	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
+	$(DOCKER) build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
 fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
 	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
 	  { echo "usage: make fly-secrets GITHUB_APP_CLIENT_ID=... GITHUB_APP_INSTALLATION_ID=... GITHUB_APP_PRIVATE_KEY_FILE=path.pem"; exit 2; }

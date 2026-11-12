@@ -25,7 +25,6 @@ make venv
 make install
 nvm install
 nvm use
-make ci web-ci docs-check
 ```
 
 `make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. See the [testing guide](../docs/testing.md#suites-and-commands) for browser installation and test commands, and [web/README.md](../web/README.md) to run the application locally.
@@ -46,7 +45,7 @@ Non-trivial changes must add or update behavioral tests in the same pull request
 
 ## Check changes
 
-Run focused tests during implementation and the relevant complete checks before review, following the [testing guide](../docs/testing.md#suites-and-commands). It also covers [CI and local hooks](../docs/testing.md#ci-and-local-hooks); use the [maintenance runbook](../docs/MAINTENANCE.md#validate-and-build) for release and installed-package checks.
+Run `make check:pre-commit` on staged changes before committing and `make check:pr` on the candidate before review. The [testing guide](../docs/testing.md#which-command-should-i-run) defines these checkpoints, their prerequisites, and the focused checks available during implementation. It also covers [CI and local hooks](../docs/testing.md#ci-and-local-hooks); use the [maintenance runbook](../docs/MAINTENANCE.md#validate-and-build) for release and installed-package checks.
 
 Stage source additions, deletions, and moves before running `venv/bin/treestamp update README.md`; inspect and stage the resulting README separately. Treestamp and its hooks never stage or commit files. `make integration-check` verifies the staged tree against the README. After committing a candidate, `make hook-check` verifies hooks installed from that HEAD; it does not cover uncommitted changes.
 

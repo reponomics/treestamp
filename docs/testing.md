@@ -4,27 +4,35 @@ This is the canonical guide to Treestamp's testing policy, commands, coverage re
 
 ## Which command should I run?
 
-**There is currently no single Make target that runs every CI check.** `make ci` runs the core quality gate; `make web-ci` runs the hosted Python and JavaScript quality gates. Neither includes browser tests, and neither is an alias for the full GitHub Actions workflow.
+Use two checkpoints. The existing granular targets remain available for focused work.
 
-After environment and [browser setup](#suites-and-commands), run this combined command for the local regression and quality checks:
+| Checkpoint | When | What it runs |
+| --- | --- | --- |
+| `make check:pre-commit` | After staging changes, before committing | Configured development hooks against staged files: formatting/lint, applicable type checks, selected Python tests, and README freshness |
+| `make check:pr` | Before opening or updating a PR | Toolchain/lock checks, workflow lint, a fresh package build, core/hosted/JavaScript/browser quality gates, documentation and README checks, package metadata and clean-install acceptance, committed-hook acceptance, and the hosted container build |
+
+`check:pre-commit` uses the same staged-file behavior as the installed Git hook. It may modify formatting and fail until you inspect and restage those changes. Use `make pre-commit-check` only when you intentionally want the development hooks to inspect all files. Neither hook entry point substitutes for the PR checkpoint.
+
+After [environment setup](../.github/CONTRIBUTING.md#set-up) and [browser installation](#suites-and-commands), the PR checkpoint also requires actionlint on `PATH`, a running Docker daemon, and network access for package installation and container base images. Commit the candidate before the final PR run: most checks exercise the working tree, but installed-hook acceptance reads committed `HEAD`.
 
 ```bash
-make toolchain-check lock-check ci web-ci web-browser-test docs-check integration-check
+make check:pre-commit
+# Inspect and commit the candidate, then:
+make check:pr
 ```
 
-This checks toolchain pins, lockfile consistency, formatting, lint, both strict type checks, core and hosted Python tests with their coverage gates, JavaScript logic, browser journeys, documentation links, and the README tree. It runs on the current machine and selected Python version. Make stops at the first failure by default.
+The PR checkpoint completes environment synchronization and package building before launching tests or artifact checks, including when invoked with `make -j`. It builds into a fresh temporary directory, removes that directory on completion or failure, and leaves existing `dist/` artifacts untouched. The granular `build`, `metadata-check`, and `distribution-check` targets still default to `dist/`, or accept `DIST_DIR=...` when used independently. A failed phase makes the checkpoint fail; no checks are silently skipped because a tool is missing. Run one checkpoint per invocation, since formatting hooks can modify the files being tested.
 
-The following checks are additional; a green combined command does not establish that every CI job is green:
+A green PR checkpoint verifies the existing local checks on the current machine and Python version. GitHub CI still supplies these additional responsibilities:
 
-| Additional check | How to run it | Scope or prerequisite |
-| --- | --- | --- |
-| Distribution build and acceptance | `make build metadata-check distribution-check` | Builds wheel/sdist, checks metadata and contents, and tests clean installations; follow the [build procedure](MAINTENANCE.md#validate-and-build) for a clean `dist/`. Run separately from tests because the build target synchronizes the shared environment. |
-| Repository hook installation | `make hook-check` | Exercises the repository's hook entries from committed `HEAD`, not uncommitted changes |
-| Hosted container | `make web-image` | Requires Docker; builds the image. CI additionally starts it and probes `/healthz`; that probe has no Make target. |
-| Platform and Python matrix | [CI workflow](../.github/workflows/ci.yml) | Linux and Windows jobs exercise the supported Python versions; one local run cannot substitute for this matrix. |
-| Dependency/security analysis | [OSV workflow](../.github/workflows/osv-scanner.yml), [Scorecard workflow](../.github/workflows/scorecard.yml), and GitHub's configured CodeQL analysis | Separate checks with no aggregate Make target; see [repository setup](MAINTENANCE.md#repository-and-release-setup) for merge requirements. |
+| CI responsibility | Where |
+| --- | --- |
+| Linux/Windows and supported Python version matrix | [CI workflow](../.github/workflows/ci.yml) |
+| Starting the built container and probing `/healthz` | Hosted job in the [CI workflow](../.github/workflows/ci.yml); the local checkpoint builds the image |
+| Dependency/license analysis, Scorecard, and CodeQL | [OSV workflow](../.github/workflows/osv-scanner.yml), [Scorecard workflow](../.github/workflows/scorecard.yml), and GitHub's configured CodeQL analysis |
+| Coverage upload | [Coverage workflow](../.github/workflows/coverage.yml); [Codecov statuses are informational](#coverage-reporting) |
 
-For workflow edits, `make workflow-check` additionally runs actionlint and requires it to be installed. `make pre-commit-check` is not an all-CI shortcut either: it runs development hooks without the browser, distribution, or container checks, and it may modify formatting. Coverage upload is separate from local validation; [Codecov statuses are informational](#coverage-reporting).
+See [repository setup](MAINTENANCE.md#repository-and-release-setup) for merge requirements. These checkpoints validate a candidate; they do not publish packages or deploy the service.
 
 ## Policy
 
@@ -60,7 +68,7 @@ make web-browser-test
 
 Use `BROWSER_FLAGS="--browser-channel chrome"` for an installed Chrome. On Linux, `venv/bin/playwright install --with-deps chromium` also installs the required system dependencies. The Makefile uses POSIX paths; see the [Windows setup instructions](../.github/CONTRIBUTING.md#set-up) for direct Python invocations.
 
-For distribution changes, run `make build metadata-check distribution-check`; the [maintenance runbook](MAINTENANCE.md#validate-and-build) explains those checks and post-commit hook verification. For hosted container changes, run `make web-image`. Keep deployment smoke checks in the [production deployment procedure](MAINTENANCE.md#production-deployment).
+Package acceptance and the hosted container build are included in `make check:pr`. The [maintenance runbook](MAINTENANCE.md#validate-and-build) explains the underlying build and installed-package checks for focused use. Keep deployment smoke checks in the [production deployment procedure](MAINTENANCE.md#production-deployment).
 
 ## CI and local hooks
 
