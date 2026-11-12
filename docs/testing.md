@@ -2,6 +2,30 @@
 
 This is the canonical guide to Treestamp's testing policy, commands, coverage reporting, and recorded verification status. For environment setup, see [Contributing](../.github/CONTRIBUTING.md#set-up); for release and deployment procedures, see [Maintenance](MAINTENANCE.md).
 
+## Which command should I run?
+
+**There is currently no single Make target that runs every CI check.** `make ci` runs the core quality gate; `make web-ci` runs the hosted Python and JavaScript quality gates. Neither includes browser tests, and neither is an alias for the full GitHub Actions workflow.
+
+After environment and [browser setup](#suites-and-commands), run this combined command for the local regression and quality checks:
+
+```bash
+make toolchain-check lock-check ci web-ci web-browser-test docs-check integration-check
+```
+
+This checks toolchain pins, lockfile consistency, formatting, lint, both strict type checks, core and hosted Python tests with their coverage gates, JavaScript logic, browser journeys, documentation links, and the README tree. It runs on the current machine and selected Python version. Make stops at the first failure by default.
+
+The following checks are additional; a green combined command does not establish that every CI job is green:
+
+| Additional check | How to run it | Scope or prerequisite |
+| --- | --- | --- |
+| Distribution build and acceptance | `make build metadata-check distribution-check` | Builds wheel/sdist, checks metadata and contents, and tests clean installations; follow the [build procedure](MAINTENANCE.md#validate-and-build) for a clean `dist/`. Run separately from tests because the build target synchronizes the shared environment. |
+| Repository hook installation | `make hook-check` | Exercises the repository's hook entries from committed `HEAD`, not uncommitted changes |
+| Hosted container | `make web-image` | Requires Docker; builds the image. CI additionally starts it and probes `/healthz`; that probe has no Make target. |
+| Platform and Python matrix | [CI workflow](../.github/workflows/ci.yml) | Linux and Windows jobs exercise the supported Python versions; one local run cannot substitute for this matrix. |
+| Dependency/security analysis | [OSV workflow](../.github/workflows/osv-scanner.yml), [Scorecard workflow](../.github/workflows/scorecard.yml), and GitHub's configured CodeQL analysis | Separate checks with no aggregate Make target; see [repository setup](MAINTENANCE.md#repository-and-release-setup) for merge requirements. |
+
+For workflow edits, `make workflow-check` additionally runs actionlint and requires it to be installed. `make pre-commit-check` is not an all-CI shortcut either: it runs development hooks without the browser, distribution, or container checks, and it may modify formatting. Coverage upload is separate from local validation; [Codecov statuses are informational](#coverage-reporting).
+
 ## Policy
 
 Both Python suites must meet **95% coverage**, measured separately for the core package and hosted editor. The [Makefile](../Makefile) enforces this minimum through `make cov` and `make web-cov`, also run by `make ci` and `make web-ci`. PRs should avoid reducing coverage by more than 1%, if at all; that regression guideline is separate from the enforced minimum. JavaScript coverage is reported without a percentage gate.
