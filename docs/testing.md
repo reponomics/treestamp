@@ -104,7 +104,7 @@ Some excluded components have regression tests; absence from a report does not i
 
 ## Recorded verification status
 
-Snapshot: **November 12, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. `make -j4 check:pr` passed on candidate `b4f6101`, including both 95% coverage gates and the browser suite. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run. `check:pre-commit` also passed against the staged checkpoint definitions.
+Snapshot: **November 12, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. `make -j4 check:pr` passed on candidate `02e623a`, exercising the shared CI phases with actionlint 1.7.12, both 95% coverage gates, and the browser suite. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run. `check:pre-commit` also passed against the staged checkpoint definitions.
 
 | Suite | Latest result | Coverage | Remaining measured gaps |
 | --- | --- | --- | --- |
