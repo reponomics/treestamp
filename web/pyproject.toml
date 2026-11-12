@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "httpx2>=2,<3", # Starlette's TestClient; the GitHub client uses httpx.
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.9",
