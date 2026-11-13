@@ -53,11 +53,6 @@ def _parser() -> argparse.ArgumentParser:
     editor = commands.add_parser(
         "tui",
         help="open the editor or print a treestamp",
-        epilog=(
-            "--load replaces --document. Positional repository paths are no longer "
-            "accepted; use --load DOCUMENT to select a document's repository, "
-            "or change directory before starting the editor."
-        ),
     )
     editor.add_argument(
         "--load",
