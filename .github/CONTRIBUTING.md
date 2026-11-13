@@ -1,6 +1,20 @@
 # Contributing
 
-Discuss ordinary bugs and proposed changes in [reponomics/treestamp issues](https://github.com/reponomics/treestamp/issues). Follow the [code of conduct](CODE_OF_CONDUCT.md) and use [private reporting](SECURITY.md) for vulnerabilities.
+Discuss ordinary bugs and proposed changes in the project's [issues section](https://github.com/reponomics/treestamp/issues). For non-trivial changes, propose the change in an issue before submitting a Pull Request. Follow the [code of conduct](CODE_OF_CONDUCT.md) and use [private reporting](SECURITY.md) for vulnerabilities.
+
+## Git
+
+### Commit Messages
+
+Prefer to use [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) when committing code for this repo.
+
+### Commit Signing
+
+Please ensure that your commits are signed and appear as "Verified" on GitHub. See GitHub [docs](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification) for guidance. This is required and enforced on Pull Requests.
+
+### Commit Signoff - DCO
+
+By contributing to this project, you must agree to the [Developer Certificate of Origin (DCO) version 1.1](./DCO.txt). This is a confirmation that you have the right to submit the code changes that you propose. To make this explicit, please include a `Signed-off-by: NAME <EMAIL ADDRESS>` trailer in your commits, which you can do simpy by adding the `--signoff` flag (or `-s`) when running `git commit`; i.e., `git commit --signoff`. Unlike commit signatures, it's acceptable to omit this from some commits, and it is not enforced by CI.
 
 ## Set up
 
@@ -11,17 +25,9 @@ make venv
 make install
 nvm install
 nvm use
-make ci web-ci docs-check
 ```
 
-`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. Browser tests also require Chromium or an installed Chrome:
-
-```bash
-venv/bin/playwright install chromium
-make web-browser-test
-```
-
-To use Chrome, pass `BROWSER_FLAGS="--browser-channel chrome"`. On Linux, Playwright's `install --with-deps chromium` can install the required system dependencies. See [web/README.md](../web/README.md) to run the application locally.
+`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. See the [testing guide](../docs/testing.md#suites-and-commands) for browser installation and test commands, and [web/README.md](../web/README.md) to run the application locally.
 
 The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, then run `uv sync --locked --all-packages --all-extras --no-install-workspace --no-build` followed by `uv sync --locked --all-packages --all-extras --no-build-isolation`. Activate `venv` and invoke Python tools directly; the [CI workflow](workflows/ci.yml) contains the Windows regression and installed-package commands.
 
@@ -35,20 +41,12 @@ Dependencies are obtained from PyPI through uv. For intentional dependency chang
 
 ## Tests for changes
 
-Treestamp maintains a high level of code coverage. Changes introduced in a PR should avoid reducing coverage by more than 1%, if at all, and a strict threshold of 90% coverage is enforced. Non-trivial changes must add or update automated tests in the same pull request. High-impact changes must be accompanied by thorough testing.
-
-Tests belong in the suite that covers the changed area, described under [Check changes](#check-changes), and should assert the changed behavior itself, not only exercise the code (test coverage as well as code coverage). Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the suites, need no new tests. Avoid brittle tests that depend on specific string literals, and, especially when working with coding agents, avoid excessive testing that provides no durable benefit.
+Non-trivial changes must add or update behavioral tests in the same pull request. Both Python suites enforce a **95% coverage minimum**. The [testing guide](../docs/testing.md) defines the full policy, suite responsibilities, coverage boundaries, and current verification status.
 
 ## Check changes
 
-Run focused tests during implementation and the relevant complete checks before review: `make ci`, `make web-ci`, `make web-browser-test`, and `make docs-check`. For distribution changes, also run `make build metadata-check distribution-check`. See [MAINTENANCE.md](../docs/MAINTENANCE.md) for release and deployment checks.
-
-The core suite in `tests/` covers the CLI, document parsing and writing, Git snapshots, tree maintenance, and the terminal editor through headless journeys. The hosted editor's suite in `web/tests/` covers its API, GitHub client, cache, and limits against a fake GitHub API served from a local checkout; `web/tests/browser/` drives the page in Chromium, and `web/tests/js/` tests the page's pure logic with Node's test runner. `make ci` and `make web-ci` fail if either suite's coverage falls below 90%.
-
-CI runs on every pull request to `main` and every push to `main`. The [CI workflow](workflows/ci.yml) runs the core suite on Linux and Windows with Python 3.11 and 3.12, the complete quality gates and distribution checks on Linux with Python 3.11, and the hosted editor's quality gates, browser suite, and container health probe. [MAINTENANCE.md](../docs/MAINTENANCE.md#repository-and-release-setup) lists the checks required before merging. Each job appears as a check on the pull request; a failing check's log shows pytest's summary of failed tests and assertions, the coverage report with missed lines, or the README diff from `treestamp check`.
-
-Install development hooks with `venv/bin/pre-commit install`. They run lint and formatting, strict type checks, Python tests selected from changed files, and the README tree check. `make pre-commit-check` runs them over all files and may apply formatting fixes. A change affecting shared behavior still needs the relevant complete suite.
+Run `make check:pre-commit` on staged changes before committing and `make check:pr` on the candidate before review. The [testing guide](../docs/testing.md#which-command-should-i-run) defines these checkpoints, their prerequisites, and the focused checks available during implementation. It also covers [CI and local hooks](../docs/testing.md#ci-and-local-hooks); use the [maintenance runbook](../docs/MAINTENANCE.md#validate-and-build) for release and installed-package checks.
 
 Stage source additions, deletions, and moves before running `venv/bin/treestamp update README.md`; inspect and stage the resulting README separately. Treestamp and its hooks never stage or commit files. `make integration-check` verifies the staged tree against the README. After committing a candidate, `make hook-check` verifies hooks installed from that HEAD; it does not cover uncommitted changes.
 
-Preserve exact path identity, frozen editing snapshots, and draft recovery on failed operations. Keep Markdown prose unwrapped. Include release notes when a change requires users to modify their documents or workflows. Update the documentation a change affects in the same pull request, and treat errors in the documentation as bugs. Automated browser tests do not replace a manual check of keyboard operation, terminal display, or clipboard behavior.
+Preserve exact path identity, frozen editing snapshots, and draft recovery on failed operations. Keep Markdown prose unwrapped. Include release notes when a change requires users to modify their documents or workflows. Update the documentation a change affects in the same pull request, and treat errors in the documentation as bugs.

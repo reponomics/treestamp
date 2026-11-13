@@ -720,3 +720,21 @@ def test_initial_single_directory_chain_is_exactly_one_level() -> None:
     initial = initial_tree(target, Settings())
     assert [node.path for node in initial.walk()] == ["src"]
     assert initial.children[0].dirs == 1
+
+
+def test_nontext_git_bytes_are_rejected() -> None:
+    from treestamp.model import read_path_value
+
+    with pytest.raises(MarkerError, match="path must be a string"):
+        read_path_value({"git_bytes": 123})
+
+
+def test_directory_cannot_print_zero_counts() -> None:
+    with pytest.raises(MarkerError, match="zero counts are not printed"):
+        parse_tree("./\n- empty/ (0 files)\n")
+
+
+def test_render_rejects_names_that_parse_as_invalid_facts() -> None:
+    tree = build_tree([Entry(" [gitlink]")])
+    with pytest.raises(MarkerError, match="cannot represent tree"):
+        render_tree(tree, Settings())

@@ -90,6 +90,43 @@ test("hints follow the error table", () => {
   assert.match(hintFor("upstream_unavailable", 503), /budget/);
   assert.match(hintFor("curation", 422), /previous draft is unchanged/);
   assert.match(hintFor("snapshot_unavailable", 410), /Load the repository URL again/);
+  assert.equal(hintFor("unexpected", 500), "");
+});
+
+test("directory shortcuts toggle nested rows and ignore unrelated keys", () => {
+  const rows = [
+    { path: "", depth: 0, kind: "dir", files: 0, dirs: 1 },
+    { path: "src", depth: 1, kind: "dir", files: 1, dirs: 0 },
+    { path: "src/main.py", depth: 2, kind: "file" },
+  ];
+  assert.deepEqual(treeNavigation(rows, ["src"], 1, " "), { index: 1, operation: "toggle" });
+  assert.deepEqual(treeNavigation(rows, ["src"], 1, "ArrowRight"), { index: 2 });
+  assert.deepEqual(treeNavigation(rows, ["src"], 2, "ArrowLeft"), { index: 1 });
+  assert.deepEqual(treeNavigation(rows, [], 1, "Escape"), { index: 1 });
+});
+
+test("empty source fields and queries preserve their documented defaults", () => {
+  assert.deepEqual(sourceSelection({}), { root: ".", document: "" });
+  assert.deepEqual(sourceSelection({ root: "src", document: "" }, { root: "old" }), { root: "src", document: "" });
+  assert.deepEqual(valuesFromQuery(new URLSearchParams()), {});
+  assert.deepEqual(valuesFromQuery(new URLSearchParams("root=")), { root: "" });
+  assert.deepEqual(valuesFromQuery(new URLSearchParams("document=")), { document: "" });
+  assert.equal(displayPath({ git_bytes: "" }), "");
+});
+
+test("saved fragments reject scalar JSON and invalid UTF-8", () => {
+  for (const value of [null, false, 42, "text"]) {
+    assert.equal(decodeState(encodeState(value)), null);
+  }
+  assert.equal(decodeState(btoa(String.fromCharCode(0xff))), null);
+  assert.deepEqual(parseRoute("/owner/repo", "#other=value"), { owner: "owner", repo: "repo", sha: null, saved: null });
+});
+
+test("partial regions preserve every byte even without closing markers", () => {
+  for (const text of ["", "<!-- treestamp:start -->\n\n", "<!-- treestamp:start -->\n<!-- treestamp:config\nroot = \".\"\n./\n"]) {
+    assert.equal(regionSegments(text).map(segment => segment.text).join(""), text);
+  }
+  assert.equal(rowSuffix({ kind: "symlink" }), "-> null");
 });
 
 test("region segments quiet the markers and config and reproduce the text exactly", () => {
@@ -194,6 +231,56 @@ test("preview candidates validate before adoption, including bundled examples", 
       assert.throws(() => preparePreview(candidate, "https://example.org"), /previous draft is unchanged/);
     }
   }
+});
+
+test("incomplete preview responses cannot replace the accepted draft", async () => {
+  const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
+  const original = Object.values(EXAMPLES)[0];
+  const invalidCandidates = [
+    () => null,
+    data => { data.region = "unmarked tree"; },
+    data => { delete data.state; },
+    data => { delete data.state.curation; },
+    data => { data.state.curation.settings.style = "unknown"; },
+    data => { data.state.curation.settings.show_counts = "true"; },
+    data => { data.state.curation.settings.root = { git_bytes: "f" }; },
+    data => { data.root = { git_bytes: "zz" }; },
+    data => { data.document = {}; },
+    data => { data.state.curation.hidden = null; },
+    data => { delete data.repository; },
+    data => { data.repository.owner = null; },
+    data => { delete data.ref; },
+    data => { data.permalink = null; },
+    data => { data.rows = {}; },
+    data => { data.rows = []; },
+    data => { data.rows[0] = null; },
+    data => { data.rows[0].name = null; },
+    data => { data.rows[0].kind = "unknown"; },
+    data => { data.rows[0].depth = 1.5; },
+    data => { data.rows[0].depth = 1024; },
+  ];
+  for (const invalidate of invalidCandidates) {
+    const data = structuredClone(original);
+    const result = invalidate(data);
+    const candidate = result === null ? null : data;
+    assert.throws(() => preparePreview(candidate, "https://example.org"), /previous draft is unchanged/);
+  }
+});
+
+test("preview byte paths retain identity while rows receive DOM keys", async () => {
+  const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
+  const data = structuredClone(Object.values(EXAMPLES)[0]);
+  const identity = { git_bytes: "737263ff" };
+  data.root = identity;
+  data.state.curation.settings.root = identity;
+  delete data.state.curation.settings.attribution; // Older shared drafts omit this option.
+  data.document = { git_bytes: "524541444d452e6d64" };
+  data.rows[0].path = identity;
+  const before = structuredClone(data);
+  const prepared = preparePreview(data, "https://example.org");
+  assert.equal(prepared.rows[0].path, "/git/737263ff");
+  assert.deepEqual(prepared.rows[0].identity, identity);
+  assert.deepEqual(data, before, "preparing a candidate must not mutate the response");
 });
 
 test("region metadata stays quiet across optional spacing and CRLF", () => {

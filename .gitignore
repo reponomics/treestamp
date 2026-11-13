@@ -143,3 +143,4 @@ sync-from-*
 .playwright-cli/
 output/
 __INTERNAL__/
+antipasta*

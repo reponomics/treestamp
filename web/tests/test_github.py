@@ -161,6 +161,7 @@ def test_resolve_rejects_unexpected_bodies() -> None:
 @pytest.mark.parametrize(
     ("status", "headers", "error", "message"),
     [
+        (401, {}, UnavailableError, "rejected the service's credential"),
         (404, {}, NotFoundError, "not public"),
         (422, {}, NotFoundError, "ref not found"),
         (409, {}, NotFoundError, "empty"),
@@ -172,6 +173,8 @@ def test_resolve_rejects_unexpected_bodies() -> None:
             "moved",
         ),
         (403, {"retry-after": "30"}, UnavailableError, "rate limiting"),
+        (429, {}, UnavailableError, "rate limiting"),
+        (403, {"retry-after": "invalid"}, UnavailableError, "rate limiting"),
         (
             429,
             {
@@ -195,9 +198,9 @@ def test_status_mapping(
     exc = info.value
     assert isinstance(exc, github.GitHubError)
     if status == 403 and "retry-after" in headers:
-        assert exc.retry_after == 30
+        assert exc.retry_after == (30 if headers["retry-after"] == "30" else 60)
     if status == 429:
-        assert exc.retry_after == 101
+        assert exc.retry_after == (101 if headers else 60)
 
 
 def test_transport_failures_map_to_timeout_and_unavailable() -> None:
@@ -620,3 +623,83 @@ def test_app_credential_against_the_fake(repo_fake_with_app) -> None:  # type: i
     )
     with pytest.raises(UnavailableError, match="status 401"):
         run(bad.resolve("o", "r", "HEAD"))
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        (httpx.ReadTimeout, UpstreamTimeoutError),
+        (httpx.ConnectError, UnavailableError),
+    ],
+)
+def test_app_token_exchange_transport_failure_can_recover(failure, expected) -> None:
+    private, _ = rsa_keys()
+    exchanges = 0
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        nonlocal exchanges
+        if request.method == "POST":
+            exchanges += 1
+            if exchanges == 1:
+                raise failure("exchange failed", request=request)
+            return httpx.Response(201, json={"token": "ghs_recovered"})
+        assert request.headers["authorization"] == "Bearer ghs_recovered"
+        return ok(b"target")
+
+    client = canned(
+        responder,
+        github_app_client_id="Iv1.example",
+        github_app_installation_id="777",
+        github_app_private_key=private,
+    )
+
+    async def exercise() -> None:
+        try:
+            with pytest.raises(expected):
+                await client.blob("o", "r", SHA)
+            assert await client.blob("o", "r", SHA) == b"target"
+            assert exchanges == 2
+        finally:
+            await client.aclose()
+
+    run(exercise())
+
+
+def test_concurrent_app_requests_share_one_token_exchange() -> None:
+    private, _ = rsa_keys()
+    exchanges = 0
+    reads = 0
+
+    async def responder(request: httpx.Request) -> httpx.Response:
+        nonlocal exchanges, reads
+        if request.method == "POST":
+            exchanges += 1
+            # Let the other requests reach the mint lock before completing it.
+            await asyncio.sleep(0)
+            return httpx.Response(201, json={"token": "ghs_shared"})
+        reads += 1
+        assert request.headers["authorization"] == "Bearer ghs_shared"
+        return ok({"sha": SHA, "tree": {"sha": TREE}})
+
+    client = GitHubClient(
+        make_config(
+            github_app_client_id="Iv1.example",
+            github_app_installation_id="777",
+            github_app_private_key=private,
+        ),
+        transport=httpx.MockTransport(responder),
+        clock=Clock(),
+    )
+
+    async def burst() -> None:
+        try:
+            results = await asyncio.gather(
+                *(client.resolve("o", "r", SHA) for _ in range(8))
+            )
+            assert results == [github.Resolved(SHA, TREE)] * 8
+            assert exchanges == 1 and reads == 8
+            assert client.calls == 9
+        finally:
+            await client.aclose()
+
+    run(burst())

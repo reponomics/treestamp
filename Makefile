@@ -4,6 +4,8 @@ PYTHON ?= python3
 UV ?= uv
 UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
+DOCKER ?= docker
+DIST_DIR ?= dist
 FLY ?= flyctl
 ACTIONLINT ?= actionlint
 PY := $(VENV)/bin/python
@@ -29,7 +31,22 @@ COV_ARGS ?=
 .PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check toolchain-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk '/^[a-zA-Z_-]+(\\:[a-zA-Z_-]+)?:.*## / {name = $$0; sub(/: .*/, "", name); gsub(/\\:/, ":", name); description = $$0; sub(/.*## /, "", description); printf "%-22s %s\n", name, description}' $(MAKEFILE_LIST)
+.PHONY: check\:pre-commit check\:pr _check-pr-core _check-pr-web
+check\:pre-commit: ## Before committing: run development hooks on staged files
+	$(VENV)/bin/pre-commit run
+check\:pr: ## Before a PR: run local CI checks, package acceptance, and container build
+	$(MAKE) _check-pr-core
+	$(MAKE) _check-pr-web
+# Shared CI phases; keep the public checkpoints above as the developer entry points.
+# The core phase syncs the environment, so finish it before starting hosted tests.
+_check-pr-core:
+	$(MAKE) toolchain-check lock-check workflow-check
+	@set -eu; check_dist=$$(mktemp -d "$${TMPDIR:-/tmp}/treestamp-check.XXXXXX"); \
+	  trap 'rm -rf "$$check_dist"' EXIT; \
+	  $(MAKE) build DIST_DIR="$$check_dist"; \
+	  $(MAKE) ci docs-check integration-check metadata-check distribution-check hook-check DIST_DIR="$$check_dist"
+_check-pr-web: web-ci web-browser-test web-image
 toolchain-check: ## Verify that development/CI and Docker uv pins agree
 	$(PYTHON) scripts/check_toolchain.py
 uv-check: ## Check that uv matches the pinned development tool version
@@ -55,17 +72,17 @@ typecheck: ## Check strict Python types
 test: ## Run the regression suite, including headless TUI journeys
 	$(PY) -m pytest
 cov: ## Run tests with branch coverage
-	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
-ci: format-check lint typecheck cov ## Run all local quality gates
+	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
+ci: format-check lint typecheck cov ## Run core quality gates (see docs/testing.md for combined checks)
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
 metadata-check: ## Check built metadata, README rendering, package contents, and hashes
-	$(PY) -m twine check --strict dist/*.whl dist/*.tar.gz
-	$(PY) scripts/release_check.py
+	$(PY) -m twine check --strict "$(DIST_DIR)"/*.whl "$(DIST_DIR)"/*.tar.gz
+	$(PY) scripts/release_check.py --dist "$(DIST_DIR)"
 build: install ## Sync locked build tools and build wheel and sdist without isolation
-	$(PY) -m build --no-isolation
+	$(PY) -m build --no-isolation --outdir "$(DIST_DIR)"
 distribution-check: ## Verify clean wheel/sdist headless commands and editor workflows
-	$(PY) scripts/distribution_check.py
+	$(PY) scripts/distribution_check.py --dist "$(DIST_DIR)"
 .PHONY: readme-styles-check readme-update
 readme-styles-check: ## Verify alternate README styles match its managed tree
 	$(PY) scripts/readme_styles.py
@@ -94,10 +111,13 @@ web-typecheck: ## Check strict types for the web editor project
 web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
 web-cov: ## Run the web editor tests with branch coverage
-	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90 $(COV_ARGS)
-web-ci: web-lint web-typecheck web-cov web-js-test ## Run all web editor quality gates
+	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
+web-ci: web-lint web-typecheck web-cov web-js-cov ## Run hosted Python and JS quality gates (browser tests are separate)
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
 	$(NODE) --test web/tests/js/*.test.mjs
+.PHONY: web-js-cov
+web-js-cov: ## Measure pure JavaScript logic coverage (excludes browser DOM code)
+	$(NODE) --experimental-test-coverage --test --test-coverage-include='**/static/logic.js' web/tests/js/*.test.mjs
 web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
@@ -107,7 +127,7 @@ web-serve: ## Run the web editor locally against GITHUB_API_URL
 tls-check: ## Check Python TLS package versions and certificate trust stores
 	$(PY) web/scripts/check_tls.py
 web-image: toolchain-check ## Build the web editor container image
-	docker build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
+	$(DOCKER) build -f web/Dockerfile --build-arg BUILD_COMMIT="$(BUILD_COMMIT)" -t treestamp-web:local .
 fly-secrets: ## Set the GitHub App secrets on Fly (GITHUB_APP_CLIENT_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_FILE)
 	@test -n "$(GITHUB_APP_CLIENT_ID)" -a -n "$(GITHUB_APP_INSTALLATION_ID)" -a -n "$(GITHUB_APP_PRIVATE_KEY_FILE)" || \
 	  { echo "usage: make fly-secrets GITHUB_APP_CLIENT_ID=... GITHUB_APP_INSTALLATION_ID=... GITHUB_APP_PRIVATE_KEY_FILE=path.pem"; exit 2; }

@@ -36,7 +36,9 @@ def _tool(environment: Path, name: str) -> Path:
 def _environment(work: Path) -> Path:
     """Bootstrap with the caller's patched pip instead of ensurepip's old bundle."""
     environment = work / "venv"
-    venv.EnvBuilder(with_pip=False).create(environment)
+    # uv's standalone Python needs its adjacent libraries; copying the executable
+    # can break that lookup on POSIX. Windows keeps venv's copy behavior.
+    venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(environment)
     python = _tool(environment, "python")
     run(
         [

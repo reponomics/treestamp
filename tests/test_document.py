@@ -767,3 +767,45 @@ def test_byte_special_paths_roundtrip_without_redundant_descendants(
     assert b"git_bytes" in content
     assert parse_document(content) == source
     assert b"/plain" not in content
+
+
+def test_create_rechecks_competing_file_and_preserves_its_bytes(
+    document: Document, tmp_path: Path
+) -> None:
+    path = tmp_path / "README.md"
+    prepared = prepare_write(document, path, create=True)
+    path.write_bytes(b"created by another writer")
+    with pytest.raises(MarkerError, match="file already exists"):
+        publish_write(prepared)
+    assert path.read_bytes() == b"created by another writer"
+    assert not list(tmp_path.glob(".treestamp-*"))
+
+
+def test_load_rejects_directory_as_document(tmp_path: Path) -> None:
+    with pytest.raises(MarkerError, match="must be a regular file"):
+        load_document(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("interior", "message"),
+    [
+        (b"<!-- treestamp:config", "malformed metadata wrapper"),
+        (b"```bad fence\n./\n```", "printed tree root must be"),
+    ],
+)
+def test_malformed_wrapper_does_not_become_a_tree(
+    interior: bytes, message: str
+) -> None:
+    with pytest.raises(MarkerError, match=message):
+        parse_document(START + b"\n" + interior + b"\n" + END)
+
+
+def test_same_content_compares_annotations_and_normalizes_tabs(
+    document: Document,
+) -> None:
+    from treestamp.document import same_content
+
+    tabbed = replace(document, tree=replace(document.tree, annotation="two\tcolumns"))
+    spaced = replace(document, tree=replace(document.tree, annotation="two  columns"))
+    assert same_content(tabbed, spaced, ".")
+    assert not same_content(document, tabbed, ".")

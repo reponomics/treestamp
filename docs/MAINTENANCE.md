@@ -4,14 +4,18 @@ These procedures require a full Git checkout, including the hosted application i
 
 ## Validate and build
 
+Follow the [testing guide](https://github.com/reponomics/treestamp/blob/main/docs/testing.md) for required suites, browser setup, CI, coverage policy, and recorded results before preparing a release candidate.
+
 ```bash
-make ci web-ci docs-check
-make web-browser-test
 make build metadata-check distribution-check
 make integration-check
 ```
 
-Browser checks require the separate browser dependencies described in [the web README](https://github.com/reponomics/treestamp/blob/main/web/README.md). `metadata-check` validates both distributions against the approved file set and reports their hashes. `distribution-check` installs the wheel and source archive into fresh environments and exercises headless commands and the terminal editor. After committing a candidate, `make hook-check` checks the public pre-commit hooks from that exact HEAD. Clear `dist/` before building so the checks read only the new artifacts.
+`metadata-check` validates both distributions against the approved file set and reports their hashes. `distribution-check` installs the wheel and source archive into fresh environments and exercises headless commands and the terminal editor. After committing a candidate, `make hook-check` checks the public pre-commit hooks from that exact HEAD. Clear `dist/` before building so the checks read only the new artifacts.
+
+## Coverage reporting and review
+
+Coverage commands, measurement boundaries, current results, and remaining gaps are maintained in the [testing guide](https://github.com/reponomics/treestamp/blob/main/docs/testing.md#coverage-reporting).
 
 ## Dependencies and toolchain
 

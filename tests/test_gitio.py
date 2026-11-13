@@ -248,3 +248,122 @@ def test_selected_root_cannot_be_a_tracked_leaf(repo: Repo) -> None:
     repo.add("leaf")
     with pytest.raises(MarkerError, match="tracked leaf"):
         capture_snapshot(repo.path / "leaf")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"",
+        b"100644 blob id name",
+        b"100644\tname",
+        b"999999 blob id\tname",
+        b"040000 tree id\tdir",
+    ],
+)
+def test_malformed_tree_records_fail_explicitly(raw: bytes) -> None:
+    with pytest.raises(GitEnvironmentError, match="invalid Git tree record"):
+        gitio._tree_record(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    [
+        (b"missing", "cannot read symlink blob"),
+        (b"id missing\n", "cannot read symlink blob"),
+        (b"id tree 1\nx\n", "cannot read symlink blob"),
+        (b"id blob invalid\nx\n", "invalid symlink blob size"),
+        (b"id blob -1\n", "incomplete symlink blob"),
+        (b"id blob 3\nx\n", "incomplete symlink blob"),
+        (b"id blob 1\nxy", "incomplete symlink blob"),
+    ],
+)
+def test_invalid_symlink_batch_output_fails_with_path(
+    raw: bytes, message: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gitio, "_git", lambda *args, **kwargs: raw)
+    with pytest.raises(GitEnvironmentError, match=f"{message}: link"):
+        gitio._symlink_targets(tmp_path, {"link": "id"})
+
+
+def test_symlink_batch_uses_lengths_for_empty_and_multiline_targets(
+    repo: Repo,
+) -> None:
+    targets = {"empty": b"", "multiline": b"one\nline\n\xff", "repeat": b""}
+    links = {path: repo.blob(target) for path, target in targets.items()}
+    assert gitio._symlink_targets(repo.path, links) == {
+        path: target.decode("utf-8", "surrogateescape")
+        for path, target in targets.items()
+    }
+
+
+@pytest.mark.parametrize("raw", [b"R100", b"R100\0source", b"M"])
+def test_truncated_change_records_fail_explicitly(raw: bytes) -> None:
+    with pytest.raises(GitEnvironmentError, match="incomplete Git change record"):
+        gitio._rename_pairs(raw)
+
+
+def test_change_records_distinguish_copies_renames_and_other_changes() -> None:
+    raw = b"C100\0source\0copy\0M\0changed\0R90\0old\0new\0D\0removed\0"
+    assert gitio._rename_pairs(raw) == [("old", "new")]
+
+
+@pytest.mark.parametrize(
+    "pairs",
+    [
+        [("a", "b"), ("a", "c")],
+        [("a", "c"), ("b", "c")],
+        [("a", "b"), ("b", "a")],
+        [("a", "b"), ("b", "c")],
+    ],
+)
+def test_ambiguous_moves_do_not_hide_an_independent_valid_move(
+    pairs: list[tuple[str, str]],
+) -> None:
+    assert gitio._unique_move_pairs([*pairs, ("independent", "renamed")]) == [
+        ("independent", "renamed")
+    ]
+
+
+def test_explicit_repository_rejects_outside_snapshot_root(repo: Repo) -> None:
+    with pytest.raises(GitEnvironmentError, match="root is outside repository"):
+        capture_snapshot(repo.path.parent, repository=repo.path)
+
+
+@pytest.mark.parametrize("failure", ["oserror", "timeout"])
+def test_git_process_failure_preserves_cause(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    import subprocess
+
+    error = (
+        OSError("cannot start process")
+        if failure == "oserror"
+        else subprocess.TimeoutExpired("git", 60)
+    )
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise error
+
+    monkeypatch.setattr(gitio.subprocess, "run", fail)
+    with pytest.raises(GitEnvironmentError, match="cannot run git rev-parse") as exc:
+        gitio.repo_root(tmp_path)
+    assert exc.value.__cause__ is error
+
+
+def test_path_inspection_failure_preserves_cause(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from treestamp.errors import ExecutionError
+
+    original = Path.lstat
+    error = PermissionError("inspection denied")
+
+    def fail_selected(path: Path, *args: object, **kwargs: object):
+        if path == tmp_path:
+            raise error
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "lstat", fail_selected)
+    with pytest.raises(ExecutionError, match="cannot inspect") as exc:
+        checked_path(tmp_path)
+    assert exc.value.__cause__ is error

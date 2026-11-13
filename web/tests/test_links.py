@@ -127,3 +127,10 @@ def test_components_and_pinned() -> None:
         repository("o", ".")
     with pytest.raises(LinkError, match="ref"):
         repository("o", "r", "a@{1}")
+
+
+@pytest.mark.parametrize("ref", ["", "x" * 256])
+def test_reference_length_bounds(ref: str) -> None:
+    with pytest.raises(LinkError, match="between 1 and 255"):
+        repository("o", "r", ref)
+    assert repository("o", "r", "x" * 255).ref == "x" * 255

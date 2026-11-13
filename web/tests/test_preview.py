@@ -10,6 +10,7 @@ from treestamp.document import Document, parse_document, render_region
 from treestamp.gitio import capture_snapshot
 from treestamp.model import Settings
 from treestamp.session import TreeSession
+from treestamp.sources import TreeRecord
 from treestamp_web.github import GitHubClient, TooLargeError, UnavailableError
 from treestamp_web.links import Repository
 from treestamp_web.localgit import FakeGitHub
@@ -419,6 +420,50 @@ def test_document_cap_and_source_errors(
     service, _ = service_for(fake)
     with pytest.raises(PreviewError, match="larger than the service reads"):
         preview(service)
+
+
+def test_cached_document_still_obeys_read_cap(
+    fake: FakeGitHub, repo: Repo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from treestamp_web import preview as preview_module
+
+    stamp(repo)
+    service, client = service_for(fake)
+    first = preview(service)
+    calls = client.calls
+    monkeypatch.setattr(preview_module, "DOCUMENT_CAP", 1)
+    with pytest.raises(PreviewError, match="larger than the service reads") as error:
+        preview(service, url=f"o/r/commit/{first.commit}")
+    assert error.value.status == 422 and error.value.code == "curation"
+    assert client.calls == calls, "a retained snapshot never fetches again"
+    assert service.stats()["trees"] == 1
+
+
+@pytest.mark.parametrize(
+    ("records", "message"),
+    [
+        ([TreeRecord("file", "999999", "blob", "a" * 40)], "unsupported tree mode"),
+        (
+            [TreeRecord("file", "100644", "blob", "a" * 40)] * 2,
+            "duplicate source path",
+        ),
+    ],
+)
+def test_invalid_upstream_tree_is_rejected_without_retaining_snapshot(
+    fake: FakeGitHub,
+    monkeypatch: pytest.MonkeyPatch,
+    records: list[TreeRecord],
+    message: str,
+) -> None:
+    async def malformed_tree(self, owner, repo, tree_id):
+        return records
+
+    monkeypatch.setattr(GitHubClient, "tree", malformed_tree)
+    service, _ = service_for(fake)
+    with pytest.raises(PreviewError, match=message) as error:
+        preview(service, document="")
+    assert error.value.status == 422 and error.value.code == "curation"
+    assert service.stats()["trees"] == 0
 
 
 def test_metadata_failure_prevents_acquisition(

@@ -298,3 +298,28 @@ def test_byte_paths_survive_json_transport() -> None:
         session.root, SessionState.from_dict(json.loads(encoded))
     )
     assert restored.state() == session.state()
+
+
+def test_state_rejects_duplicate_annotation_paths() -> None:
+    with pytest.raises(MarkerError, match="duplicate annotation path"):
+        SessionState.from_dict(
+            {
+                "annotations": [
+                    {"path": "readme", "text": "one"},
+                    {"path": "readme", "text": "two"},
+                ]
+            }
+        )
+
+
+def test_toggle_restores_directory_layout_and_rejects_file_without_mutation() -> None:
+    session = make_session()
+    before = session.state()
+    session.toggle("src")
+    assert "src" in session.collapsed
+    session.toggle("src")
+    assert session.state() == before
+    for operation in (session.toggle, session.expand, session.collapse):
+        with pytest.raises(MarkerError, match="not a tracked directory"):
+            operation("readme")
+        assert session.state() == before

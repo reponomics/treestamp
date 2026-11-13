@@ -611,3 +611,13 @@ def test_editor_preserves_authored_toml_until_hidden_paths_change(
     assert destination.read_bytes() == changed.encode()
     editor.adopt(editor.prepare_load("tree.md"))
     assert not editor.dirty
+
+
+def test_dirty_guard_detects_unrepresentable_direct_session_mutation(
+    repo: Repo,
+) -> None:
+    editor = make_editor(repo)
+    editor.state.session.annotations["src/a"] = "bad\nannotation"
+    assert editor.dirty
+    with pytest.raises(MarkerError, match="single line"):
+        editor.region_text()
