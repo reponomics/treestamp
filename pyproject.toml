@@ -64,6 +64,7 @@ include = [
     "/src/treestamp/*.py",
     "/src/treestamp/py.typed",
     "/tests/*.py",
+    "/scripts/actionlint_tool.py",
     "/scripts/changed_tests.py",
     "/scripts/check_docs.py",
     "/scripts/check_toolchain.py",

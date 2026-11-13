@@ -7,7 +7,8 @@ NODE ?= node
 DOCKER ?= docker
 DIST_DIR ?= dist
 FLY ?= flyctl
-ACTIONLINT ?= actionlint
+GH ?= gh
+ACTIONLINT ?= $(CURDIR)/.tools/bin/actionlint
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 CLI := $(VENV)/bin/treestamp
@@ -92,8 +93,13 @@ readme-update: ## Refresh the managed README tree and all style previews
 integration-check: ## Verify the README tree and all alternate style previews
 	$(CLI) check README.md
 	$(PY) scripts/readme_styles.py
-workflow-check: ## Validate GitHub Actions workflows (requires actionlint)
-	$(ACTIONLINT)
+.PHONY: actionlint-install actionlint-check
+actionlint-install: ## Install pinned actionlint after verifying its release attestation (requires gh)
+	$(PYTHON) scripts/actionlint_tool.py install --binary "$(ACTIONLINT)" --gh "$(GH)"
+actionlint-check: ## Require the actionlint version pinned in .tool-versions
+	$(PYTHON) scripts/actionlint_tool.py check --binary "$(ACTIONLINT)"
+workflow-check: actionlint-check ## Validate GitHub Actions workflows with pinned actionlint
+	"$(ACTIONLINT)"
 hook-check: ## Exercise installed repository hooks at HEAD
 	$(PY) scripts/hook_check.py
 pre-commit-check: ## Run the repository development hooks

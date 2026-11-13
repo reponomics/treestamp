@@ -13,7 +13,7 @@ Use two checkpoints. The existing granular targets remain available for focused 
 
 `check:pre-commit` uses the same staged-file behavior as the installed Git hook. It may modify formatting and fail until you inspect and restage those changes. Use `make pre-commit-check` only when you intentionally want the development hooks to inspect all files. Neither hook entry point substitutes for the PR checkpoint.
 
-After [environment setup](../.github/CONTRIBUTING.md#set-up) and [browser installation](#suites-and-commands), the PR checkpoint also requires actionlint on `PATH`, a running Docker daemon, and network access for package installation and container base images. Commit the candidate before the final PR run: most checks exercise the working tree, but installed-hook acceptance reads committed `HEAD`.
+After [environment setup](../.github/CONTRIBUTING.md#set-up) and [browser installation](#suites-and-commands), the PR checkpoint also requires the [pinned actionlint installation](#workflow-linter), a running Docker daemon, and network access for package installation and container base images. Commit the candidate before the final PR run: most checks exercise the working tree, but installed-hook acceptance reads committed `HEAD`.
 
 ```bash
 make check:pre-commit
@@ -70,9 +70,22 @@ Use `BROWSER_FLAGS="--browser-channel chrome"` for an installed Chrome. On Linux
 
 Package acceptance and the hosted container build are included in `make check:pr`. The [maintenance runbook](MAINTENANCE.md#validate-and-build) explains the underlying build and installed-package checks for focused use. Keep deployment smoke checks in the [production deployment procedure](MAINTENANCE.md#production-deployment).
 
+### Workflow linter
+
+The actionlint version is pinned in [`.tool-versions`](../.tool-versions). Install [GitHub CLI](https://cli.github.com/) and authenticate with `gh auth login` (or provide `GH_TOKEN`), then run:
+
+```bash
+make actionlint-install
+make workflow-check
+```
+
+The shared installer supports macOS and Linux on x86_64 and ARM64. It downloads the exact platform archive for the pinned release and verifies its GitHub artifact attestation against `rhysd/actionlint` and the expected release tag before extracting or executing the binary. Installation fails if download, attestation verification, or the executable's version check fails; an existing installation is preserved. This trusts upstream-authenticated release artifacts rather than maintaining a separate archive checksum manifest.
+
+The executable is installed into the ignored checkout-local `.tools/bin/` directory; no `PATH` changes or administrator access are needed. `make workflow-check` enforces the pinned version before linting, including inside `make check:pr`. A missing or different version fails with installation guidance instead of silently updating the tool. `ACTIONLINT=/absolute/path/to/actionlint` overrides the executable location for both installation and checking; `GH=/path/to/gh` overrides the installer’s GitHub CLI. CI supplies its read-only GitHub token to the same installation target. See [toolchain maintenance](MAINTENANCE.md#dependencies-and-toolchain) for upgrades.
+
 ## CI and local hooks
 
-The local `check:pr` target and the primary Linux CI jobs share two internal Make phases. `_check-pr-core` owns toolchain/lock/workflow checks, environment synchronization, a fresh temporary build, core quality gates, documentation/README checks, and package/hook acceptance. `_check-pr-web` owns hosted Python/JavaScript quality gates, browser journeys, and the container build. Add or remove checks in these Make phases rather than maintaining another list in workflow YAML. The local checkpoint finishes the core phase before starting the hosted phase so dependency synchronization cannot race with tests; CI runs them in isolated jobs. CI installs actionlint 1.7.12 from a checksum-verified release archive before the core phase.
+The local `check:pr` target and the primary Linux CI jobs share two internal Make phases. `_check-pr-core` owns toolchain/lock/workflow checks, environment synchronization, a fresh temporary build, core quality gates, documentation/README checks, and package/hook acceptance. `_check-pr-web` owns hosted Python/JavaScript quality gates, browser journeys, and the container build. Add or remove checks in these Make phases rather than maintaining another list in workflow YAML. The local checkpoint finishes the core phase before starting the hosted phase so dependency synchronization cannot race with tests; CI runs them in isolated jobs. CI uses `make actionlint-install` to verify and install the same pinned actionlint release as local development before the core phase.
 
 The Python 3.12 compatibility job, Windows matrix, coverage uploads, README-only workflow, and release publication retain their narrower commands and artifact lifecycles. The staged-file `check:pre-commit` target is intentionally local: a clean CI checkout has no staged changes to inspect. Release publication keeps its validated artifacts for upload, whereas the PR checkpoint removes its temporary artifacts.
 

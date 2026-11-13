@@ -27,6 +27,7 @@ SDIST_FILES = {
     ".python-version",
     ".pre-commit-config.yaml",
     ".pre-commit-hooks.yaml",
+    "scripts/actionlint_tool.py",
     "scripts/changed_tests.py",
     "scripts/check_docs.py",
     "scripts/check_toolchain.py",

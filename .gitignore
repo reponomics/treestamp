@@ -137,6 +137,7 @@ INTERNAL
 sync-from-*
 
 # Treestamp tooling and local working material
+.tools/
 .stamps/
 .mypy_cache/
 .ruff_cache/
