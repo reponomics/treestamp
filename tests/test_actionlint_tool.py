@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
 import subprocess
 import sys
 import tarfile
@@ -126,7 +127,8 @@ def test_install_verifies_before_execution_and_preserves_previous_on_failure(
     else:
         tool.install(str(binary), VERSION, "gh")
         assert binary.read_bytes() == b"verified executable"
-        assert binary.stat().st_mode & 0o111
+        if os.name != "nt":
+            assert binary.stat().st_mode & 0o111
         assert events == ["download", "attestation", "version"]
     assert sorted(path.name for path in binary.parent.iterdir()) == ["actionlint"]
 
