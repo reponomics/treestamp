@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from treestamp.editor import EditorController
 
-COMMANDS = ("tui", "update", "check")
+COMMANDS = ("tui", "update", "check", "help")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -96,6 +96,14 @@ def _parser() -> argparse.ArgumentParser:
         child.add_argument(
             "--compare", metavar="REF", help="reference for detected moves"
         )
+    help_command = commands.add_parser("help", help="show general or command help")
+    help_command.add_argument(
+        "help_command",
+        metavar="COMMAND",
+        nargs="?",
+        choices=COMMANDS,
+        help="command to describe (default: general help)",
+    )
     return parser
 
 
@@ -221,7 +229,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not arguments or arguments[0] not in (*COMMANDS, "--help", "-h", "--version"):
         arguments.insert(0, "tui")
     try:
-        args = _parser().parse_args(arguments)
+        parser = _parser()
+        args = parser.parse_args(arguments)
+        if args.command == "help":
+            # Validate help's arguments before argparse's help action exits.
+            target = [args.help_command] if args.help_command else []
+            parser.parse_args([*target, "--help"])
         if args.command == "tui":
             return _explore(args)
         return _maintain(args)
