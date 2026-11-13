@@ -53,6 +53,10 @@ def _parser() -> argparse.ArgumentParser:
     editor = commands.add_parser(
         "tui",
         help="open the editor or print a treestamp",
+        description=(
+            "Create or edit a treestamp from the staged Git index. "
+            "Stage changes before opening the editor."
+        ),
     )
     editor.add_argument(
         "--load",
@@ -72,9 +76,17 @@ def _parser() -> argparse.ArgumentParser:
         child = commands.add_parser(
             command,
             help=(
-                "report whether Update would change a document"
+                "report whether update would change a document"
                 if command == "check"
                 else "update a treestamped document"
+            ),
+            description=(
+                "Compare a treestamped document with the target snapshot without "
+                "writing it. Print a diff and exit 1 if an update is needed; "
+                "exit 0 if it is current."
+                if command == "check"
+                else "Update a treestamped document from the target snapshot, "
+                "preserving content outside its treestamp markers."
             ),
         )
         child.add_argument(
@@ -86,10 +98,12 @@ def _parser() -> argparse.ArgumentParser:
             ),
         )
         child.add_argument(
-            "--target", metavar="REF", help="target Git ref (default: captured index)"
+            "--target",
+            metavar="REF",
+            help="target Git ref (default: staged Git index)",
         )
         child.add_argument(
-            "--compare", metavar="REF", help="reference for detected moves"
+            "--compare", metavar="REF", help="baseline Git ref for detecting moves"
         )
     help_command = commands.add_parser("help", help="show general or command help")
     help_command.add_argument(
@@ -97,7 +111,7 @@ def _parser() -> argparse.ArgumentParser:
         metavar="COMMAND",
         nargs="?",
         choices=COMMANDS,
-        help="command to describe (default: general help)",
+        help=f"command to describe: {', '.join(COMMANDS)} (default: general help)",
     )
     return parser
 
