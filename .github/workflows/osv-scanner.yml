@@ -37,10 +37,12 @@ jobs:
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version-file: .tool-versions
-      - name: Validate the committed workspace lock
+      - name: Validate the workspace lock and prepare pinned tools
         run: |
           uv lock --check
           python - <<'PY'
+          import json
+          import re
           import tomllib
           from pathlib import Path
 
@@ -51,16 +53,33 @@ jobs:
           assert required <= names, f'Missing resolved dependencies: {required - names}'
           assert all(package.get('version') for package in registry), 'Expected pinned versions'
           print(f'Scanning {len(registry)} locked third-party package versions across platforms.')
+
+          tools = {'actionlint': ('Go', 'github.com/rhysd/actionlint', 'v'), 'uv': ('PyPI', 'uv', '')}
+          pins = {}
+          for line in Path('.tool-versions').read_text().splitlines():
+              fields = line.split('#', 1)[0].split()
+              if fields and fields[0] in tools:
+                  assert len(fields) == 2 and fields[0] not in pins, f'Invalid or duplicate tool pin: {line}'
+                  pins[fields[0]] = fields[1]
+          entries = []
+          for tool, (ecosystem, name, prefix) in tools.items():
+              version = pins[tool]  # A missing pin must fail, not silently skip the tool.
+              assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version), f'Expected an exact version for {tool}'
+              entries.append({'package': {'name': name, 'ecosystem': ecosystem, 'version': prefix + version}})
+          Path('tool-dependencies.json').write_text(json.dumps({'results': [{'packages': entries}]}) + '\n')
+          print('Scanning pinned tools:', pins)
           PY
-      - name: Scan the resolved dependency versions
+      - name: Scan resolved dependencies and pinned tools
         # The workspace lock covers core, hosted, build, and development
         # dependencies, including entries for other supported platforms.
+        # The custom input adds tool release advisories, not their embedded dependencies.
         # --licenses is the dependency license allowlist; osv-scanner.toml
         # corrects packages whose metadata lacks an SPDX license.
         uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
         with:
           scan-args: |-
             --lockfile=uv.lock
+            --lockfile=osv-scanner:tool-dependencies.json
             --no-resolve
             --licenses=MIT,MIT-0,BSD-2-Clause,BSD-3-Clause,Apache-2.0,ISC,PSF-2.0,MPL-2.0
             --format=sarif
@@ -73,6 +92,7 @@ jobs:
           path: |
             osv-scanner.sarif
             uv.lock
+            tool-dependencies.json
           retention-days: 5
       - name: Upload SARIF to code scanning
         # Private repositories may not have GitHub Code Security enabled, and

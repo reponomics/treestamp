@@ -91,6 +91,8 @@ The Python 3.12 compatibility job, Windows matrix, coverage uploads, README-only
 
 The [CI workflow](../.github/workflows/ci.yml) runs on pull requests to `main` and pushes to `main`. Core regression tests run on Linux and Windows with Python 3.11 and 3.12; clean installed-package checks run on Linux 3.11 and both Windows versions. Linux with Python 3.11 also runs the complete quality gates and distribution metadata checks; the hosted job runs web quality gates, Chromium journeys, and a container health probe. CI logs contain test summaries, missed coverage lines, or README diffs when checks fail. The [maintenance runbook](MAINTENANCE.md#repository-and-release-setup) describes required checks and release configuration.
 
+The [OSV workflow](../.github/workflows/osv-scanner.yml) scans `uv.lock` plus a small generated input derived from `.tool-versions`: actionlint maps to `Go / github.com/rhysd/actionlint`, and uv maps to `PyPI / uv`. The same scan and existing failure policy apply to both inputs on PRs, pushes to `main`, and the weekly schedule. The generated tool inventory is retained with the report; no second version list is maintained. This checks known advisories for those tool releases, not every dependency embedded in their binaries. It does not automatically upgrade the pins or replace actionlint's attestation verification.
+
 Install local development hooks with `venv/bin/pre-commit install`. They run lint and formatting, strict types, Python tests selected from changed files, and the README tree check. `make pre-commit-check` runs them over all files and may apply formatting fixes. Selected tests are a fast feedback mechanism; shared behavior changes still require the relevant complete suites.
 
 ## Coverage reporting
