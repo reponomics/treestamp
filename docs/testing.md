@@ -79,7 +79,7 @@ make actionlint-install
 make workflow-check
 ```
 
-The shared installer supports macOS and Linux on x86_64 and ARM64. It downloads the exact platform archive for the pinned release and verifies its GitHub artifact attestation against `rhysd/actionlint` and the expected release tag before extracting or executing the binary. Installation fails if download, attestation verification, or the executable's version check fails; an existing installation is preserved. This trusts upstream-authenticated release artifacts rather than maintaining a separate archive checksum manifest.
+The shared installer supports macOS and Linux on x86_64 and ARM64. It downloads the exact platform archive for the pinned release and [verifies its GitHub artifact attestation](https://cli.github.com/manual/gh_attestation_verify) against `rhysd/actionlint` and the expected release tag before extracting or executing the binary. Installation fails if download, attestation verification, or the executable's version check fails; an existing installation is preserved. This trusts upstream-authenticated release artifacts rather than maintaining a separate archive checksum manifest.
 
 The executable is installed into the ignored checkout-local `.tools/bin/` directory; no `PATH` changes or administrator access are needed. `make workflow-check` enforces the pinned version before linting, including inside `make check:pr`. A missing or different version fails with installation guidance instead of silently updating the tool. `ACTIONLINT=/absolute/path/to/actionlint` overrides the executable location for both installation and checking; `GH=/path/to/gh` overrides the installer’s GitHub CLI. CI supplies its read-only GitHub token to the same installation target. See [toolchain maintenance](MAINTENANCE.md#dependencies-and-toolchain) for upgrades.
 
@@ -117,16 +117,16 @@ Some excluded components have regression tests; absence from a report does not i
 
 ## Recorded verification status
 
-Snapshot: **November 12, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. `make -j4 check:pr` passed on candidate `02e623a`, exercising the shared CI phases with actionlint 1.7.12, both 95% coverage gates, and the browser suite. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run. `check:pre-commit` also passed against the staged checkpoint definitions.
+Snapshot: **November 13, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. The shared actionlint installer passed real release-attestation verification and workflow lint with the pinned version. `make -j4 check:pr` ran against implementation `fd46749`: all tests, quality gates, and package/hook acceptance passed, but the command failed because Docker Desktop was stopped. After starting Docker, `make web-image` passed on `167b24c`. That follow-up revision also makes an installer test's permission assertion portable to Windows; all 32 focused installer cases passed after the adjustment. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run.
 
 | Suite | Latest result | Coverage | Remaining measured gaps |
 | --- | --- | --- | --- |
-| Core Python | 1,003 passed, 1 filesystem-dependent skip | 99.70% statements and branches | 3 statements, 5 branch destinations |
+| Core Python | 1,035 passed, 1 filesystem-dependent skip | 99.70% statements and branches | 3 statements, 5 branch destinations |
 | Hosted Python | 293 passed; browser cases run separately | 99.28% statements and branches | 10 statements, 3 branch destinations |
 | JavaScript logic | 23 passed | 100% lines, branches, and functions | None in `logic.js` |
 | Chromium browser | 162 passed, 1 known warning | Not collected | See coverage scope above |
 
-The PR checkpoint also passed formatting, lint, strict typing, lockfile/toolchain consistency, workflow lint, documentation and README checks, wheel/sdist metadata and clean-install acceptance, installed-hook acceptance, and the Docker image build. Its first run exposed a copied-interpreter library lookup failure with uv-managed Python; acceptance environments now use symlinks on POSIX and retain copying on Windows. The earlier coverage review raised the core total from 95.97% and the hosted total from 98.11%, adding 58 core cases, 14 hosted cases, and 6 JavaScript tests. Refresh this dated snapshot when recording a new coverage audit or a material testing/dependency change; use CI results for the status of other revisions.
+Together, the checkpoint and container rerun passed formatting, lint, strict typing, lockfile/toolchain consistency, workflow lint, documentation and README checks, wheel/sdist metadata and clean-install acceptance, installed-hook acceptance, and the Docker image build. An earlier checkpoint run exposed a copied-interpreter library lookup failure with uv-managed Python; acceptance environments now use symlinks on POSIX and retain copying on Windows. The earlier coverage review raised the core total from 95.97% and the hosted total from 98.11%, adding 58 core cases, 14 hosted cases, and 6 JavaScript tests. Refresh this dated snapshot when recording a new coverage audit or a material testing/dependency change; use CI results for the status of other revisions.
 
 ### Test dependencies and known warnings
 
