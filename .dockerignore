@@ -14,3 +14,4 @@ web/venv
 **/*.egg-info
 INTERNAL
 __INTERNAL__
+.tools

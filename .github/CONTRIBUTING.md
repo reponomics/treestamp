@@ -27,7 +27,7 @@ nvm install
 nvm use
 ```
 
-`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. See the [testing guide](../docs/testing.md#suites-and-commands) for browser installation and test commands, and [web/README.md](../web/README.md) to run the application locally.
+`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. See the testing guide for [browser installation and test commands](../docs/testing.md#suites-and-commands) and [pinned actionlint setup](../docs/testing.md#workflow-linter), and [web/README.md](../web/README.md) to run the application locally.
 
 The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, then run `uv sync --locked --all-packages --all-extras --no-install-workspace --no-build` followed by `uv sync --locked --all-packages --all-extras --no-build-isolation`. Activate `venv` and invoke Python tools directly; the [CI workflow](workflows/ci.yml) contains the Windows regression and installed-package commands.
 

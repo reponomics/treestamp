@@ -47,12 +47,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install pinned actionlint
         if: matrix.python-version == '3.11'
-        run: |
-          mkdir -p "$RUNNER_TEMP/actionlint"
-          curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint" actionlint
-          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make actionlint-install
       - name: Run the shared core and package PR checkpoint
         if: matrix.python-version == '3.11'
         # This phase installs dependencies and builds fresh temporary artifacts.

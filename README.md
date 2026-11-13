@@ -224,7 +224,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── .github/ (9 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
 ├── docs/ (10 files, 1 folder)
-├── scripts/ (8 files)  # Installed-package acceptance
+├── scripts/ (9 files)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
 │       ├── cli.py
@@ -267,7 +267,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- .github/ (9 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
 |-- docs/ (10 files, 1 folder)
-|-- scripts/ (8 files)  # Installed-package acceptance
+|-- scripts/ (9 files)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
 |       |-- cli.py
@@ -308,7 +308,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 - .github/ (9 files, 2 folders)
 - assets/ (2 files, 1 folder)
 - docs/ (10 files, 1 folder)
-- scripts/ (8 files)  # Installed-package acceptance
+- scripts/ (9 files)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
     - cli.py

@@ -5,6 +5,12 @@
 # confirmed against the project's license file.
 
 [[PackageOverrides]]
+name = "github.com/rhysd/actionlint"
+ecosystem = "Go"
+license.override = ["MIT"]
+reason = "Registry license data is unavailable; verified against upstream LICENSE.txt"
+
+[[PackageOverrides]]
 name = "colorama"
 ecosystem = "PyPI"
 license.override = ["BSD-3-Clause"]
