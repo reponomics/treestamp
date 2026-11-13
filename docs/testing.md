@@ -117,7 +117,7 @@ Some excluded components have regression tests; absence from a report does not i
 
 ## Recorded verification status
 
-Snapshot: **November 13, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. The shared actionlint installer passed real release-attestation verification and workflow lint with the pinned version. `make -j4 check:pr` ran against implementation `fd46749`: all tests, quality gates, and package/hook acceptance passed, but the command failed because Docker Desktop was stopped. After starting Docker, `make web-image` passed on `167b24c`. That follow-up revision also makes an installer test's permission assertion portable to Windows; all 32 focused installer cases passed after the adjustment. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run.
+Snapshot: **November 13, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. The shared actionlint installer passed real release-attestation verification and workflow lint with the pinned version. `make -j4 check:pr` ran against implementation `fd46749`: all tests, quality gates, and package/hook acceptance passed, but the command failed because Docker Desktop was stopped. After starting Docker, `make web-image` passed on `167b24c`. The 32 installer cases included in this historical run were subsequently removed when the installer was simplified. These are local results, not a live CI status or evidence of a fresh Windows/Linux matrix run.
 
 | Suite | Latest result | Coverage | Remaining measured gaps |
 | --- | --- | --- | --- |
@@ -127,6 +127,8 @@ Snapshot: **November 13, 2026**, on macOS with Python 3.11.11 and Node 24.22.1. 
 | Chromium browser | 162 passed, 1 known warning | Not collected | See coverage scope above |
 
 Together, the checkpoint and container rerun passed formatting, lint, strict typing, lockfile/toolchain consistency, workflow lint, documentation and README checks, wheel/sdist metadata and clean-install acceptance, installed-hook acceptance, and the Docker image build. An earlier checkpoint run exposed a copied-interpreter library lookup failure with uv-managed Python; acceptance environments now use symlinks on POSIX and retain copying on Windows. The earlier coverage review raised the core total from 95.97% and the hosted total from 98.11%, adding 58 core cases, 14 hosted cases, and 6 JavaScript tests. Refresh this dated snapshot when recording a new coverage audit or a material testing/dependency change; use CI results for the status of other revisions.
+
+The installer was subsequently reduced to a short shell script, with version enforcement in Make and no dedicated automated test suite. One-time validation covered a real attestation-verified installation, stopping on failed attestation while preserving an existing binary, rejection of an older installed version, and ShellCheck. The full test suites were not rerun for this simplification.
 
 ### Test dependencies and known warnings
 

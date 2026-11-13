@@ -239,7 +239,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── sources.py
 │       ├── tui.py
 │       └── tui_dialogs.py
-├── tests/ (19 files)  # Contract and integration tests
+├── tests/ (18 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)
@@ -282,7 +282,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- sources.py
 |       |-- tui.py
 |       `-- tui_dialogs.py
-|-- tests/ (19 files)  # Contract and integration tests
+|-- tests/ (18 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (3 files)
 |   |-- src/ (1 folder)
@@ -323,7 +323,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - sources.py
     - tui.py
     - tui_dialogs.py
-- tests/ (19 files)  # Contract and integration tests
+- tests/ (18 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (3 files)
   - src/ (1 folder)

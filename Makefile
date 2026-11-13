@@ -9,6 +9,7 @@ DIST_DIR ?= dist
 FLY ?= flyctl
 GH ?= gh
 ACTIONLINT ?= $(CURDIR)/.tools/bin/actionlint
+ACTIONLINT_VERSION := $(shell awk '$$1 == "actionlint" {print $$2}' .tool-versions)
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 CLI := $(VENV)/bin/treestamp
@@ -95,9 +96,11 @@ integration-check: ## Verify the README tree and all alternate style previews
 	$(PY) scripts/readme_styles.py
 .PHONY: actionlint-install actionlint-check
 actionlint-install: ## Install pinned actionlint after verifying its release attestation (requires gh)
-	$(PYTHON) scripts/actionlint_tool.py install --binary "$(ACTIONLINT)" --gh "$(GH)"
+	sh scripts/install_actionlint.sh "$(ACTIONLINT_VERSION)" "$(ACTIONLINT)" "$(GH)"
 actionlint-check: ## Require the actionlint version pinned in .tool-versions
-	$(PYTHON) scripts/actionlint_tool.py check --binary "$(ACTIONLINT)"
+	@version=$$("$(ACTIONLINT)" -version) && \
+	  test "$$(printf '%s\n' "$$version" | awk 'NR == 1 {sub(/^v/, ""); print; exit}')" = "$(ACTIONLINT_VERSION)" || \
+	  { echo "Run make actionlint-install for pinned actionlint $(ACTIONLINT_VERSION)." >&2; exit 1; }
 workflow-check: actionlint-check ## Validate GitHub Actions workflows with pinned actionlint
 	"$(ACTIONLINT)"
 hook-check: ## Exercise installed repository hooks at HEAD
