@@ -8,11 +8,14 @@ See [Design](design.md) for the document format and architecture, and [ADR 0001]
 treestamp [tui] [--load DOCUMENT] [--print]
 treestamp check [DOCUMENT] [--target REF] [--compare REF]
 treestamp update [DOCUMENT] [--target REF] [--compare REF]
+treestamp help [COMMAND]
 treestamp --version
 treestamp --help
 ```
 
-With no command, `treestamp` opens the TUI. `tui` can also be omitted before its options: `treestamp --print` and `treestamp tui --print` are equivalent. Use `treestamp tui --help`, `treestamp check --help`, or `treestamp update --help` for command-specific help.
+With no command, `treestamp` opens the TUI. `tui` can also be omitted before its options: `treestamp --print` and `treestamp tui --print` are equivalent.
+
+Use `treestamp help` (equivalent to `treestamp --help`) for general help, or `treestamp help <command>` (equivalent to `treestamp <command> --help`) for command-specific help. For example, `treestamp help tui` describes the editor options, and `treestamp help check` describes the drift checker. Help works outside a Git repository and exits without opening the editor. Within the TUI, press `?` for keyboard help.
 
 ## Repositories, paths, and snapshots
 
