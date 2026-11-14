@@ -1996,7 +1996,7 @@ wheels = [
 
 [[package]]
 name = "treestamp"
-version = "1.0.1"
+version = "1.1.0"
 source = { editable = "." }
 default-groups = ["build", "runtime-tools"]
 dependencies = [
@@ -2055,7 +2055,7 @@ runtime-tools = [
 
 [[package]]
 name = "treestamp-web"
-version = "1.0.1"
+version = "1.1.0"
 source = { editable = "web" }
 dependencies = [
     { name = "certifi" },

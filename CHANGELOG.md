@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/reponomics/treestamp/compare/v1.0.1...v1.1.0) (2026-11-14)
+
+
+### Features
+
+* **cli:** add general and command-specific help alias ([#51](https://github.com/reponomics/treestamp/issues/51)) ([e6cfd5b](https://github.com/reponomics/treestamp/commit/e6cfd5bf54fbd3136ab434d1245796a417b77016))
+
 ## [1.0.1](https://github.com/reponomics/treestamp/compare/v1.0.0...v1.0.1) (2026-11-07)
 
 
