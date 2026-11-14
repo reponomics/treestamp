@@ -268,11 +268,11 @@
       </div>
     </div>
     <div id="load-panel-document" class="settings-group" role="tabpanel" aria-labelledby="load-tab-document" hidden>
-      <p id="reload-hint" class="group-note">Opening an existing treestamp will show any updates based on the current project state.</p>
+      <p id="reload-hint" class="group-note">Opening an existing treestamp updates its draft from a snapshot of the repository's default branch. This does not write to the repository.</p>
       <div class="field field-wide">
         <label for="document">Document</label>
         <input id="document" name="document" type="text" value="" placeholder="e.g. README.md" spellcheck="false" required aria-describedby="document-hint">
-        <p id="document-hint" class="group-note">Path to an existing document containing a treestamp.</p>
+        <p id="document-hint" class="group-note">Path to an existing treestamp document, relative to the repository root.</p>
       </div>
     </div>
     <p id="reload-error" class="dialog-error" role="alert" hidden></p>

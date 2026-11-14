@@ -236,7 +236,7 @@ def test_load_tabs_separate_document_and_root_selection(
     expect(page.locator("#document")).to_be_visible()
     expect(page.locator("#document")).to_have_value("README.md")
     expect(page.locator("#load-panel-document")).to_contain_text(
-        "Opening an existing treestamp will show any updates based on the current project state"
+        "Opening an existing treestamp updates its draft from a snapshot of the repository's default branch."
     )
     expect(page.locator("#reload-settings")).to_contain_text(
         "Current changes in the editor will be discarded"

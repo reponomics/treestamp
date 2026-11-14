@@ -697,8 +697,8 @@ def test_open_completion_replaces_generic_unwritten_status(
             assert rendered_text(
                 app.screen.query_one("#prompt-description", Static)
             ) == (
-                "Opening an existing treestamp will show any updates "
-                "based on the current project state. "
+                "Opening an existing treestamp updates its draft from the staged Git index. "
+                "Stage changes before loading. No file is written until you choose Write. "
                 "Document paths are relative to the repository root."
             )
             await press(pilot, "enter")

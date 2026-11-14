@@ -149,13 +149,16 @@ def _row_label(node: Node, session: TreeSession) -> str:
 
 _HELP = (
     "Edit your tree, then write or copy it. Only Write changes files.",
+    "New and Load capture the staged Git index. Stage changes before opening.",
+    "The captured tree stays fixed until you choose New or Load again.",
     "",
     "NAVIGATE",
     "Up / Down       Select an entry",
     "Right           Expand a directory or move to its first child",
     "Left            Collapse a directory or move to its parent",
     "Space           Toggle directory expansion",
-    "Home / End      First / last row; Page Up / Down scroll",
+    "Home / End      Select the first / last row",
+    "Page Up / Down  Move the selection up / down by a page",
     "",
     "EDIT",
     "h               Hide or unhide the selected entry",
@@ -193,8 +196,8 @@ NEW_DESCRIPTION = (
     "Use . for the repository root (the default)."
 )
 OPEN_DESCRIPTION = (
-    "Opening an existing treestamp will show any updates "
-    "based on the current project state. "
+    "Opening an existing treestamp updates its draft from the staged Git index. "
+    "Stage changes before loading. No file is written until you choose Write. "
     "Document paths are relative to the repository root."
 )
 
