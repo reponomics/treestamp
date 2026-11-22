@@ -17,7 +17,7 @@ from treestamp.tui import TreestampApp
 
 async def curate(app: TreestampApp) -> bool | None:
     async with app.run_test() as pilot:
-        assert app.startup_document is None
+        assert not app.choose_source
         assert app.editor.state.document_path == Path.cwd() / "README.md"
         await pilot.pause()
         await pilot.press("down", "right", "right")
@@ -27,9 +27,8 @@ async def curate(app: TreestampApp) -> bool | None:
         await pilot.press("enter", "down")
         assert app.cursor.path == "src/internal.py"
         await pilot.press("h", "w")
-        field = app.screen.query_one("#prompt-input", Input)
-        assert field.value == "README.md"
-        await pilot.press("enter")
+        assert app.editor.state.document_path == Path.cwd() / "README.md"
+        assert not app.screen.query("#prompt-input")
         await pilot.pause()
         assert not app.editor.dirty
         await pilot.press("q")

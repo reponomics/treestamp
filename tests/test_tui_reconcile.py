@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 from textual.containers import VerticalScroll
-from textual.widgets import Input, ListView, Rule, Static
+from textual.widgets import ListView, Rule, Static
 
 from treestamp.document import write_document
 from treestamp.editor import EditorController
 from treestamp.gitio import capture_snapshot
 from treestamp.model import Settings
 from treestamp.tui import TreestampApp
-from treestamp.tui_dialogs import DocumentChoiceScreen, PreviewScreen, PromptScreen
+from treestamp.tui_dialogs import PreviewScreen
+from treestamp.tui_entry import SourceChoiceScreen
 from treestamp.tui_reconcile import (
     PlacementChoiceScreen,
     PlacementConfirmScreen,
@@ -387,12 +387,12 @@ def test_startup_load_offers_placement_after_adopting_document(
     seed = EditorController(capture_snapshot(repo.path), Settings())
 
     async def journey() -> None:
-        app = TreestampApp(seed, startup_document=Path("tree.md"))
+        app = TreestampApp(seed, choose_source=True)
         async with app.run_test() as pilot:
-            assert isinstance(app.screen, DocumentChoiceScreen)
-            await press(pilot, "l")
-            assert isinstance(app.screen, PromptScreen)
-            app.screen.query_one(Input).value = "tree.md"
+            assert isinstance(app.screen, SourceChoiceScreen)
+            app.screen.source_tree.index = next(
+                i for i, row in enumerate(app.screen.rows) if row.path.name == "tree.md"
+            )
             await press(pilot, "enter")
             assert isinstance(app.screen, PlacementChoiceScreen)
             await press(pilot, "enter")

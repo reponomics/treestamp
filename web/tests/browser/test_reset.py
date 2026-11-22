@@ -1,4 +1,4 @@
-"""Reset restores the source tree without turning storage into a user concept."""
+"""Discard restores the accepted session start without repeating preparation."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def annotate(page: Page) -> None:
     expect(page.locator("#region")).to_contain_text("A temporary note")
 
 
-def test_reset_cancel_preserves_edits_and_reset_survives_a_return(
+def test_discard_cancel_preserves_edits_and_reset_survives_a_return(
     page: Page, service: str
 ) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
@@ -26,8 +26,10 @@ def test_reset_cancel_preserves_edits_and_reset_survives_a_return(
     annotate(page)
     edited = page.locator("#region").text_content()
     address = page.url
+    expect(page.locator("#reset-tree")).to_have_text("Discard changes")
     page.locator("#reset-tree").click()
     expect(page.locator("#reset-dialog")).to_be_visible()
+    expect(page.locator("#reset-title")).to_have_text("Discard changes?")
     page.locator("#reset-cancel").click()
     expect(page.locator("#region")).to_have_text(edited)
     assert page.url == address
@@ -40,7 +42,7 @@ def test_reset_cancel_preserves_edits_and_reset_survives_a_return(
     expect(page.locator("#region")).to_have_text(original)
 
 
-def test_failed_reset_keeps_accepted_changes(page: Page, service: str) -> None:
+def test_failed_discard_keeps_accepted_changes(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     annotate(page)
@@ -48,7 +50,7 @@ def test_failed_reset_keeps_accepted_changes(page: Page, service: str) -> None:
     address = page.url
     record = page.evaluate("localStorage.getItem('treestamp.current-draft')")
     page.route(
-        "**/api/preview*",
+        "**/api/op",
         lambda route: route.fulfill(
             status=503,
             json={"error": {"message": "Repository unavailable."}},
@@ -64,7 +66,7 @@ def test_failed_reset_keeps_accepted_changes(page: Page, service: str) -> None:
     expect(page.locator("#workspace")).to_be_visible()
 
 
-def test_reset_loaded_document_uses_its_captured_commit_and_source(
+def test_discard_loaded_document_uses_its_captured_commit_and_source(
     page: Page, service: str
 ) -> None:
     page.goto(f"{service}/fixture/repo?document=README.md")
@@ -73,16 +75,17 @@ def test_reset_loaded_document_uses_its_captured_commit_and_source(
     commit = page.locator("[data-repo-commit]").first.text_content()
     annotate(page)
     page.locator("#reset-tree").click()
-    with page.expect_request("**/api/preview") as request:
+    with page.expect_request("**/api/op") as request:
         page.locator("#reset-confirm").click()
     body = request.value.post_data_json
     assert body["ref"] == commit
     assert body["document"] == "README.md"
+    assert body["op"]["type"] == "reset"
     expect(page.locator("#reset-dialog")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original)
 
 
-def test_example_reset_stays_local_and_keeps_its_curated_content(
+def test_example_discard_stays_local_and_keeps_its_curated_content(
     page: Page, service: str
 ) -> None:
     page.goto(service + "/")
@@ -104,7 +107,7 @@ def test_example_reset_stays_local_and_keeps_its_curated_content(
     assert requests == []
 
 
-def test_edited_example_can_reset_after_reloading_the_page(
+def test_edited_example_can_discard_after_reloading_the_page(
     page: Page, service: str
 ) -> None:
     page.goto(service + "/")

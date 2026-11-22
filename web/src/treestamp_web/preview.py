@@ -55,6 +55,7 @@ DOCUMENT_CAP = 1024 * 1024
 OPEN_NOTICE = "Treestamp updated"
 OPERATIONS = (
     "restore",
+    "reset",
     "present",
     "toggle",
     "expand",
@@ -229,6 +230,20 @@ def _baseline(value: object) -> bytes | None:
         raise PreviewError(400, "invalid_state", "invalid document baseline") from None
 
 
+def _session_identity(data: Mapping[str, object]) -> tuple[str, int]:
+    generation, revision = data["generation"], data["revision"]
+    if (
+        not isinstance(generation, str)
+        or not generation
+        or type(revision) is not int
+        or revision < 0
+    ):
+        raise PreviewError(
+            400, "invalid_state", "invalid session generation or revision"
+        )
+    return generation, revision
+
+
 @dataclass(frozen=True)
 class Envelope:
     curation: SessionState
@@ -236,6 +251,7 @@ class Envelope:
     baseline: bytes | None
     generation: str
     revision: int = 0
+    initial_curation: SessionState | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -247,40 +263,37 @@ class Envelope:
             else base64.b64encode(self.baseline).decode("ascii"),
             "generation": self.generation,
             "revision": self.revision,
+            **(
+                {"initial_curation": self.initial_curation.to_dict()}
+                if self.initial_curation is not None
+                else {}
+            ),
         }
 
     @classmethod
     def from_dict(cls, data: object) -> Envelope:
         if (
             not isinstance(data, dict)
-            or set(data)
+            or set(data) - {"initial_curation"}
             != {"version", "curation", "source", "baseline", "generation", "revision"}
             or data["version"] != 1
         ):
             raise PreviewError(400, "invalid_state", "invalid session envelope")
-        generation, revision, baseline = (
-            data["generation"],
-            data["revision"],
-            data["baseline"],
-        )
-        if (
-            not isinstance(generation, str)
-            or not generation
-            or type(revision) is not int
-            or revision < 0
-        ):
-            raise PreviewError(
-                400, "invalid_state", "invalid session generation or revision"
-            )
-        decoded = _baseline(baseline)
+        generation, revision = _session_identity(data)
+        decoded = _baseline(data["baseline"])
         source = data["source"]
         if not isinstance(source, dict):
             raise PreviewError(400, "invalid_state", "invalid session source")
         try:
             state = SessionState.from_dict(data["curation"])
+            initial = (
+                SessionState.from_dict(data["initial_curation"])
+                if "initial_curation" in data
+                else None
+            )
         except MarkerError as exc:
             raise PreviewError(400, "invalid_state", str(exc)) from None
-        return cls(state, source, decoded, generation, revision)
+        return cls(state, source, decoded, generation, revision, initial)
 
 
 @dataclass(frozen=True)
@@ -340,6 +353,10 @@ def parse_op_request(data: object) -> OpRequest:
     if (
         envelope.source != _source(repo, repo.ref, root, document)
         or envelope.curation.settings.root != root
+        or (
+            envelope.initial_curation is not None
+            and envelope.initial_curation.settings.root != root
+        )
     ):
         raise PreviewError(
             400, "invalid_state", "session source does not match the request"
@@ -574,6 +591,7 @@ class PreviewService:
             _source(repo, snapshot.resolved.commit, root, request.document),
             baseline,
             str(uuid.uuid4()),
+            initial_curation=session.state(),
         )
         result = self._compose(
             repo,
@@ -599,18 +617,22 @@ class PreviewService:
         if snapshot is None:
             raise _snapshot_unavailable()
         target = await self._target(request.repository, snapshot, request.root, False)
+        initial = request.envelope.initial_curation or request.envelope.curation
         self._preflight(target.node, request.envelope.curation.settings)
+        self._preflight(target.node, initial.settings)
         try:
+            initial_session = TreeSession.restore(target.node, initial)
             session = TreeSession.restore(target.node, request.envelope.curation)
         except MarkerError as exc:
             raise PreviewError(400, "invalid_state", str(exc)) from None
+        if request.op.type == "reset":
+            session = initial_session
         request.op.apply(session)
-        envelope = Envelope(
-            session.state(),
-            request.envelope.source,
-            request.envelope.baseline,
-            request.envelope.generation,
-            request.envelope.revision + int(request.op.type != "restore"),
+        envelope = replace(
+            request.envelope,
+            curation=session.state(),
+            revision=request.envelope.revision + int(request.op.type != "restore"),
+            initial_curation=initial,
         )
         result = self._compose(
             request.repository,
@@ -635,7 +657,10 @@ class PreviewService:
         self._preflight(target.node, opening.envelope.curation.settings)
         session, review = replay(target.node, request)
         envelope = replace(
-            opening.envelope, curation=session.state(), revision=len(request.decisions)
+            opening.envelope,
+            curation=session.state(),
+            revision=len(request.decisions),
+            initial_curation=session.state(),
         )
         result = self._compose(
             opening.repository, target, session, opening.document, envelope

@@ -415,9 +415,9 @@ def test_interactive_open_print_and_write_share_controller(
 ) -> None:
     path = stamp(repo)
 
-    def load_then_print(editor, *, startup_document=None):
+    def load_then_print(editor, *, choose_source=False):
         assert editor.state.document_path == path
-        assert startup_document is None
+        assert not choose_source
         assert editor.state.snapshot.repo == repo.path
         return True
 

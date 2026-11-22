@@ -14,6 +14,8 @@ When a freshly loaded document contains notes whose paths disappeared, the app o
 
 Placement uses `POST /api/placement` against the already captured snapshot. Requests carry the original opening envelope, a bounded decision log, and separate browsing expansion/reveal settings. Intermediate results remain provisional in the browser; finishing or declining accepts the result and replaces the saved draft. Browsing destinations does not change the draft's folds or exclusions. Like editing, placement reports an expired snapshot rather than fetching another commit.
 
+**Discard changes** restores the accepted tree at the start of editing, after any note placement. The session envelope keeps an optional `initial_curation` alongside current curation; `/api/op` with `reset` restores it against the captured snapshot without reloading the document or reopening placement. It survives saved-draft and URL restoration. Legacy sessions without this field adopt their restored curation as the starting point.
+
 ## Run locally
 
 From the repository root:

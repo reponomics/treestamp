@@ -209,15 +209,15 @@ def _explore(args: argparse.Namespace) -> int:
 
     if args.load is not None:
         editor = _editor_inputs(args)
-        startup_document = None
+        choose_source = False
     else:
         repository = repo_root(Path.cwd())
-        # New/Load captures its selected subtree only after the opening choice.
+        # Source selection captures only its chosen subtree after browsing.
         editor = EditorController(
             Snapshot(repository, repository, build_tree([]), ""), Settings()
         )
-        startup_document = Path(DEFAULT_DOCUMENT_FILE)
-    if explore(editor, startup_document=startup_document):
+        choose_source = True
+    if explore(editor, choose_source=choose_source):
         _emit(editor.region_text())
     return 0
 

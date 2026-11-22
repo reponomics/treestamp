@@ -46,7 +46,7 @@ The modules in `src/treestamp/` have narrow responsibilities:
 
 - **Snapshot.** Treestamp captures the Git index (or a ref given with `--target`) once. Every later action in that run or editing session uses the same snapshot, so files changing on disk do not alter the tree being edited.
 - **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
-- **Start or load.** In the terminal editor, **New document** starts a tree for a chosen subtree root. **Load document** reads an existing treestamped document and restores its tree, hidden entries, and settings against the current snapshot.
+- **Start or load.** In the terminal editor, the opening filesystem tree lets the user select a folder for **Create treestamp here** or a file for **Load treestamp from document**. Creation captures the chosen subtree; loading reads the document and restores its tree, hidden entries, and settings against the captured index.
 - **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
 - **Write.** `update` and the editor's **Write to document** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. The editor offers writing only for a loaded document, and always writes back to that document. New trees are copied or printed for insertion into a document.
 - **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
@@ -92,7 +92,7 @@ The Python modules are not a supported library interface.
 
 [ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) documents command usage, path rules, and defaults.
 
-`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents New/Load. `treestamp` with no command is equivalent to `treestamp tui`.
+`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents a visual folder/document chooser. `treestamp` with no command is equivalent to `treestamp tui`.
 
 With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new tree if the README is absent or unmarked; malformed or empty marked regions remain errors.
 
@@ -118,7 +118,7 @@ Errors are written to standard error, prefixed with `treestamp:`.
 
 ### Terminal editor
 
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to document (loaded sessions only), `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. New and Load are available only in the opening flow; document paths entered there are relative to the repository root.
+The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to document (loaded sessions only), `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Folder creation and document loading are available only in the opening visual chooser. Browsing includes untracked files, is lazy, and does not follow symlinks. Source preparation validates the selection before the chooser closes; document loads then offer note placement when necessary.
 
 ### Document format
 

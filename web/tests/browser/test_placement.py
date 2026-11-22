@@ -286,7 +286,7 @@ def test_keyboard_and_layout_keep_one_source_above_one_destination_tree(
     assert source and tree and source["y"] + source["height"] < tree["y"]
 
 
-def test_another_document_load_starts_with_enabled_placement_controls(
+def test_fresh_same_document_load_restarts_placement_without_losing_saved_draft(
     page: Page, placement_service: str
 ) -> None:
     start(page, placement_service)
@@ -295,15 +295,28 @@ def test_another_document_load_starts_with_enabled_placement_controls(
     expect(page.locator("#placement-source")).to_have_text("retired.py")
     page.locator("#placement-skip").click()
     expect(page.locator("#workspace")).to_be_visible()
+    previous = page.locator("#region").text_content()
+    saved = page.evaluate(DRAFT)
+    address = page.url
+    assert previous and "Data preparation tools" in previous
     page.locator("#submit").click()
     page.locator('#source-browser [data-path="README.md"]').click()
     page.locator("#reload").click()
+    expect(page.locator("#placement-choice-title")).to_have_text(
+        "4 notes lost their place."
+    )
     page.locator("#placement-start").click()
     expect(page.locator("#placement-source")).to_have_text("old-tools/")
+    expect(page.locator("#placement-progress")).to_have_text("4 left · 0 placed")
+    expect(page.locator("#region")).to_have_text(previous)
+    assert page.evaluate(DRAFT) == saved
+    assert page.url == address
     for selector in ("#placement-skip", "#placement-finish", "#placement-reveal"):
         expect(page.locator(selector)).to_be_enabled()
     page.locator("#placement-finish").click()
     expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
+    assert page.evaluate(DRAFT) != saved
 
 
 def test_file_and_folder_destinations_make_incompatible_choices_unavailable(
@@ -389,64 +402,70 @@ def place_folder_and_finish(page: Page) -> None:
     expect(page.locator("#workspace")).to_be_visible()
 
 
-@pytest.mark.parametrize("place_again", [True, False])
-def test_reset_reloads_source_and_completes_placement_before_accepting_draft(
-    page: Page, placement_service: str, place_again: bool
+@pytest.mark.parametrize("transfer", [True, False])
+@pytest.mark.parametrize("restore", ["live", "fragment", "local"])
+def test_discard_restores_post_placement_session_without_reopening_queue(
+    page: Page, placement_service: str, transfer: bool, restore: str
 ) -> None:
-    start(page, placement_service)
-    place_folder_and_finish(page)
+    open_document(page, placement_service)
+    if transfer:
+        page.locator("#placement-start").click()
+        place_folder_and_finish(page)
+    else:
+        page.locator("#placement-decline").click()
+        expect(page.locator("#workspace")).to_be_visible()
+    baseline = page.locator("#region").text_content()
+    assert baseline and "Historical importer" not in baseline
+    assert ("Data preparation tools" in baseline) == transfer
     page.locator('.row[data-path="keep.py"] [data-action="note"]').click()
     page.locator("#note-text").fill("An edit after placing")
     page.locator("#note-save").click()
     expect(page.locator("#region")).to_contain_text("An edit after placing")
-    previous = page.locator("#region").text_content()
-    record = page.evaluate(DRAFT)
-    address = page.url
+    page.locator("#attribution").check()
+    expect(page.locator("#region")).to_contain_text("Maintained with")
+    edited = page.locator("#region").text_content()
+    if restore == "fragment":
+        page.reload()
+    elif restore == "local":
+        page.goto(placement_service + "/")
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#region")).to_have_text(edited)
+    expect(page.locator("#placement-dialog")).to_be_hidden()
+    requests: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            requests.append(request.url) if "/api/" in request.url else None
+        ),
+    )
     page.locator("#reset-tree").click()
     page.locator("#reset-confirm").click()
-    expect(page.locator("#placement-dialog")).to_be_visible()
-    expect(page.locator("#reset-dialog")).to_be_visible()
-    expect(page.locator("#placement-start")).to_be_focused()
-    assert page.evaluate(DRAFT) == record
-    assert page.url == address
-    expect(page.locator("#region")).to_have_text(previous)
-    if place_again:
-        page.locator("#placement-start").click()
-        place_folder_and_finish(page)
-        expect(page.locator("#region")).to_contain_text("Data preparation tools")
-        expect(page.locator("#region")).to_contain_text("Normalize incoming columns")
-    else:
-        page.locator("#placement-decline").click()
-        expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
     expect(page.locator("#reset-dialog")).to_be_hidden()
-    expect(page.locator("#region")).not_to_contain_text("An edit after placing")
-    expect(page.locator("#region")).to_contain_text("Keep this existing note")
-    assert page.evaluate(DRAFT) != record
-    accepted = page.locator("#region").text_content()
-    page.locator("#submit").click()
-    warning = page.locator("#replace-draft-warning")
-    if place_again:
-        expect(warning).to_be_visible()
-    else:
-        expect(warning).to_be_hidden()
-    page.locator("#entry-return").click()
-    expect(page.locator("#region")).to_have_text(accepted)
+    expect(page.locator("#placement-dialog")).to_be_hidden()
+    expect(page.locator("#region")).to_have_text(baseline)
+    expect(page.locator("#attribution")).not_to_be_checked()
+    assert requests and all(url.endswith("/api/op") for url in requests)
     page.goto(placement_service + "/")
     expect(page.locator("#workspace")).to_be_visible()
-    expect(page.locator("#region")).to_have_text(accepted)
+    expect(page.locator("#region")).to_have_text(baseline)
     expect(page.locator("#placement-dialog")).to_be_hidden()
 
 
-def test_failed_reset_of_placed_document_preserves_storage_and_can_retry(
+def test_failed_discard_of_placed_document_preserves_storage_and_can_retry(
     page: Page, placement_service: str
 ) -> None:
     start(page, placement_service)
     place_folder_and_finish(page)
+    baseline = page.locator("#region").text_content()
+    page.locator('.row[data-path="keep.py"] [data-action="note"]').click()
+    page.locator("#note-text").fill("Keep this until discard succeeds")
+    page.locator("#note-save").click()
+    expect(page.locator("#region")).to_contain_text("Keep this until discard succeeds")
     previous = page.locator("#region").text_content()
     record = page.evaluate(DRAFT)
     address = page.url
     page.route(
-        "**/api/preview",
+        "**/api/op",
         lambda route: route.fulfill(
             status=503, json={"error": {"message": "Snapshot unavailable."}}
         ),
@@ -460,12 +479,11 @@ def test_failed_reset_of_placed_document_preserves_storage_and_can_retry(
     expect(page.locator("#region")).to_have_text(previous)
     assert page.evaluate(DRAFT) == record
     assert page.url == address
-    page.unroute("**/api/preview")
+    page.unroute("**/api/op")
     page.locator("#reset-confirm").click()
-    expect(page.locator("#placement-dialog")).to_be_visible()
-    page.locator("#placement-decline").click()
     expect(page.locator("#reset-dialog")).to_be_hidden()
-    expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
+    expect(page.locator("#placement-dialog")).to_be_hidden()
+    expect(page.locator("#region")).to_have_text(baseline)
 
 
 def test_resume_progress_after_placement_preserves_notes_without_reopening_queue(

@@ -24,16 +24,16 @@ Use `treestamp help` (equivalent to `treestamp --help`) for general help, or `tr
 | `--load DOCUMENT` | A cwd-relative or absolute document path; opens it directly and selects its containing repository |
 | Explicit `check DOCUMENT` / `update DOCUMENT` | A cwd-relative or absolute document path; selects its containing repository |
 | Omitted document for `check`, `update`, or `--print` | The repository-root `README.md` in the repository containing cwd |
-| TUI startup without `--load` | The repository containing cwd; shows New/Load |
-| TUI tree root and document dialogs | Paths relative to the selected repository root |
+| TUI startup without `--load` | The repository containing cwd; opens a visual folder/document chooser |
+| TUI source chooser | Folders and documents on disk within the selected repository |
 
 Explicit CLI document paths follow filesystem conventions. From `docs/`, `treestamp check README.md` checks `docs/README.md`, while `treestamp check ../README.md` checks the repository's top-level README. Bare `treestamp check` selects the top-level README. A document can select another checkout even when cwd is outside any repository.
 
-CLI document paths may include `..`, but symlinks are refused, including traversed components before parent normalization. A document in an initialized nested repository or submodule selects that repository. Paths into an uninitialized submodule are rejected. Within the editor, document paths are repository-root-relative: absolute paths, parent traversal, symlinks, and crossings into other repositories or submodules are rejected.
+CLI document paths may include `..`, but symlinks are refused, including traversed components before parent normalization. A document in an initialized nested repository or submodule selects that repository. Paths into an uninitialized submodule are rejected. The visual chooser is currently confined to its starting repository. Symlinks and crossings into other repositories or submodules are rejected when preparing a selection.
 
-To open another repository, load a document in it or change directories before starting treestamp. Choose a subtree in the New document dialog; the root dialog accepts spellings such as `./src/` and stores the canonical `src` path.
+To open another repository, pass a document in it with `--load` or change directories before starting treestamp. Within the chooser, select a folder to choose the tree root without typing its path.
 
-The default source is a captured Git index, not the working tree. Stage additions, deletions, and renames before opening or checking a treestamp. Untracked files are absent, and unstaged changes are not incorporated. New or Load captures a snapshot; subsequent edits use that snapshot until another New or Load operation. The containing document is read from disk, not from the index. Treestamp does not stage or commit files or fetch remote history.
+The default source is a captured Git index, not the working tree. Stage additions, deletions, and renames before opening or checking a treestamp. Untracked files are absent from the generated tree, and unstaged changes are not incorporated. Accepting a folder or document captures a snapshot; subsequent edits use that snapshot for the session. The containing document is read from disk, not from the index. Treestamp does not stage or commit files or fetch remote history.
 
 ## Interactive editor
 
@@ -43,7 +43,9 @@ treestamp --load docs/structure.md
 treestamp tui --load /path/to/another/checkout/README.md
 ```
 
-Without `--load`, startup offers **New document** or **Load document**. `--load DOCUMENT` opens the document directly, bypassing the opening choice and path-entry dialog. An invalid explicit load reports an error without launching the editor or starting a new document. New document starts with the selected root's immediate children and collapsed directories. Load reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
+Without `--load`, startup shows one visual source tree. Selecting a folder offers **Create treestamp here**; selecting a regular file offers **Load treestamp from document**. Arrow keys navigate and expand folders, and Enter accepts the selected source. The chooser reads the working filesystem, including untracked documents, but the editable tree still comes from the staged Git index. Failed loads keep the document selected and report the error; they never silently create a new tree.
+
+`--load DOCUMENT` opens the document directly, bypassing the chooser. An invalid explicit load reports an error without launching the editor. New trees start with the selected root's immediate children and collapsed directories. Loading reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
 
 | Keys | Action |
 | --- | --- |
@@ -65,7 +67,7 @@ Placing a directory also carries its pending annotated descendants recursively w
 
 Run `make reconcile-demo` from a development checkout for a disposable example with moved files, a directory with nested annotations, and a deliberately removed entry. Its writes stay in a temporary repository.
 
-New trees are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. When a session starts by loading a document, Write to document saves directly back to that document and preserves content outside its boundary markers. There is no write action for a new-tree session and no destination picker. New and Load are available only in the opening flow. Unwritten changes require confirmation before quitting.
+New trees are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. When a session starts by loading a document, Write to document saves directly back to that document and preserves content outside its boundary markers. There is no write action for a new-tree session and no destination picker. Folder creation and document loading are available only in the opening chooser. Unwritten changes require confirmation before quitting.
 
 ## Print without opening the editor
 

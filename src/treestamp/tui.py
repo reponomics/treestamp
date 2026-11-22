@@ -17,10 +17,10 @@ from treestamp.document import ATTRIBUTION_URL
 from treestamp.errors import TreestampError
 from treestamp.tui_dialogs import (
     ConfirmScreen,
-    DocumentChoiceScreen,
     PreviewScreen,
     PromptScreen,
 )
+from treestamp.tui_entry import SourceChoiceScreen
 from treestamp.tui_reconcile import PlacementChoiceScreen, ReconcileScreen
 from treestamp.tui_rows import Cursor as Cursor
 from treestamp.tui_rows import row_label as _row_label
@@ -29,7 +29,6 @@ from treestamp.tui_rows import tree_prefixes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
     from textual.app import ComposeResult
     from textual.binding import BindingType
@@ -40,7 +39,7 @@ if TYPE_CHECKING:
 
 _HELP = (
     "Edit your tree, then copy or print the complete treestamp.",
-    "New and Load capture the staged Git index. Stage changes before opening.",
+    "Choose a folder or document to begin. Stage tree changes before opening.",
     "The captured tree stays fixed for this editing session.",
     "",
     "NAVIGATE",
@@ -84,15 +83,6 @@ _HELP = (
 )
 STYLES = ("unicode", "ascii", "list")
 STYLE_LABELS = {"unicode": "Unicode", "ascii": "ASCII", "list": "List"}
-NEW_DESCRIPTION = (
-    "Enter a path to the root of the tree, relative to the repository root. "
-    "Use . for the repository root (the default)."
-)
-OPEN_DESCRIPTION = (
-    "Opening an existing treestamp updates its draft from the staged Git index. "
-    "Stage changes before loading. No file is written until you choose Write. "
-    "Document paths are relative to the repository root."
-)
 
 
 def _toggle_counts(session: TreeSession) -> str:
@@ -159,7 +149,7 @@ class TreestampApp(App[bool]):
     """
 
     def __init__(
-        self, editor: EditorController, *, startup_document: Path | None = None
+        self, editor: EditorController, *, choose_source: bool = False
     ) -> None:
         super().__init__()
         self.editor = editor
@@ -178,7 +168,7 @@ class TreestampApp(App[bool]):
         )
         self.document_controls.display = self.editor.state.document_path is not None
         self._rebuilding = False
-        self.startup_document = startup_document
+        self.choose_source = choose_source
 
     def compose(self) -> ComposeResult:
         yield Static("treestamp", markup=False, id="title")
@@ -198,56 +188,20 @@ class TreestampApp(App[bool]):
         )
 
     async def on_mount(self) -> None:
-        if self.startup_document is None:
+        if not self.choose_source:
             await self.refresh_tree(self.editor.state.status)
             self._offer_placement()
         else:
             self._show_startup()
 
     def _show_startup(self) -> None:
-        self.push_screen(DocumentChoiceScreen(), self._accept_startup_choice)
+        self.push_screen(SourceChoiceScreen(self.editor), self._accept_startup)
 
-    def _accept_startup_choice(self, operation: str | None) -> None:
-        if operation is None:
+    async def _accept_startup(self, candidate: EditorState | None) -> None:
+        if candidate is None:
             self.exit(False)
         else:
-            self._prompt_startup(operation)
-
-    def _prompt_startup(
-        self, operation: str, value: str | None = None, error: str = ""
-    ) -> None:
-        new = operation == "new"
-        description = NEW_DESCRIPTION if new else OPEN_DESCRIPTION
-        self.push_screen(
-            PromptScreen(
-                "New document" if new else "Load document",
-                value
-                if value is not None
-                else "."
-                if new
-                else str(self.startup_document),
-                description="\n".join(part for part in (description, error) if part),
-            ),
-            partial(self._accept_startup_input, operation),
-        )
-
-    async def _accept_startup_input(self, operation: str, value: str | None) -> None:
-        if value is None:
-            self._show_startup()
-            return
-        if value == "":
-            self._prompt_startup(operation, value, "Enter a root or document path.")
-            return
-        try:
-            candidate = (
-                self.editor.prepare_new(value)
-                if operation == "new"
-                else self.editor.prepare_load(value)
-            )
-        except (TreestampError, OSError, ValueError) as exc:
-            self._prompt_startup(operation, value, str(exc))
-            return
-        await self._adopt_editor_state(candidate)
+            await self._adopt_editor_state(candidate)
 
     def _set_status(self, text: str) -> None:
         self.status_widget.update(_safe_text(text))
@@ -530,5 +484,5 @@ def _clipboard_command() -> list[str] | None:
     return None
 
 
-def explore(editor: EditorController, *, startup_document: Path | None = None) -> bool:
-    return bool(TreestampApp(editor, startup_document=startup_document).run())
+def explore(editor: EditorController, *, choose_source: bool = False) -> bool:
+    return bool(TreestampApp(editor, choose_source=choose_source).run())

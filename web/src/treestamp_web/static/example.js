@@ -79,7 +79,44 @@ export const EXAMPLES = {
       },
       "baseline": null,
       "generation": "e00bc08d-4429-594a-a18d-9c54dec1167d",
-      "revision": 0
+      "revision": 0,
+      "initial_curation": {
+        "settings": {
+          "root": ".",
+          "style": "unicode",
+          "show_counts": true,
+          "attribution": false
+        },
+        "expanded": [
+          ".github",
+          ".reponomics",
+          "docs"
+        ],
+        "hidden": [
+          ".gitignore",
+          ".reponomics",
+          "CODE_OF_CONDUCT.md",
+          "CONTRIBUTING.md",
+          "LICENSE",
+          "README.backup.md",
+          "README.md",
+          "SECURITY.md"
+        ],
+        "annotations": [
+          {
+            "path": ".github/workflows",
+            "text": "Collect data and publish the dashboard"
+          },
+          {
+            "path": "config.yaml",
+            "text": "Choose repositories and publishing options"
+          },
+          {
+            "path": "docs/reponomics",
+            "text": "Setup and operation guides"
+          }
+        ]
+      }
     },
     "rows": [
       {
@@ -275,7 +312,58 @@ export const EXAMPLES = {
       },
       "baseline": null,
       "generation": "89d865f3-5a20-57f7-8c57-d4dceac65881",
-      "revision": 0
+      "revision": 0,
+      "initial_curation": {
+        "settings": {
+          "root": ".",
+          "style": "unicode",
+          "show_counts": true,
+          "attribution": false
+        },
+        "expanded": [
+          "dashboard_action",
+          "dashboard_action/runtime"
+        ],
+        "hidden": [
+          ".gitattributes",
+          ".gitignore",
+          ".pre-commit-config.yaml",
+          ".python-version",
+          "CHANGELOG.md",
+          "CODE_OF_CONDUCT.md",
+          "CONTRIBUTING.md",
+          "LICENSE",
+          "Makefile",
+          "README.action.md",
+          "README.md",
+          "SECURITY.md",
+          "dashboard_action/__init__.py",
+          "dashboard_action/runtime/__init__.py",
+          "pyproject.toml",
+          "requirements-analysis.in",
+          "requirements-analysis.txt",
+          "requirements-guide-tooling.in",
+          "requirements-guide-tooling.txt",
+          "requirements-runtime.txt",
+          "template-contract.yml",
+          "template-manifest.yml",
+          "version.txt"
+        ],
+        "annotations": [
+          {
+            "path": "action.yml",
+            "text": "GitHub Action entry point"
+          },
+          {
+            "path": "dashboard_action/runtime/scripts",
+            "text": "Collection and rendering"
+          },
+          {
+            "path": "tests",
+            "text": "Tests and fixtures"
+          }
+        ]
+      }
     },
     "rows": [
       {
@@ -533,7 +621,33 @@ export const EXAMPLES = {
       },
       "baseline": null,
       "generation": "dab4d8d1-8f70-5aa1-a4cb-1c4bbdebda15",
-      "revision": 0
+      "revision": 0,
+      "initial_curation": {
+        "settings": {
+          "root": "src",
+          "style": "unicode",
+          "show_counts": true,
+          "attribution": false
+        },
+        "expanded": [
+          "routes"
+        ],
+        "hidden": [],
+        "annotations": [
+          {
+            "path": "app.ts",
+            "text": "Start the badge service"
+          },
+          {
+            "path": "badges",
+            "text": "Policy checks and badge formats"
+          },
+          {
+            "path": "github",
+            "text": "App authentication and GitHub API"
+          }
+        ]
+      }
     },
     "rows": [
       {

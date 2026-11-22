@@ -135,7 +135,7 @@
             </div>
           </fieldset>
           <p id="loaded-note" hidden></p>
-          <div class="settings-reset"><button id="reset-tree" type="button" disabled>Reset tree</button></div>
+          <div class="settings-reset"><button id="reset-tree" type="button" disabled>Discard changes</button></div>
         </div>
       </section>
     </aside>
@@ -285,12 +285,12 @@
   </dialog>
 
   <dialog id="reset-dialog" class="dialog" aria-labelledby="reset-title" aria-describedby="reset-description">
-    <div class="dialog-head"><h2 id="reset-title">Reset this tree?</h2></div>
-    <p id="reset-description">Return to the tree as originally opened. Your changes to notes, hidden entries, folds, and formatting will be removed.</p>
+    <div class="dialog-head"><h2 id="reset-title">Discard changes?</h2></div>
+    <p id="reset-description">Return to the start of editing. Annotation transfers are kept; later changes to notes, hidden entries, folds, and formatting are discarded.</p>
     <p class="dialog-error" role="alert" hidden></p>
     <div class="dialog-actions">
       <button id="reset-cancel" type="button">Cancel</button>
-      <button id="reset-confirm" type="button">Reset tree</button>
+      <button id="reset-confirm" type="button">Discard changes</button>
     </div>
   </dialog>
 

@@ -768,8 +768,7 @@ const resetDialog = document.getElementById("reset-dialog");
 const resetConfirm = document.getElementById("reset-confirm");
 document.getElementById("reset-tree").addEventListener("click", () => {
   resetDialog.querySelector(".dialog-error").hidden = true;
-  const startingPoint = editor.document ? "Restore the document’s treestamp from the captured repository version." : "Restore this tree’s starting layout and formatting.";
-  document.getElementById("reset-description").textContent = `${startingPoint} Your changes to notes, hidden entries, folds, and formatting will be removed.`;
+  document.getElementById("reset-description").textContent = "Return to the start of editing. Annotation transfers are kept; later changes to notes, hidden entries, folds, and formatting are discarded.";
   resetDialog.showModal();
   document.getElementById("reset-cancel").focus();
 });
@@ -788,8 +787,9 @@ async function resetTree() {
     loadExample(example[0]);
     return true;
   }
-  const accepted = await preview({ owner: editor.owner, repo: editor.repo, ref: editor.ref, root: editor.root, document: editor.document });
+  const accepted = await operate("reset");
   if (!accepted) reveal.checked = revealed;
+  else userEdited = false;
   return accepted;
 }
 

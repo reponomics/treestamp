@@ -1,6 +1,6 @@
 # Web UI flow
 
-Decision recorded November 22, 2026. This document describes the web editor's entry flow and the reasoning behind it. The terminal UI is a separate follow-up.
+Decision recorded November 22, 2026. This document describes the web editor's entry flow, its reasoning, and the corresponding terminal source chooser.
 
 ## Decision
 
@@ -40,7 +40,9 @@ Repository entry is the place to type a repository address. The editor shows the
 
 The controls and editor use separate responsive transitions. From 1,024px, repository controls and settings occupy a sidebar beside the tree. Between 768px and 1,024px, the controls above the tree split into repository information on the left and settings on the right; the tree uses the full width below. Below 768px, the controls stack and settings open in a sheet. The masthead has its own space requirement: its attribution stays visible down to 640px. Typography does not shrink to compensate for a layout that needs to change.
 
-**Reset tree** is an editing action, not browser-storage management. After confirmation, it reloads the selected folder or document at the captured commit, removing subsequent curation and formatting changes. A loaded document starts again from its existing treestamp; a new tree starts from the folder defaults. The bundled example resets to its curated starting point. A failed reset preserves the current tree and its locally saved state. Successful reset saves the resulting tree through the same silent mechanism as other accepted edits.
+**Discard changes** restores the start of the editing session after confirmation. That starting point is captured after annotation transfer finishes, including placements and skips. Later changes to notes, hidden entries, folds, and formatting are discarded; annotation transfer does not reopen. A new tree returns to its starting folder layout, and a bundled example returns to its curated starting point. A failed discard preserves the current tree and its locally saved state. Successful discard saves the result through the same silent mechanism as other accepted edits.
+
+The session envelope retains both the initial and current curation, so this behavior survives local draft restoration and shared session links. Annotation-transfer decisions are provisional and their queue is not retained after acceptance. Older session links without an initial curation use the restored tree as their starting point; they cannot recover a historical start that was never stored.
 
 ## Folder and document selection
 
@@ -72,6 +74,10 @@ Regression checks cover fresh arrivals, opting into the example, explicit-link p
 
 Future feedback should distinguish whether visitors can identify what the tree represents, complete their first repository selection, and understand the folder/document relationship. Those observations would support or challenge the hypothesis; the implementation alone does not validate it. If the entry step proves obstructive, adjust its choices or the example offramp before assuming that an automatically loaded example is the only alternative.
 
-## Terminal UI follow-up
+## Terminal source selection and platform differences
 
-The same principle may help the TUI: selecting a concrete folder or document could determine the next action. The TUI already starts inside a repository, so it does not need the web repository-entry step. Whether to unify its current New/Open entry screen, or permit choosing another repository, remains undecided. This web change does not alter TUI behavior.
+The TUI starts with a visual tree of its current repository on disk. Selecting a folder offers **Create treestamp here**; selecting a regular file offers **Load treestamp from document**. Browsing includes untracked documents, so a newly pasted treestamp can be loaded without typing its path. The editable tree remains a captured Git index; filesystem browsing does not change that source contract. Invalid selections leave the chooser open, and successful document loads pass through optional note placement before editing. Explicit `--load` still bypasses the chooser.
+
+The web and terminal apps share this source-selection model, but their session persistence is intentionally different. Browser local storage preserves an unfinished draft across visits, and **Resume progress** returns to the current accepted tree while browsing another source. The TUI keeps its draft only in the running process; it does not add a separate recovery file or a matching resume action. A loaded document can be written back, and a new tree is copied or printed for insertion into a document.
+
+This first integration keeps the terminal chooser inside its starting repository. The intended later extension is for a selected filesystem path to determine its containing Git repository, allowing another checkout to be selected and reporting paths outside Git clearly. Cross-repository browsing, a terminal return-to-intro action, and terminal reset behavior are deferred rather than made artificial counterparts of browser navigation.

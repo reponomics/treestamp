@@ -7,65 +7,11 @@ from typing import TYPE_CHECKING, ClassVar
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Static, TextArea
+from textual.widgets import Input, Label, Static, TextArea
 
 if TYPE_CHECKING:
-    from textual import events
     from textual.app import ComposeResult
     from textual.binding import BindingType
-
-
-class DocumentChoiceScreen(ModalScreen[str | None]):
-    """Choose how to start editing before a draft is shown."""
-
-    AUTO_FOCUS = "#new"
-    BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("up", "app.focus_previous", "Previous", show=False),
-        Binding("down", "app.focus_next", "Next", show=False),
-        Binding("n", "choose('new')", "New document"),
-        Binding("l", "choose('load')", "Load document"),
-        Binding("q,escape", "quit", "Quit"),
-    ]
-    DEFAULT_CSS = """
-    DocumentChoiceScreen { align: center middle; background: $background; }
-    .choice-panel { width: 90%; max-width: 60; height: auto; padding: 1 2;
-                    border: round $accent; background: $surface; }
-    .choice-panel Label { text-style: bold; margin-bottom: 1; }
-    .choice-panel Button { width: 1fr; margin-bottom: 1; }
-    #choice-description { height: auto; min-height: 2; }
-    #choice-help { color: $text-muted; margin-top: 1; }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="choice-panel"):
-            yield Label("treestamp", markup=False)
-            yield Button("New document", id="new")
-            yield Button("Load document", id="load")
-            yield Static("", id="choice-description", markup=False)
-            yield Static(
-                "↑↓ Choose  Enter Continue\nn New  l Load  Esc/q Quit",
-                id="choice-help",
-                markup=False,
-            )
-
-    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
-        description = (
-            "Start a tree from the repository's staged Git index."
-            if event.widget.id == "new"
-            else "Open a document with an existing treestamp and preview updates "
-            "from the staged Git index."
-        )
-        self.query_one("#choice-description", Static).update(description)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        event.stop()
-        self.dismiss(event.button.id)
-
-    def action_choose(self, operation: str) -> None:
-        self.dismiss(operation)
-
-    def action_quit(self) -> None:
-        self.dismiss(None)
 
 
 class PromptScreen(ModalScreen[str | None]):

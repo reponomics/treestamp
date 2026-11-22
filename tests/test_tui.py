@@ -15,7 +15,8 @@ from treestamp.editor import EditorController
 from treestamp.gitio import Snapshot, capture_snapshot
 from treestamp.model import Entry, Settings, build_tree
 from treestamp.tui import Cursor, TreestampApp
-from treestamp.tui_dialogs import ConfirmScreen, DocumentChoiceScreen, PromptScreen
+from treestamp.tui_dialogs import ConfirmScreen, PromptScreen
+from treestamp.tui_entry import SourceChoiceScreen
 
 from .conftest import Repo, run_cli
 
@@ -46,10 +47,19 @@ async def prompt(pilot: Pilot[bool], key: str) -> Input:
     return pilot.app.screen.query_one("#prompt-input", Input)
 
 
-def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
-    repo: Repo,
-    editor: EditorController,
-    monkeypatch: pytest.MonkeyPatch,
+async def select_source(app: TreestampApp, pilot: Pilot[bool], name: str) -> None:
+    screen = app.screen
+    assert isinstance(screen, SourceChoiceScreen)
+    screen.source_tree.index = next(
+        i
+        for i, row in enumerate(screen.rows)
+        if row.path.relative_to(screen.repository).as_posix() == name
+    )
+    await pilot.pause()
+
+
+def test_cli_starts_with_visual_choice_without_reading_existing_document(
+    repo: Repo, editor: EditorController, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     invalid = "<!-- treestamp:start -->\n<!-- treestamp:end -->\n"
     repo.write("README.md", invalid)
@@ -57,20 +67,12 @@ def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
 
     async def journey(app: TreestampApp) -> bool | None:
         async with app.run_test() as pilot:
-            assert isinstance(app.screen, DocumentChoiceScreen)
+            assert isinstance(app.screen, SourceChoiceScreen)
             assert not app.tree_view.children
             assert app.editor.state.document_path is None
-            await press(pilot, "n")
-            field = app.screen.query_one(Input)
-            assert field.value == "."
-            description = rendered_text(
-                app.screen.query_one("#prompt-description", Static)
-            )
-            assert "relative to the repository root" in description
-            assert "Use . for the repository root (the default)" in description
-            field.value = "./src"
+            await select_source(app, pilot, "src")
             await press(pilot, "enter")
-            assert not isinstance(app.screen, PromptScreen | ConfirmScreen)
+            assert not isinstance(app.screen, SourceChoiceScreen | PromptScreen)
             assert app.session.settings.root == "src"
             assert {node.path for node, _ in app.session.visible_rows()} == {
                 "",
@@ -86,7 +88,7 @@ def test_cli_starts_with_choice_and_new_ignores_invalid_existing_document(
     assert repo.read("README.md") == invalid
 
 
-def test_startup_load_retries_missing_document_and_opens_without_writing(
+def test_startup_load_failure_retains_selection_then_opens_untracked_document(
     repo: Repo, editor: EditorController
 ) -> None:
     destination = repo.path / "tree.md"
@@ -97,29 +99,19 @@ def test_startup_load_retries_missing_document_and_opens_without_writing(
     seed = EditorController(capture_snapshot(repo.path), Settings())
 
     async def journey() -> None:
-        app = TreestampApp(seed, startup_document=destination.relative_to(repo.path))
+        app = TreestampApp(seed, choose_source=True)
         async with app.run_test() as pilot:
-            await press(pilot, "l")
-            field = app.screen.query_one(Input)
-            assert field.value == str(
-                destination.relative_to(editor.state.snapshot.repo)
-            )
-            assert "Opening an existing treestamp" in rendered_text(
-                app.screen.query_one("#prompt-description", Static)
-            )
-            field.value = "missing.md"
+            await select_source(app, pilot, "readme")
+            screen = app.screen
             await press(pilot, "enter")
-            assert isinstance(app.screen, PromptScreen)
-            assert "missing.md" in rendered_text(
-                app.screen.query_one("#prompt-description", Static)
-            )
-            app.screen.query_one(Input).value = str(
-                destination.relative_to(editor.state.snapshot.repo)
-            )
+            assert app.screen is screen
+            assert isinstance(screen, SourceChoiceScreen)
+            assert screen.current.path == repo.path / "readme"
+            assert rendered_text(screen.error)
+            await select_source(app, pilot, "tree.md")
             await press(pilot, "enter")
-            assert not isinstance(app.screen, PromptScreen | ConfirmScreen)
+            assert not isinstance(app.screen, SourceChoiceScreen | PromptScreen)
             assert app.editor.state.document_path == destination
-            assert rendered_text(app.status_widget) == "Treestamp updated"
             assert "new.txt" in app.editor.region_text()
             assert app.editor.dirty
             assert destination.read_bytes() == before
@@ -135,8 +127,7 @@ def test_startup_load_retries_missing_document_and_opens_without_writing(
         pytest.param(
             " ",
             marks=pytest.mark.skipif(
-                os.name == "nt",
-                reason="Win32 normalizes whitespace-only path components",
+                os.name == "nt", reason="Win32 normalizes whitespace-only components"
             ),
         ),
     ],
@@ -152,12 +143,11 @@ def test_startup_preserves_untrimmed_paths(
         write_document(editor.document(), destination, create=True)
 
     async def journey() -> None:
-        app = TreestampApp(editor, startup_document=Path("README.md"))
+        app = TreestampApp(editor, choose_source=True)
         async with app.run_test() as pilot:
-            await press(pilot, "n" if operation == "new" else "l")
-            app.screen.query_one(Input).value = name
+            await select_source(app, pilot, name)
             await press(pilot, "enter")
-            assert not isinstance(app.screen, PromptScreen)
+            assert not isinstance(app.screen, SourceChoiceScreen)
             if operation == "new":
                 assert app.session.settings.root == name
                 assert app.editor.state.root == destination
@@ -169,22 +159,12 @@ def test_startup_preserves_untrimmed_paths(
     asyncio.run(journey())
 
 
-def test_startup_input_cancel_returns_to_choice_and_escape_quits(
-    editor: EditorController,
-) -> None:
+def test_startup_escape_quits_without_creating_draft(editor: EditorController) -> None:
     async def journey() -> None:
-        app = TreestampApp(editor, startup_document=Path("README.md"))
+        app = TreestampApp(editor, choose_source=True)
         async with app.run_test() as pilot:
-            await press(pilot, "n", "escape")
-            assert isinstance(app.screen, DocumentChoiceScreen)
-            await press(pilot, "l")
-            app.screen.query_one(Input).value = ""
-            await press(pilot, "enter")
-            assert isinstance(app.screen, PromptScreen)
-            assert "Enter a root or document path" in rendered_text(
-                app.screen.query_one("#prompt-description", Static)
-            )
-            await press(pilot, "escape", "escape")
+            assert isinstance(app.screen, SourceChoiceScreen)
+            await press(pilot, "escape")
         assert app.return_value is False
 
     asyncio.run(journey())
@@ -679,10 +659,9 @@ def test_new_root_is_chosen_at_startup_and_style_edits_that_tree(
     editor: EditorController,
 ) -> None:
     async def journey() -> None:
-        app = TreestampApp(editor, startup_document=Path("README.md"))
+        app = TreestampApp(editor, choose_source=True)
         async with app.run_test() as pilot:
-            await press(pilot, "n")
-            app.screen.query_one(Input).value = "./src/"
+            await select_source(app, pilot, "src")
             await press(pilot, "enter")
             assert app.session.settings.root == "src"
             assert app.cursor.path == "" and not app.editor.dirty
@@ -758,8 +737,8 @@ def test_cli_explicit_load_opens_document_without_startup_dialogs(
 
     async def journey(app: TreestampApp) -> bool | None:
         async with app.run_test() as pilot:
-            assert not isinstance(app.screen, DocumentChoiceScreen | PromptScreen)
-            assert app.startup_document is None
+            assert not isinstance(app.screen, SourceChoiceScreen | PromptScreen)
+            assert not app.choose_source
             assert app.editor.state.document_path == repo.path / "docs/tree.md"
             assert app.editor.state.snapshot.repo == repo.path
             assert app.session.settings.root == "src"

@@ -68,10 +68,10 @@ Invoke it directly from anywhere within a Git repository. You can also run it di
 pipx run treestamp
 ```
 
-Choose **New document** and select the path where you want the root of the repository tree to be located (defaults to the repository root, `.`, but you can generate a treestamp for any sub-tree in the repository) - the treestamp root is a relative path from the repository's root.
+Browse the opening tree and select a folder, then choose **Create treestamp here**. The repository root is selected initially; you can expand folders to choose a subtree. To edit an existing treestamp, select its document and choose **Load treestamp from document**.
 
 > [!NOTE]
-> Tree-root and document paths entered in the editor, and paths stored in its configuration, are relative to the _repository root_. Entries in the rendered tree are relative to the selected subtree.
+> The opening chooser browses your repository on disk, including untracked documents. The chosen tree root and paths stored in configuration are relative to the _repository root_. Entries in the rendered tree are relative to the selected subtree.
 
 > [!TIP]
 > The terminal editor captures the Git index, so stage additions, deletions, and renames before opening it; untracked files and unstaged changes are not included. The web editor reads the pushed state of the repository's default branch.
@@ -227,13 +227,14 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── sources.py
 │       ├── tui.py
 │       ├── tui_dialogs.py
+│       ├── tui_entry.py
 │       ├── tui_reconcile.py
 │       └── tui_rows.py
-├── tests/ (20 files)  # Contract and integration tests
+├── tests/ (21 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (15 files, 2 folders)
+│   ├── tests/ (16 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -273,13 +274,14 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- sources.py
 |       |-- tui.py
 |       |-- tui_dialogs.py
+|       |-- tui_entry.py
 |       |-- tui_reconcile.py
 |       `-- tui_rows.py
-|-- tests/ (20 files)  # Contract and integration tests
+|-- tests/ (21 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (3 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (15 files, 2 folders)
+|   |-- tests/ (16 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
@@ -317,13 +319,14 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - sources.py
     - tui.py
     - tui_dialogs.py
+    - tui_entry.py
     - tui_reconcile.py
     - tui_rows.py
-- tests/ (20 files)  # Contract and integration tests
+- tests/ (21 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (3 files)
   - src/ (1 folder)
-  - tests/ (15 files, 2 folders)
+  - tests/ (16 files, 2 folders)
   - Dockerfile
   - README.md
   - fly.preview.toml
