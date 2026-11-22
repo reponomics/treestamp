@@ -6,7 +6,13 @@ import os
 import pytest
 
 from tests.conftest import Repo, run_cli
-from treestamp.document import Document, prepare_write, publish_write, render_region
+from treestamp.document import (
+    Document,
+    prepare_write,
+    publish_write,
+    render_region,
+    write_document,
+)
 from treestamp.editor import EditorController
 from treestamp.errors import MarkerError
 from treestamp.gitio import capture_snapshot, document_path
@@ -46,9 +52,9 @@ def test_rejects_nonrelative_or_traversing_document_spelling(
 
 def test_inside_absolute_path_is_rejected_without_touching_files(repo: Repo) -> None:
     editor = editor_for(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     before = repo.read_bytes("tree.md")
-    for operation in (editor.prepare_load, editor.write, editor.create):
+    for operation in (editor.prepare_load, editor.write):
         with pytest.raises(MarkerError, match="relative"):
             operation(str(repo.path / "tree.md"))
     assert repo.read_bytes("tree.md") == before
@@ -60,7 +66,7 @@ def test_nested_cwd_and_tree_root_do_not_rebase_document_paths(
 ) -> None:
     editor = editor_for(repo)
     editor.adopt(editor.prepare_new("src"))
-    editor.create("./tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     monkeypatch.chdir(repo.path / "src")
     assert document_path(repo.path, "./tree.md") == repo.path / "tree.md"
     assert run_cli("check", "tree.md")[0] == 2
@@ -81,13 +87,13 @@ def test_explicit_document_selects_its_own_repository(
     absolute: bool,
 ) -> None:
     editor = editor_for(repo)
-    editor.create("README.md")
+    write_document(editor.document(), repo.path / "README.md", create=True)
     other = Repo(tmp_path_factory.mktemp("other-repository"))
     other.git("init", "-q")
     other.write("other.txt")
     other.add(".")
     other_editor = EditorController(capture_snapshot(other.path), Settings())
-    other_editor.create("README.md")
+    write_document(other_editor.document(), other.path / "README.md", create=True)
     if outside_repository:
         monkeypatch.chdir(tmp_path_factory.mktemp("outside-repository"))
     document = other.path / "README.md"
@@ -102,7 +108,7 @@ def test_explicit_document_selects_its_own_repository(
 @pytest.mark.parametrize("link_parent", [False, True])
 def test_document_symlinks_are_refused(repo: Repo, link_parent: bool) -> None:
     editor = editor_for(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     try:
         if link_parent:
             (repo.path / "alias").symlink_to(repo.path, target_is_directory=True)
@@ -126,7 +132,7 @@ def test_nested_repository_documents_are_refused(repo: Repo) -> None:
     nested.path.mkdir()
     nested.git("init", "-q")
     nested.write("tree.md", editor.region_text())
-    for operation in (editor.prepare_load, editor.write, editor.create):
+    for operation in (editor.prepare_load, editor.write):
         with pytest.raises(MarkerError, match="another repository"):
             operation("nested/tree.md")
 
@@ -147,7 +153,7 @@ def test_submodule_documents_are_refused(repo: Repo, initialized: bool) -> None:
     if not initialized:
         repo.git("submodule", "deinit", "-f", "module")
     with pytest.raises(MarkerError, match="repository|submodule"):
-        editor.create("module/tree.md")
+        editor.write("module/tree.md")
     assert not (repo.path / "module" / "tree.md").exists()
 
 
@@ -160,7 +166,7 @@ def test_document_names_keep_spaces_and_git_bytes(repo: Repo, name: str) -> None
     editor = editor_for(repo)
     assert os.fsencode(document_path(repo.path, name).name) == os.fsencode(name)
     try:
-        editor.create(name)
+        write_document(editor.document(), repo.path / name, create=True)
     except OSError as exc:
         if "\udcff" in name and exc.errno == errno.EILSEQ:
             pytest.skip("filesystem rejects non-UTF-8 names")
@@ -201,7 +207,7 @@ def test_cli_document_symlinks_are_refused_before_normalizing_parents(
     repo: Repo, value: str
 ) -> None:
     editor = editor_for(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     try:
         (repo.path / "alias.md").symlink_to("tree.md")
         (repo.path / "alias").symlink_to(repo.path / "src", target_is_directory=True)
@@ -228,7 +234,7 @@ def test_cli_selects_nested_repository_but_editor_does_not_cross_into_it(
     nested.write("nested.txt")
     nested.add(".")
     nested_editor = EditorController(capture_snapshot(nested.path), Settings())
-    nested_editor.create("tree.md")
+    write_document(nested_editor.document(), nested.path / "tree.md", create=True)
     assert run_cli("check", "nested/tree.md")[0] == 0
     code, output, error = run_cli("--load", "nested/tree.md", "--print")
     assert code == 0 and not error and "nested.txt" in output and "src/" not in output
@@ -239,7 +245,7 @@ def test_cli_selects_nested_repository_but_editor_does_not_cross_into_it(
 @pytest.mark.parametrize("initialized", [False, True])
 def test_cli_submodule_document_ownership(repo: Repo, initialized: bool) -> None:
     editor = editor_for(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     repo.add("tree.md")
     repo.commit()
     repo.git(
@@ -273,7 +279,7 @@ def test_cli_rejects_invalid_document_path_without_writing(
     repo: Repo, value: str
 ) -> None:
     editor = editor_for(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     before = repo.read_bytes("tree.md")
     for arguments in (
         ("check", value),

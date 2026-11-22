@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
-import unicodedata
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from functools import partial
 from typing import TYPE_CHECKING, ClassVar
 
@@ -15,16 +13,19 @@ from textual.app import App
 from textual.binding import Binding
 from textual.widgets import Label, ListItem, ListView, Static
 
-from treestamp.codec import format_counts
-from treestamp.document import ATTRIBUTION_URL, DEFAULT_DOCUMENT_FILE
+from treestamp.document import ATTRIBUTION_URL
 from treestamp.errors import TreestampError
-from treestamp.model import KIND_GITLINK, KIND_SYMLINK
 from treestamp.tui_dialogs import (
     ConfirmScreen,
     DocumentChoiceScreen,
     PreviewScreen,
     PromptScreen,
 )
+from treestamp.tui_reconcile import PlacementChoiceScreen, ReconcileScreen
+from treestamp.tui_rows import Cursor as Cursor
+from treestamp.tui_rows import row_label as _row_label
+from treestamp.tui_rows import safe_text as _safe_text
+from treestamp.tui_rows import tree_prefixes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -34,123 +35,13 @@ if TYPE_CHECKING:
     from textual.binding import BindingType
 
     from treestamp.editor import EditorController, EditorState
-    from treestamp.model import Node
     from treestamp.session import TreeSession
 
 
-@dataclass
-class Cursor:
-    session: TreeSession
-    selected: int = 0
-
-    @property
-    def path(self) -> str:
-        return self.session.visible_rows()[self.selected][0].path
-
-    def move(self, delta: int) -> None:
-        self.selected = min(
-            max(0, self.selected + delta), len(self.session.visible_rows()) - 1
-        )
-
-    def right(self) -> None:
-        rows = self.session.visible_rows()
-        node, level = rows[self.selected]
-        if not node.is_dir:
-            return
-        if node.path in self.session.collapsed:
-            self.session.expand(node.path)
-        elif self.selected + 1 < len(rows) and rows[self.selected + 1][1] > level:
-            self.move(1)
-
-    def left(self) -> None:
-        rows = self.session.visible_rows()
-        node, level = rows[self.selected]
-        if node.path and node.children and node.path not in self.session.collapsed:
-            self.session.collapse(node.path)
-            return
-        for index in range(self.selected - 1, -1, -1):
-            if rows[index][1] < level:
-                self.selected = index
-                break
-
-    def toggle(self) -> None:
-        node, _ = self.session.visible_rows()[self.selected]
-        if node.is_dir and node.path:
-            self.session.toggle(node.path)
-
-    def repair(self, path: str) -> None:
-        """Keep the selected entry, or the nearest surviving row if it vanished."""
-        for index, (node, _) in enumerate(self.session.visible_rows()):
-            if node.path == path:
-                self.selected = index
-                return
-        self.move(0)
-
-    def toggle_hidden(self) -> str:
-        path = self.path
-        if not path:
-            return "The root always stays included."
-        self.session.toggle_hidden(path)
-        self.repair(path)
-        if self.session.is_hidden(path):
-            return f"Hidden: {path} (H reveals hidden entries)"
-        return f"Included: {path}"
-
-    def reveal_hidden(self) -> str:
-        path = self.path
-        self.session.show_hidden = not self.session.show_hidden
-        self.repair(path)
-        return (
-            "Hidden entries revealed for browsing; output is unchanged."
-            if self.session.show_hidden
-            else "Hidden entries concealed from this view."
-        )
-
-    def show_all(self) -> str:
-        path = self.path
-        self.session.unhide_all()
-        self.repair(path)
-        return "All entries included; directory expansion is unchanged."
-
-
-def _label(node: Node) -> str:
-    if node.is_dir:
-        return f"{node.name}/"
-    if node.kind == KIND_GITLINK:
-        return f"{node.name}/  # submodule"
-    if node.kind == KIND_SYMLINK:
-        return f"{node.name} -> {json.dumps(node.target, ensure_ascii=True)}"
-    return node.name
-
-
-def _safe_text(text: str) -> str:
-    """Keep paths, annotations, and filesystem errors on one safe terminal row."""
-    return "".join(
-        json.dumps(char, ensure_ascii=True)[1:-1]
-        if unicodedata.category(char).startswith("C") or char in "\u2028\u2029"
-        else char
-        for char in text
-    )
-
-
-def _row_label(node: Node, session: TreeSession) -> str:
-    closed = node.is_dir and session.is_visibly_collapsed(node.path)
-    label = _label(node)
-    if closed and session.show_counts:
-        files, dirs = session.immediate_counts(node.path)
-        counts = format_counts(files, dirs)
-        if counts:
-            label += " " + counts
-    annotation = session.annotations.get(node.path, "")
-    if annotation:
-        label += f"  # {annotation}"
-    return ("[hidden] " if session.is_hidden(node.path) else "") + label
-
-
 _HELP = (
-    "Edit your tree, then write or copy it. Only Write changes files.",
+    "Edit your tree, then copy or print the complete treestamp.",
     "New and Load capture the staged Git index. Stage changes before opening.",
-    "The captured tree stays fixed until you choose New or Load again.",
+    "The captured tree stays fixed for this editing session.",
     "",
     "NAVIGATE",
     "Up / Down       Select an entry",
@@ -172,12 +63,6 @@ _HELP = (
     "s               Switch between Unicode, ASCII, and list styles",
     "t               Include or remove the Maintained with treestamp trailer",
     "",
-    "DOCUMENT",
-    "N               New document: choose a tree root",
-    "l               Load document: open and update its draft",
-    "n               Write the treestamp to a new file",
-    "w               Write the treestamp into an existing document",
-    "",
     "OUTPUT",
     "v               Preview the printed tree",
     "y               Copy the complete treestamp",
@@ -186,7 +71,15 @@ _HELP = (
     "?               Show this help",
     "q / Esc         Quit; confirm if there are unwritten changes",
     "",
-    "Collapse/write/expand preserves curation during this session.",
+    "ON DOCUMENT LOAD",
+    "If annotations lost their rows, choose whether to place them first.",
+    "One source stays at the top; navigate only the destination tree.",
+    "Enter places; s skips; u undoes the last decision during placement.",
+    "Directories carry matching annotations recursively by relative path.",
+    "Browsing folders leaves the draft unchanged. Placing reveals the target.",
+    "Placement ends before editing. Skipped annotations are left out.",
+    "",
+    "Collapsing a folder preserves its curation during this session.",
     "Reopening restores only printed rows and recorded hiding.",
 )
 STYLES = ("unicode", "ascii", "list")
@@ -245,12 +138,9 @@ class TreestampApp(App[bool]):
         Binding("c", "counts", "Show counts"),
         Binding("s", "style", "Tree style"),
         Binding("t", "attribution", "Attribution trailer"),
-        Binding("N", "new", "New document"),
         Binding("v", "preview", "Preview tree"),
         Binding("y", "copy", "Copy treestamp"),
-        Binding("l", "load", "Load document"),
-        Binding("n", "create", "Write new file"),
-        Binding("w", "document_write", "Write to existing"),
+        Binding("w", "document_write", "Write to document"),
         Binding("q,escape", "quit", "Quit"),
         Binding("p", "print", "Print and exit"),
         Binding("question_mark", "help", "Help"),
@@ -283,6 +173,10 @@ class TreestampApp(App[bool]):
         self.attribution_widget.display = False
         self.status_widget = Static("", markup=False, id="status")
         self.summary_widget = Static("", id="summary")
+        self.document_controls = Static(
+            "[bold]Document[/] w Write to document", classes="controls"
+        )
+        self.document_controls.display = self.editor.state.document_path is not None
         self._rebuilding = False
         self.startup_document = startup_document
 
@@ -297,10 +191,7 @@ class TreestampApp(App[bool]):
             classes="controls",
         )
         yield self.summary_widget
-        yield Static(
-            "[bold]Document[/] N New  l Load  n Write new file  w Write existing",
-            classes="controls",
-        )
+        yield self.document_controls
         yield Static(
             "[bold]Output[/]   v Preview  y Copy  p Print & exit    ? Help  q Quit",
             classes="controls",
@@ -309,6 +200,7 @@ class TreestampApp(App[bool]):
     async def on_mount(self) -> None:
         if self.startup_document is None:
             await self.refresh_tree(self.editor.state.status)
+            self._offer_placement()
         else:
             self._show_startup()
 
@@ -374,31 +266,15 @@ class TreestampApp(App[bool]):
 
     def _tree_items(self) -> list[ListItem]:
         rows = self.session.visible_rows()
-        last_children = {
-            node.path.rpartition("/")[0]: node.path for node, level in rows if level
-        }
-        continuations: dict[str, str] = {}
-        items: list[ListItem] = []
-        for node, level in rows:
-            prefix = ""
-            continuations[node.path] = ""
-            if level:
-                parent = node.path.rpartition("/")[0]
-                last = last_children[parent] == node.path
-                prefix = continuations[parent] + ("└── " if last else "├── ")
-                continuations[node.path] = continuations[parent] + (
-                    "    " if last else "│   "
-                )
-            items.append(
-                ListItem(
-                    Label(
-                        _safe_text(prefix + _row_label(node, self.session)),
-                        markup=False,
-                    ),
-                    classes="hidden-entry" if self.session.is_hidden(node.path) else "",
-                )
+        return [
+            ListItem(
+                Label(
+                    _safe_text(prefix + _row_label(node, self.session)), markup=False
+                ),
+                classes="hidden-entry" if self.session.is_hidden(node.path) else "",
             )
-        return items
+            for (node, _), prefix in zip(rows, tree_prefixes(rows), strict=True)
+        ]
 
     async def refresh_tree(self, status: str = "") -> None:
         self._rebuilding = True
@@ -412,6 +288,7 @@ class TreestampApp(App[bool]):
             self._rebuilding = False
         files, dirs = self.session.hidden_stats()
         self.attribution_widget.display = self.session.settings.attribution
+        self.document_controls.display = self.editor.state.document_path is not None
         self.summary_widget.update(
             "[bold]View[/]     "
             f"c Counts: {'on' if self.session.show_counts else 'off'}  "
@@ -558,114 +435,58 @@ class TreestampApp(App[bool]):
             "paste to confirm your terminal supports it."
         )
 
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "document_write":
+            return self.editor.state.document_path is not None
+        return True
+
     def action_help(self) -> None:
+        lines = list(_HELP)
+        if self.editor.state.document_path is not None:
+            index = lines.index("OUTPUT") + 1
+            lines.insert(index, "w               Write back to the loaded document")
         self.push_screen(
-            PreviewScreen("Keyboard shortcuts", "\n".join(_HELP), soft_wrap=True)
+            PreviewScreen("Keyboard shortcuts", "\n".join(lines), soft_wrap=True)
         )
 
-    def _document_default(self, operation: str) -> str:
-        state = self.editor.state
-        if operation == "create":
-            path = state.root / "tree.md"
+    def _offer_placement(self) -> None:
+        state = self.editor.state.reconciliation
+        if state is None or not state.total:
+            self.editor.state.reconciliation = None
+            return
+        self.push_screen(PlacementChoiceScreen(state.total), self._accept_placement)
+
+    async def _accept_placement(self, accepted: bool | None) -> None:
+        if accepted:
+            self.push_screen(ReconcileScreen(self.editor), self._after_reconcile)
         else:
-            path = state.document_path or state.root / DEFAULT_DOCUMENT_FILE
-        return str(path.relative_to(state.snapshot.repo))
+            await self._after_reconcile(
+                "Continued without placing removed annotations. w writes the draft."
+            )
 
-    def _prompt_document(self, operation: str) -> None:
-        titles = {
-            "load": "Load document",
-            "create": "Write new file",
-            "write": "Write to existing",
-        }
-        description = (
-            OPEN_DESCRIPTION
-            if operation == "load"
-            else "Document paths are relative to the repository root."
-        )
-        dialog = PromptScreen(
-            titles[operation],
-            self._document_default(operation),
-            description=description,
-        )
-        if operation == "load":
-            self.push_screen(dialog, self._accept_load)
-        else:
-            self.push_screen(dialog, partial(self._accept_document_write, operation))
+    async def _after_reconcile(self, status: str | None) -> None:
+        # Placement belongs to loading, not the subsequent editing session.
+        self.editor.state.reconciliation = None
+        await self.refresh_tree(status or "")
 
-    def action_load(self) -> None:
-        self._prompt_document("load")
-
-    def action_new(self) -> None:
-        self.push_screen(
-            PromptScreen("New document", ".", description=NEW_DESCRIPTION),
-            self._accept_new,
-        )
-
-    async def _accept_new(self, value: str | None) -> None:
-        if value is None or value == "":
-            self._set_status("New tree cancelled.")
+    async def action_document_write(self) -> None:
+        path = self.editor.state.document_path
+        if path is None:
             return
         try:
-            candidate = self.editor.prepare_new(value)
+            destination = str(path.relative_to(self.editor.state.snapshot.repo))
+            message = self.editor.write(destination)
         except (TreestampError, OSError, ValueError) as exc:
-            self._set_status(f"New tree failed: {exc}")
+            self._set_status(f"Write failed: {exc}")
             return
-        if self.editor.dirty:
-            self.push_screen(
-                ConfirmScreen("Discard unwritten changes and start a new tree?"),
-                partial(self._confirm_load, candidate),
-            )
-        else:
-            await self._adopt_editor_state(candidate)
-
-    def action_create(self) -> None:
-        self._prompt_document("create")
-
-    def action_document_write(self) -> None:
-        self._prompt_document("write")
-
-    async def _accept_load(self, value: str | None) -> None:
-        if value is None or value == "":
-            self._set_status("Open cancelled.")
-            return
-        try:
-            candidate = self.editor.prepare_load(value)
-        except (TreestampError, OSError, ValueError) as exc:
-            self._set_status(f"Open failed: {exc}")
-            return
-        if self.editor.dirty:
-            self.push_screen(
-                ConfirmScreen("Discard unwritten changes and open this document?"),
-                partial(self._confirm_load, candidate),
-            )
-        else:
-            await self._adopt_editor_state(candidate)
-
-    async def _confirm_load(
-        self, candidate: EditorState, confirmed: bool | None
-    ) -> None:
-        if confirmed:
-            await self._adopt_editor_state(candidate)
-        else:
-            self._set_status("Open cancelled; draft retained.")
+        await self.refresh_tree(message)
 
     async def _adopt_editor_state(self, candidate: EditorState) -> None:
         self.editor.adopt(candidate)
         self.session = candidate.session
         self.cursor = Cursor(candidate.session)
         await self.refresh_tree(candidate.status)
-
-    async def _accept_document_write(self, operation: str, value: str | None) -> None:
-        if value is None or value == "":
-            self._set_status("Write cancelled.")
-            return
-        try:
-            write = self.editor.create if operation == "create" else self.editor.write
-            message = write(value)
-        except (TreestampError, OSError, ValueError) as exc:
-            self._set_status(f"Write failed: {exc}")
-            return
-        await self.refresh_tree(message)
+        self._offer_placement()
 
     async def action_quit(self) -> None:
         if self.editor.dirty:

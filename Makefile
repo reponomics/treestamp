@@ -4,6 +4,8 @@ PYTHON ?= python3
 UV ?= uv
 UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
+VHS ?= vhs
+DEMO_DIR ?= output/reconcile-demo
 DOCKER ?= docker
 DIST_DIR ?= dist
 FLY ?= flyctl
@@ -107,6 +109,13 @@ hook-check: ## Exercise installed repository hooks at HEAD
 	$(PY) scripts/hook_check.py
 pre-commit-check: ## Run the repository development hooks
 	$(VENV)/bin/pre-commit run --all-files
+.PHONY: reconcile-demo reconcile-video
+reconcile-demo: ## Try annotation placement in a disposable example repository
+	PYTHONPATH=src $(PY) scripts/reconcile_demo.py
+
+reconcile-video: ## Record and verify a TUI note-placement demo (requires VHS)
+	PYTHONPATH=src $(PY) scripts/demos/record_reconcile.py --vhs "$(VHS)" --output "$(DEMO_DIR)"
+
 tui: ## Open the editor
 	$(CLI)
 clean: ## Remove generated build and coverage artifacts

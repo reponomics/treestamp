@@ -24,6 +24,7 @@ from treestamp.errors import MarkerError
 from treestamp.gitio import Snapshot, capture_snapshot, document_path
 from treestamp.maintenance import update
 from treestamp.model import Settings, repo_path, tree_path
+from treestamp.reconcile import Reconciliation
 from treestamp.session import TreeSession
 
 if TYPE_CHECKING:
@@ -43,6 +44,7 @@ class EditorState:
     document_snapshot: DocumentSnapshot | None = None
     status: str = ""
     baseline: DocumentSnapshot | bytes | None = None
+    reconciliation: Reconciliation | None = None
 
     @property
     def root(self) -> Path:
@@ -99,7 +101,12 @@ def _prepare_state(
     state = EditorState(session, snapshot, path, saved, baseline=baseline)
     state.status = "Ready to edit a new treestamp."
     if document is not None:
+        state.reconciliation = Reconciliation(document.tree, session)
         state.status = OPEN_UPDATED_NOTICE if state.dirty else "Treestamp is up to date"
+        remaining = state.reconciliation.remaining
+        if remaining:
+            noun = "annotation" if remaining == 1 else "annotations"
+            state.status += f": {remaining} {noun} to review"
     return state
 
 
@@ -166,6 +173,8 @@ class EditorController:
         settings = session.settings
         collapsed, hidden = session.collapsed.copy(), session.hidden.copy()
         annotations = session.annotations.copy()
+        reconciliation = self.state.reconciliation
+        decisions = reconciliation.snapshot() if reconciliation is not None else None
         try:
             yield
             if session.settings != settings:
@@ -175,22 +184,17 @@ class EditorController:
             session.settings = settings
             session.collapsed, session.hidden = collapsed, hidden
             session.annotations = annotations
+            if reconciliation is not None and decisions is not None:
+                reconciliation.restore(decisions)
             raise
 
-    def create(self, path: str) -> str:
-        return self._write(path, create=True)
-
     def write(self, path: str) -> str:
-        return self._write(path, create=False)
-
-    def _write(self, path: str, *, create: bool) -> str:
         repository = self.state.snapshot.repo
         destination = document_path(repository, path)
         result = write_document(
             self.document(),
             destination,
-            create=create,
-            expected=None if create else self._snapshots.get(destination),
+            expected=self._snapshots.get(destination),
             repository=repository,
         )
         self._snapshots[result.path] = result

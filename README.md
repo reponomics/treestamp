@@ -129,20 +129,7 @@ hidden = ["tests"]
 
 The `hidden` array records paths that the user has elected to hide, so that when the treestamp is reloaded, the application can remember: "don't render these in the output." These hidden paths can always be viewed and unhidden in the editor interface.
 
-<details>
-<summary>Alternate bootstrapping method</summary>
 
-Another way to write the initial treestamp is to simply place the boundary markers into the target document, like so:
-
-
-```html
-<!-- treestamp:start -->
-<!-- treestamp:end -->
-```
-
-In the terminal editor, choose **New document**, select the tree root, and edit the tree. When you are ready, choose **Write to existing** and enter the path to the document containing those markers. The application fills the marked region by writing to that file and preserves the surrounding content.
-
-</details>
 
 ### 4. Update an existing treestamp
 
@@ -203,7 +190,7 @@ The editor has to define a reserved sequence to be the delimiter between a filen
 
 Currently, there is also the potential for a treestamp to be corrupted if it contains filenames that have trailing whitespace, and this whitespace is truncated or edited by some automation such as a linter.
 
-The TUI and web editor do not currently detect moves or renames, so annotations on moved entries may be dropped when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
+When a loaded treestamp has annotations whose rows disappeared, the terminal editor offers to place them before editing begins. One source stays at the top while you navigate the updated tree: Enter places it, <kbd>s</kbd> skips it, and <kbd>u</kbd> undoes the last decision. Placing a directory also carries annotations at matching relative paths inside it, recursively; unmatched or conflicting descendants remain in the queue. Declining placement or skipping annotations leaves them out of the written tree. The web editor drops annotations on moved entries when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
 
 treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on preserving the generated tree and configuration between its boundary markers. Manual edits to annotations are supported. Other changes to the tree or configuration should be made through the editor so treestamp can reliably reload the document.
 
@@ -224,7 +211,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── .github/ (9 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
 ├── docs/ (10 files, 1 folder)
-├── scripts/ (9 files)  # Installed-package acceptance
+├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
 │       ├── cli.py
@@ -235,11 +222,14 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── gitio.py
 │       ├── maintenance.py
 │       ├── model.py
+│       ├── reconcile.py
 │       ├── session.py
 │       ├── sources.py
 │       ├── tui.py
-│       └── tui_dialogs.py
-├── tests/ (18 files)  # Contract and integration tests
+│       ├── tui_dialogs.py
+│       ├── tui_reconcile.py
+│       └── tui_rows.py
+├── tests/ (20 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)
@@ -267,7 +257,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- .github/ (9 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
 |-- docs/ (10 files, 1 folder)
-|-- scripts/ (9 files)  # Installed-package acceptance
+|-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
 |       |-- cli.py
@@ -278,11 +268,14 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- gitio.py
 |       |-- maintenance.py
 |       |-- model.py
+|       |-- reconcile.py
 |       |-- session.py
 |       |-- sources.py
 |       |-- tui.py
-|       `-- tui_dialogs.py
-|-- tests/ (18 files)  # Contract and integration tests
+|       |-- tui_dialogs.py
+|       |-- tui_reconcile.py
+|       `-- tui_rows.py
+|-- tests/ (20 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (3 files)
 |   |-- src/ (1 folder)
@@ -308,7 +301,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 - .github/ (9 files, 2 folders)
 - assets/ (2 files, 1 folder)
 - docs/ (10 files, 1 folder)
-- scripts/ (9 files)  # Installed-package acceptance
+- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
     - cli.py
@@ -319,11 +312,14 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - gitio.py
     - maintenance.py
     - model.py
+    - reconcile.py
     - session.py
     - sources.py
     - tui.py
     - tui_dialogs.py
-- tests/ (18 files)  # Contract and integration tests
+    - tui_reconcile.py
+    - tui_rows.py
+- tests/ (20 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (3 files)
   - src/ (1 folder)

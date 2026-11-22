@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Input, Static, TextArea
 
-from treestamp.document import ATTRIBUTION, parse_document
+from treestamp.document import ATTRIBUTION, parse_document, write_document
 from treestamp.editor import EditorController
 from treestamp.gitio import Snapshot, capture_snapshot
 from treestamp.model import Entry, Settings, build_tree
@@ -90,7 +90,7 @@ def test_startup_load_retries_missing_document_and_opens_without_writing(
     repo: Repo, editor: EditorController
 ) -> None:
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(editor.state.snapshot.repo)))
+    write_document(editor.document(), destination, create=True)
     before = destination.read_bytes()
     repo.write("new.txt")
     repo.add("new.txt")
@@ -149,7 +149,7 @@ def test_startup_preserves_untrimmed_paths(
         repo.write(f"{name}/leaf")
         repo.add(".")
     else:
-        editor.create(str(destination.relative_to(editor.state.snapshot.repo)))
+        write_document(editor.document(), destination, create=True)
 
     async def journey() -> None:
         app = TreestampApp(editor, startup_document=Path("README.md"))
@@ -316,9 +316,16 @@ def test_dirty_quit_can_cancel_and_revert(editor: EditorController) -> None:
     asyncio.run(journey())
 
 
-def test_create_write_collapse_and_restore_preserve_transient_state(
+def test_loaded_write_collapse_and_restore_preserve_transient_state(
     editor: EditorController,
 ) -> None:
+    destination = editor.state.root / "tree.md"
+    write_document(
+        editor.document(), editor.state.snapshot.repo / "tree.md", create=True
+    )
+    destination.write_text("# Before\n\n" + destination.read_text() + "\nAfter.\n")
+    editor.adopt(editor.prepare_load("tree.md"))
+
     async def journey() -> None:
         app = TreestampApp(editor)
         async with app.run_test() as pilot:
@@ -327,82 +334,117 @@ def test_create_write_collapse_and_restore_preserve_transient_state(
             field = await prompt(pilot, "a")
             field.value = "remember me"
             await press(pilot, "enter", "home", "down", "space")
-            assert (
-                not app.editor.dirty
-            )  # annotation is hidden in the unchanged saved tree
-            await prompt(pilot, "n")
-            await press(pilot, "enter")
-            destination = editor.state.root / "tree.md"
-            assert destination.exists() and "remember me" not in destination.read_text(
-                encoding="utf-8"
-            )
+            assert not app.editor.dirty  # hidden annotation is not in the output
+            await press(pilot, "w")
+            assert not isinstance(app.screen, PromptScreen)
+            assert "remember me" not in destination.read_text(encoding="utf-8")
             assert not app.editor.dirty
             await press(pilot, "right")
             assert "remember me" in editor.preview()
-            field = await prompt(pilot, "w")
-            assert field.value == str(
-                destination.relative_to(editor.state.snapshot.repo)
-            )
-            await press(pilot, "enter")
-            assert (
-                "remember me" in destination.read_text(encoding="utf-8")
-                and not app.editor.dirty
-            )
+            await press(pilot, "w")
+            content = destination.read_text(encoding="utf-8")
+            assert "remember me" in content and not app.editor.dirty
+            assert content.startswith("# Before\n\n") and content.endswith("\nAfter.\n")
+            assert app.editor.state.document_path == destination
             await press(pilot, "v")
             assert "remember me" in app.screen.query_one(TextArea).text
 
     asyncio.run(journey())
 
 
-def test_invalid_cancelled_and_conflicting_writes_preserve_dirty_draft(
+def test_conflicting_loaded_write_preserves_dirty_draft(
     editor: EditorController,
 ) -> None:
+    write_document(
+        editor.document(), editor.state.snapshot.repo / "tree.md", create=True
+    )
+    editor.adopt(editor.prepare_load("tree.md"))
+    destination = editor.state.root / "tree.md"
+
     async def journey() -> None:
         app = TreestampApp(editor)
         async with app.run_test() as pilot:
             await press(pilot, "c")
-            await prompt(pilot, "w")
-            await press(pilot, "enter")
-            assert "Write failed" in rendered_text(app.status_widget)
-            assert app.editor.dirty
-            await prompt(pilot, "n")
-            await press(pilot, "escape")
-            assert app.editor.dirty
-            await prompt(pilot, "n")
-            await press(pilot, "enter")
-            await press(pilot, "c")
-            destination = editor.state.root / "tree.md"
+            before = app.session.state()
             destination.write_text("concurrent changes", encoding="utf-8")
-            await prompt(pilot, "w")
-            await press(pilot, "enter")
+            await press(pilot, "w")
             assert "Write failed" in rendered_text(app.status_widget)
             assert app.editor.dirty
+            assert app.session.state() == before
             assert destination.read_text(encoding="utf-8") == "concurrent changes"
+            assert not isinstance(app.screen, PromptScreen)
 
     asyncio.run(journey())
 
 
-def test_load_prepares_before_confirmation_and_cancellation_keeps_draft(
-    editor: EditorController,
+@pytest.mark.parametrize("loaded", [False, True])
+def test_retired_editor_actions_cannot_replace_the_draft(
+    editor: EditorController, loaded: bool
 ) -> None:
-    destination = editor.state.root / "tree.md"
-    editor.create(str(destination.relative_to(editor.state.snapshot.repo)))
+    if loaded:
+        write_document(
+            editor.document(), editor.state.snapshot.repo / "tree.md", create=True
+        )
+        editor.adopt(editor.prepare_load("tree.md"))
+    editor.state.session.set_annotation("readme", "Keep my edits")
+    before = editor.state.session.state()
+    document = editor.state.document_path
 
     async def journey() -> None:
         app = TreestampApp(editor)
-        original_session = app.session
         async with app.run_test() as pilot:
-            await press(pilot, "c")
-            field = await prompt(pilot, "l")
-            field.value = str(destination.relative_to(editor.state.snapshot.repo))
-            await press(pilot, "enter")
-            assert isinstance(app.screen, ConfirmScreen)
-            await press(pilot, "n")
-            assert app.session is original_session and app.editor.dirty
-            await prompt(pilot, "l")
-            await press(pilot, "enter", "y")
-            assert app.session is not original_session and not app.editor.dirty
-            assert app.cursor.path == ""
+            await press(pilot, "N", "l", "n")
+            assert len(app.screen_stack) == 1
+            assert app.session.state() == before
+            assert app.editor.state.document_path == document
+            controls = "\n".join(rendered_text(w) for w in app.query(".controls"))
+            assert "New" not in controls and "Load" not in controls
+            assert "Write new" not in controls
+            await press(pilot, "?")
+            help_text = app.screen.query_one(TextArea).text
+            assert ("w               " in help_text) is loaded
+            for obsolete in (
+                "N               ",
+                "l               ",
+                "n               ",
+                "new file",
+            ):
+                assert obsolete not in help_text
+
+    asyncio.run(journey())
+
+
+def test_new_tree_has_no_write_action_and_keeps_copy_available(
+    editor: EditorController, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from treestamp import tui
+
+    sent: list[str] = []
+    monkeypatch.setattr(tui, "_clipboard_command", lambda: None)
+    monkeypatch.setattr(
+        TreestampApp, "copy_to_clipboard", lambda self, text: sent.append(text)
+    )
+    editor.state.session.set_annotation("readme", "Copy this note")
+    before = editor.state.session.state()
+
+    async def journey() -> None:
+        app = TreestampApp(editor)
+        async with app.run_test() as pilot:
+            await press(pilot, "w")
+            assert len(app.screen_stack) == 1
+            assert app.session.state() == before
+            assert editor.state.document_path is None
+            assert not (editor.state.root / "tree.md").exists()
+            assert not (editor.state.root / "README.md").exists()
+            controls = "\n".join(
+                rendered_text(w) for w in app.query(".controls") if w.display
+            )
+            assert "Write" not in controls
+            await press(pilot, "?")
+            assert "w               " not in app.screen.query_one(TextArea).text
+            await press(pilot, "escape", "y")
+            assert sent == [editor.region_text()]
+            assert "Copy this note" in sent[0]
 
     asyncio.run(journey())
 
@@ -596,7 +638,12 @@ def test_controls_remain_visible_and_reflect_view_settings(
     asyncio.run(journey())
 
 
-def test_attribution_toggle_write_load_and_print(editor: EditorController) -> None:
+def test_attribution_toggle_loaded_write_and_print(editor: EditorController) -> None:
+    write_document(
+        editor.document(), editor.state.snapshot.repo / "attributed.md", create=True
+    )
+    editor.adopt(editor.prepare_load("attributed.md"))
+
     async def journey() -> None:
         app = TreestampApp(editor)
         async with app.run_test() as pilot:
@@ -610,11 +657,10 @@ def test_attribution_toggle_write_load_and_print(editor: EditorController) -> No
             assert "Maintained with treestamp" in rendered_text(app.attribution_widget)
             await press(pilot, "v")
             assert app.screen.query_one(TextArea).text.endswith(f"\n\n{ATTRIBUTION}\n")
-            await press(pilot, "escape")
-            field = await prompt(pilot, "n")
-            field.value = "attributed.md"
-            await press(pilot, "enter")
+            await press(pilot, "escape", "w")
             assert not app.editor.dirty
+            saved = parse_document((editor.state.root / "attributed.md").read_bytes())
+            assert saved is not None and saved.settings.attribution
             await press(pilot, "t")
             assert ATTRIBUTION not in app.editor.region_text()
             assert not app.attribution_widget.display
@@ -622,47 +668,28 @@ def test_attribution_toggle_write_load_and_print(editor: EditorController) -> No
             assert ATTRIBUTION not in app.screen.query_one(TextArea).text
             await press(pilot, "escape")
             assert app.editor.dirty
-            # Restore the saved choice through the editor's load flow.
-            field = await prompt(pilot, "l")
-            field.value = "attributed.md"
-            await press(pilot, "enter", "y")
-            assert app.session.settings.attribution
-            assert app.attribution_widget.display
-            assert not app.editor.dirty
-            await press(pilot, "t", "p")
+            await press(pilot, "p")
         assert app.return_value is True
         assert ATTRIBUTION not in app.editor.region_text()
 
     asyncio.run(journey())
 
 
-def test_new_root_and_style_controls(editor: EditorController) -> None:
+def test_new_root_is_chosen_at_startup_and_style_edits_that_tree(
+    editor: EditorController,
+) -> None:
     async def journey() -> None:
-        app = TreestampApp(editor)
+        app = TreestampApp(editor, startup_document=Path("README.md"))
         async with app.run_test() as pilot:
-            await press(pilot, "s")
-            assert app.session.settings.style == "ascii" and app.editor.dirty
-            field = await prompt(pilot, "N")
-            field.value = "./src"
-            await press(pilot, "enter")
-            assert isinstance(app.screen, ConfirmScreen)
             await press(pilot, "n")
-            assert app.session.settings.root == "."
-            field = await prompt(pilot, "N")
-            field.value = "./src/"
-            await press(pilot, "enter", "y")
+            app.screen.query_one(Input).value = "./src/"
+            await press(pilot, "enter")
             assert app.session.settings.root == "src"
-            assert app.session.settings.style == "unicode"
             assert app.cursor.path == "" and not app.editor.dirty
             assert "pkg" in app.session.collapsed
-            field = await prompt(pilot, "N")
-            field.value = "../outside"
-            await press(pilot, "enter")
-            assert "New tree failed" in rendered_text(app.status_widget)
+            await press(pilot, "s")
+            assert app.session.settings.style == "ascii" and app.editor.dirty
             assert app.session.settings.root == "src"
-            await prompt(pilot, "N")
-            await press(pilot, "escape")
-            assert "cancelled" in rendered_text(app.status_widget)
 
     asyncio.run(journey())
 
@@ -673,7 +700,7 @@ def test_open_completion_replaces_generic_unwritten_status(
     from treestamp.editor import OPEN_UPDATED_NOTICE
 
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(editor.state.snapshot.repo)))
+    write_document(editor.document(), destination, create=True)
     repo.write("new.txt")
     repo.add("new.txt")
     editor.adopt(
@@ -690,20 +717,9 @@ def test_open_completion_replaces_generic_unwritten_status(
             assert destination.read_bytes() == before
             await press(pilot, "down")
             assert OPEN_UPDATED_NOTICE not in rendered_text(app.status_widget)
-            await prompt(pilot, "w")
-            await press(pilot, "enter")
+            await press(pilot, "w")
             assert not app.editor.dirty
-            await prompt(pilot, "l")
-            assert rendered_text(
-                app.screen.query_one("#prompt-description", Static)
-            ) == (
-                "Opening an existing treestamp updates its draft from the staged Git index. "
-                "Stage changes before loading. No file is written until you choose Write. "
-                "Document paths are relative to the repository root."
-            )
-            await press(pilot, "enter")
-            assert rendered_text(app.status_widget) == "Treestamp is up to date"
-            assert not app.editor.dirty
+            assert "Wrote treestamped document" in rendered_text(app.status_widget)
 
     asyncio.run(journey())
 
@@ -714,7 +730,8 @@ def test_count_toggle_without_collapsed_folders_does_not_prompt_on_quit(
     editor.state.session.expand("src")
     editor.state.session.expand("src/pkg")
     destination = editor.state.root / "tree.md"
-    editor.create(str(destination.relative_to(editor.state.snapshot.repo)))
+    write_document(editor.document(), destination, create=True)
+    editor.adopt(editor.prepare_load("tree.md"))
 
     async def journey() -> None:
         app = TreestampApp(editor)
@@ -733,7 +750,9 @@ def test_cli_explicit_load_opens_document_without_startup_dialogs(
 ) -> None:
     editor.adopt(editor.prepare_new("src"))
     (repo.path / "docs").mkdir()
-    editor.create("docs/tree.md")
+    write_document(
+        editor.document(), editor.state.snapshot.repo / "docs/tree.md", create=True
+    )
     before = repo.read_bytes("docs/tree.md")
     monkeypatch.chdir(repo.path / "docs")
 
@@ -746,9 +765,11 @@ def test_cli_explicit_load_opens_document_without_startup_dialogs(
             assert app.session.settings.root == "src"
             assert app.tree_view.children
             assert not app.editor.dirty
-            field = await prompt(pilot, "w")
-            assert field.value == str(Path("docs") / "tree.md")
-            await press(pilot, "escape", "q")
+            await press(pilot, "w")
+            assert not isinstance(app.screen, PromptScreen)
+            assert app.editor.state.document_path == repo.path / "docs/tree.md"
+            assert "Wrote treestamped document" in rendered_text(app.status_widget)
+            await press(pilot, "q")
         return app.return_value
 
     monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
@@ -812,7 +833,7 @@ def test_cursor_root_and_leaf_actions_preserve_layout(editor: EditorController) 
 def test_special_entry_labels_preserve_type_and_escape_targets(
     entry: Entry, expected: str
 ) -> None:
-    from treestamp.tui import _label
+    from treestamp.tui_rows import label as _label
 
     assert _label(build_tree([entry]).children[0]) == expected
 
@@ -871,36 +892,6 @@ def test_failed_native_clipboard_reports_error_without_claiming_success(
                 == "Cannot copy with test-clipboard: clipboard unavailable"
             )
             assert editor.state.session.state() == before
-
-    asyncio.run(journey())
-
-
-def test_load_cancel_and_failure_keep_current_draft(editor: EditorController) -> None:
-    before = editor.state
-
-    async def journey() -> None:
-        app = TreestampApp(editor)
-        async with app.run_test():
-            for value in (None, ""):
-                await app._accept_load(value)
-                assert rendered_text(app.status_widget) == "Open cancelled."
-                assert editor.state is before
-            await app._accept_load("missing.md")
-            assert "Open failed:" in rendered_text(app.status_widget)
-            assert "document does not exist" in rendered_text(app.status_widget)
-            assert editor.state is before
-
-    asyncio.run(journey())
-
-
-def test_new_clean_draft_opens_without_discard_prompt(editor: EditorController) -> None:
-    async def journey() -> None:
-        app = TreestampApp(editor)
-        async with app.run_test():
-            await app._accept_new("src")
-            assert app.session.settings.root == "src"
-            assert not editor.dirty
-            assert len(app.screen_stack) == 1
 
     asyncio.run(journey())
 

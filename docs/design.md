@@ -48,7 +48,7 @@ The modules in `src/treestamp/` have narrow responsibilities:
 - **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
 - **Start or load.** In the terminal editor, **New document** starts a tree for a chosen subtree root. **Load document** reads an existing treestamped document and restores its tree, hidden entries, and settings against the current snapshot.
 - **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
-- **Write.** `update` and the editor's **Write to existing** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. **Write new file** creates a new document containing only the region and refuses a path that already exists.
+- **Write.** `update` and the editor's **Write to document** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. The editor offers writing only for a loaded document, and always writes back to that document. New trees are copied or printed for insertion into a document.
 - **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
 - **Copy.** The editor sends the complete treestamp to a native clipboard command if one is on `PATH`, otherwise to the terminal through OSC 52.
 
@@ -118,7 +118,7 @@ Errors are written to standard error, prefixed with `treestamp:`.
 
 ### Terminal editor
 
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
+The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to document (loaded sessions only), `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. New and Load are available only in the opening flow; document paths entered there are relative to the repository root.
 
 ### Document format
 

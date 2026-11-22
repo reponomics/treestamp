@@ -51,12 +51,21 @@ Without `--load`, startup offers **New document** or **Load document**. `--load 
 | `h`, `H`, `S` | Hide/unhide an entry, reveal hidden entries for browsing, unhide all |
 | `a` | Edit the selected entry's annotation |
 | `c`, `s`, `t` | Toggle counts, cycle Unicode/ASCII/list style, toggle attribution footer |
-| `N`, `l` | Start a new document or load an existing one |
-| `n`, `w` | Write a new file or replace the treestamp in an existing file |
+| `w` | Write back to the loaded document (loaded sessions only) |
 | `v`, `y`, `p` | Preview, copy the complete treestamp, print it and exit |
 | `?`, `q` / Escape | Help, quit |
 
-Write new file requires a nonexistent destination. Write to existing requires a boundary-marker pair and preserves content outside it. Empty markers are valid as a write destination, but cannot be loaded as a tree: start with New document, then Write to existing. Copy includes markers and any configuration comment. Unwritten changes require confirmation before quitting or replacing the draft.
+When loading a document leaves annotations without their original rows, the terminal editor asks whether to place them in the updated tree. Enter accepts; Escape continues into the editor without them. This happens for both explicit `--load` and documents selected through the opening flow. New documents and loads without removed annotations open the editor directly. Headless printing and updating do not show the prompt.
+
+During placement, one source stays in a single line above a separator; the rest of the view is the destination tree. Navigate with the arrow keys, press Enter to place the source on the selected row, or `s` to skip it. A directory belongs on a directory; other annotations belong on files or other leaf entries. Opening folders only changes the browser. Placing an annotation expands its destination's ancestors in the actual draft so that the annotation will be written. `H` reveals hidden destinations for browsing; placing on one also unhides it. Replacing an existing annotation requires confirmation. `?` shows the full source, destination, and annotation when a line is truncated.
+
+Placing a directory also carries its pending annotated descendants recursively when their full paths relative to that directory and entry kinds match. An unannotated removed directory can stand for its annotated descendants. Missing paths, kind changes, different existing annotations, and destinations already holding another placed annotation remain for individual decisions. Skipping a directory leaves its descendants available individually. Matching never uses just a basename, and it does not guess renamed paths.
+
+`u` undoes the last decision, including every annotation carried by a directory placement. When the queue is exhausted, the editor opens automatically. Escape skips the remaining items and starts editing. Placement is a one-time step for each document load; there is no placement mode to reopen during editing. Skipped annotations are omitted when writing. No file changes until you choose Write in the main editor.
+
+Run `make reconcile-demo` from a development checkout for a disposable example with moved files, a directory with nested annotations, and a deliberately removed entry. Its writes stay in a temporary repository.
+
+New trees are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. When a session starts by loading a document, Write to document saves directly back to that document and preserves content outside its boundary markers. There is no write action for a new-tree session and no destination picker. New and Load are available only in the opening flow. Unwritten changes require confirmation before quitting.
 
 ## Print without opening the editor
 
