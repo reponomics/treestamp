@@ -18,7 +18,6 @@ DIALOGS = [
     ("#note-dialog", '.row[data-path="src"] [data-action="note"]'),
     ("#keymap-dialog", "#tui-help"),
     ("#repo-info-dialog", "#repo-info"),
-    ("#reload-settings", "#submit"),
 ]
 
 
@@ -47,23 +46,15 @@ def test_backdrop_dismisses_dialog_without_applying_edits(
     dismissal_page: Page, service: str, selector: str, opener: str
 ) -> None:
     page = dismissal_page
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     original_region = page.locator("#region").text_content()
     origin = page.locator(opener)
     origin.click()
     dialog = page.locator(selector)
     expect(dialog).to_be_visible()
-    source = {
-        field: page.locator(field).input_value() for field in ("#root", "#document")
-    }
     if selector == "#note-dialog":
         page.locator("#note-text").fill("discard this draft")
-    elif selector == "#reload-settings":
-        page.locator("#load-tab-new").click()
-        page.locator("#root").fill("src")
-        page.locator("#load-tab-document").click()
-        page.locator("#document").fill("other.md")
 
     bounds = dialog.bounding_box()
     assert bounds is not None and bounds["x"] > 0 and bounds["y"] > 0
@@ -77,17 +68,13 @@ def test_backdrop_dismisses_dialog_without_applying_edits(
     if selector == "#note-dialog":
         origin.click()
         expect(page.locator("#note-text")).to_have_value("")
-    elif selector == "#reload-settings":
-        origin.click()
-        for field, value in source.items():
-            expect(page.locator(field)).to_have_value(value)
 
 
 @pytest.mark.parametrize(("selector", "opener"), DIALOGS)
 def test_drag_from_dialog_to_backdrop_keeps_dialog_open(
     page: Page, service: str, selector: str, opener: str
 ) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     page.locator(opener).click()
     dialog = page.locator(selector)
@@ -104,15 +91,16 @@ def test_drag_from_dialog_to_backdrop_keeps_dialog_open(
 
 
 @pytest.mark.parametrize("operation", ["note", "load"])
-def test_backdrop_preserves_in_flight_dialog_operations(
+def test_in_flight_actions_cannot_be_dismissed_by_outside_clicks(
     page: Page, service: str, operation: str
 ) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     page.evaluate("""() => {
         const fetch = window.fetch.bind(window);
         window.fetch = async (...args) => {
             const response = await fetch(...args);
+            if (String(args[0]).startsWith('/api/browse')) return response;
             await new Promise(resolve => {
                 window.releaseOperation = resolve;
                 document.documentElement.dataset.operationPending = "true";
@@ -127,12 +115,17 @@ def test_backdrop_preserves_in_flight_dialog_operations(
         dialog = page.locator("#note-dialog")
     else:
         page.locator("#submit").click()
-        page.locator("#load-tab-new").click()
         page.locator("#reload").click()
         dialog = page.locator("#reload-settings")
     expect(page.locator("html")).to_have_attribute("data-operation-pending", "true")
     page.mouse.click(1, 1)
     expect(dialog).to_be_visible()
+    if operation == "load":
+        expect(page.locator("#entry-return")).to_be_disabled()
+        expect(page.locator("#entry-change-repo")).to_be_disabled()
+        page.locator(".wordmark").click()
+        expect(page.locator("#reload-settings")).to_be_visible()
+        expect(page.locator("#entry-welcome")).to_be_hidden()
     page.evaluate("window.releaseOperation()")
     expect(dialog).to_be_hidden()
     if operation == "note":

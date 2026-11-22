@@ -13,7 +13,7 @@ pytestmark = pytest.mark.browser
 
 
 def open_editor(page: Page, service: str, *, tui_mode: bool = True) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#submit")).to_be_enabled()
     expect(page.locator("#tui-mode")).to_have_attribute("aria-pressed", "false")
@@ -118,7 +118,9 @@ def test_tui_annotation_uses_dialog_and_preserves_native_text_input(
     expect(docs.locator(".note")).to_have_text("# ahHSf?")
     expect(docs).to_be_focused()
 
-    repository = page.locator("#url")
+    page.locator("#submit").click()
+    page.locator("#entry-change-repo").click()
+    repository = page.locator("#entry-url")
     repository.fill("")
     repository.press_sequentially("ahHSf?")
     expect(repository).to_have_value("ahHSf?")
@@ -335,7 +337,7 @@ def test_show_all_button_works_without_tui_mode(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
     open_editor(page, service, tui_mode=False)
-    if width < 1024:
+    if width < 768:
         page.locator(".settings-open").click()
     with page.expect_response("**/api/op") as response:
         page.get_by_role("button", name="Unhide all", exact=True).click()

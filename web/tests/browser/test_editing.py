@@ -16,9 +16,16 @@ pytestmark = pytest.mark.browser
 
 
 def open_editor(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     page.wait_for_selector("#rows .row")
     expect(page.locator("#submit")).to_be_enabled()
+
+
+def browse_other_repository(page: Page, repository: str) -> None:
+    page.locator("#submit").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-url").fill(repository)
+    page.locator("#entry-browse").click()
 
 
 @pytest.fixture
@@ -34,11 +41,12 @@ def touch_page(browser: Browser) -> Iterator[Page]:
         context.close()
 
 
-def test_the_page_opens_on_the_bundled_example_without_a_request(
+def test_exploring_the_example_opens_it_without_a_request(
     page: Page, service: str
 ) -> None:
     page.route("**/api/preview*", lambda route: route.abort())
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     expect(page.locator("#rows .row")).not_to_have_count(0)
     expect(page.locator("#url")).to_have_value("reponomics/reponomics-dashboard")
     expect(page.locator("#error")).to_be_hidden()
@@ -54,19 +62,18 @@ def test_a_failed_load_keeps_the_open_tree(page: Page, service: str) -> None:
             status=503, json={"error": {"message": "Repository unavailable."}}
         ),
     )
-    page.fill("#url", "fixture/elsewhere")
-    page.click("#submit")
-    expect(page.locator("#reload")).to_have_text("Create treestamp")
+    browse_other_repository(page, "fixture/elsewhere")
+    expect(page.locator("#reload")).to_have_text("Create treestamp here")
     page.click("#reload")
     expect(page.locator("#reload-error")).to_contain_text("Repository unavailable.")
     expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#rows .row")).to_have_count(9)
+    page.locator("#entry-return").click()
     expect(page.locator("#copy")).to_be_visible()
 
 
-@pytest.mark.parametrize("close", ["Cancel", "Escape"])
 def test_cancelling_load_preserves_tree_and_restores_source_fields(
-    page: Page, service: str, close: str
+    page: Page, service: str
 ) -> None:
     open_editor(page, service)
     original_region = page.locator("#region").text_content()
@@ -80,18 +87,11 @@ def test_cancelling_load_preserves_tree_and_restores_source_fields(
             previews.append(request.url) if "/api/preview" in request.url else None
         ),
     )
-    page.locator("#url").fill("fixture/another-repository")
-    page.locator("#submit").click()
+    browse_other_repository(page, "fixture/another-repository")
     expect(page.locator("#reload-settings")).to_be_visible()
-    expect(page.locator("#reload")).to_have_text("Create treestamp")
-    page.locator("#load-tab-document").click()
-    page.locator("#document").fill("docs/README.md")
-    if close == "Cancel":
-        page.locator("#reload-settings").get_by_role(
-            "button", name="Cancel", exact=True
-        ).click()
-    else:
-        page.keyboard.press("Escape")
+    expect(page.locator("#reload")).to_have_text("Create treestamp here")
+    page.locator('.source-row[data-path="src"]').click()
+    page.locator("#entry-return").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#submit")).to_be_focused()
     expect(page.locator("#document")).to_have_value(initial_document)
@@ -125,7 +125,7 @@ def test_dismissing_error_preserves_draft_and_allows_later_errors(
     dismiss.focus()
     dismiss.press("Enter")
     expect(page.locator("#error")).to_be_hidden()
-    expect(page.locator("#url")).to_be_focused()
+    expect(page.locator("#submit")).to_be_focused()
     expect(row.locator(".note")).to_contain_text("Preserve this annotation")
     assert page.locator("#region").text_content() == original_region
     assert page.url == original_address
@@ -259,16 +259,13 @@ def test_invalid_candidate_keeps_the_accepted_draft(
         route.fulfill(response=response, json=body)
 
     page.route("**/api/preview*", invalid_candidate)
-    page.locator("#url").fill("fixture/replacement")
-    page.locator("#submit").click()
+    browse_other_repository(page, "fixture/replacement")
     page.locator("#reload").click()
-    expect(page.locator("#reload-error")).to_contain_text("previous draft is unchanged")
+    expect(page.locator("#reload-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
-    page.locator("#reload-settings").get_by_role(
-        "button", name="Cancel", exact=True
-    ).click()
+    page.locator("#entry-return").click()
     expect(page.locator("#copy")).to_be_enabled()
 
 
@@ -283,7 +280,7 @@ def test_note_save_rejects_unprintable_candidate_without_replacing_draft(
     page.locator("#note-text").fill("last edit")
     page.locator("#note-save").click()
     expect(page.locator("#note-dialog")).to_be_visible()
-    expect(page.locator("#note-error")).to_contain_text("previous draft is unchanged")
+    expect(page.locator("#note-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
     page.locator("#note-cancel").click()
@@ -449,10 +446,9 @@ def test_reopening_after_a_failed_edit_allows_copy(
     page.locator('.row[data-path="docs"] .fold').click()
     expect(page.locator("#error")).to_be_visible()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous draft")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous tree")
     assert page.evaluate("window.copiedBlocks") == [original_region]
-    page.locator("#url").fill("fixture/reopened")
-    page.locator("#submit").click()
+    browse_other_repository(page, "fixture/reopened")
     page.locator("#reload").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#url")).to_have_value("fixture/reopened")
@@ -533,7 +529,7 @@ def test_cancelling_failed_note_preserves_an_earlier_failed_edit(
     note.press("Escape")
     expect(page.locator("#note-dialog")).to_be_hidden()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous draft")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous tree")
 
 
 @pytest.mark.parametrize("close", ["Cancel", "Escape"])
@@ -741,6 +737,6 @@ def test_expired_saved_link_does_not_export_an_unvalidated_placeholder(
     expect(page.locator("#error")).to_contain_text("Load the repository URL again")
     expect(page.locator("#rows .row")).to_have_count(0)
     page.locator("#copy").evaluate("button => button.click()")
-    expect(page.locator("#copy-status")).to_have_text("No draft to copy")
+    expect(page.locator("#copy-status")).to_have_text("No tree to copy")
     expect(page.locator("#copy")).to_be_disabled()
     assert page.evaluate("window.copiedBlocks") == []

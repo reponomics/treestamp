@@ -9,7 +9,7 @@ import json
 import posixpath
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -34,6 +34,7 @@ from treestamp.model import (
     tree_path,
     validate_path,
 )
+from treestamp.reconcile import Reconciliation
 from treestamp.session import SessionState, TreeSession
 from treestamp.sources import tree_from_records
 from treestamp_web.cache import Snapshot, SnapshotCache
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
     from treestamp.model import Node
     from treestamp_web.config import Config
     from treestamp_web.github import GitHubClient, Resolved
+    from treestamp_web.placement import PlacementRequest
 
 DEFAULT_DOCUMENT = "README.md"
 DOCUMENT_CAP = 1024 * 1024
@@ -398,6 +400,7 @@ class Preview:
     dirty: bool
     notice: str | None = None
     default_branch: str | None = None
+    placement: dict[str, object] | None = None
 
     def permalink(self, public_base_url: str | None) -> str:
         root, document = path_value(self.root), path_value(self.document)
@@ -417,7 +420,7 @@ class Preview:
     def to_dict(self, public_base_url: str | None) -> dict[str, object]:
         settings: dict[str, object] = asdict(self.settings)
         settings["root"] = path_value(self.settings.root)
-        return {
+        result: dict[str, object] = {
             "repository": {
                 "owner": self.repository.owner,
                 "name": self.repository.name,
@@ -444,6 +447,9 @@ class Preview:
             "state": self.state,
             "rows": self.rows,
         }
+        if self.placement is not None:
+            result["placement"] = self.placement
+        return result
 
 
 @dataclass
@@ -452,6 +458,69 @@ class _Target:
     root: str
     node: Node
     default_branch: str | None = None
+
+
+def _browse_entries(root: Node) -> list[dict[str, object]]:
+    """Expose source structure without reading document or symlink contents."""
+    entries: list[dict[str, object]] = []
+    pending: list[tuple[Node, str | None]] = [(root, None)]
+    while pending:
+        node, parent = pending.pop()
+        path = node.path or "."
+        kind = "dir" if node.is_dir else "file" if node.kind == "file" else "other"
+        entries.append(
+            {
+                "path": path_value(path),
+                "parent": path_value(parent) if parent is not None else None,
+                "name": path_value(node.name),
+                "kind": kind,
+            }
+        )
+        pending.extend((child, path) for child in reversed(node.children))
+    return entries
+
+
+def _require_new_root(snapshot: Snapshot, root: str) -> None:
+    if root != "." and not any(
+        row.path == root or row.path.startswith(root + "/") for row in snapshot.records
+    ):
+        raise PreviewError(
+            404,
+            "root_not_found",
+            f"Tree root {_display(root)!r} does not exist in this repository snapshot.",
+        )
+
+
+def _check_plain_document(content: bytes, document: str) -> None:
+    try:
+        content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise PreviewError(
+            422, "curation", f"{_display(document)} is not a UTF-8 text document."
+        ) from None
+    if b"\0" in content:
+        raise PreviewError(
+            422, "curation", f"{_display(document)} is not a text document."
+        )
+
+
+def _loaded_document(
+    content: bytes, request: PreviewRequest
+) -> tuple[Document, bytes] | None:
+    try:
+        parsed = parse_document(content, location=request.document, allow_absent=True)
+        if parsed is not None:
+            return parsed, extract_region(content, location=request.document)
+    except MarkerError as exc:
+        raise PreviewError(422, "curation", str(exc)) from None
+    if request.explicit_document:
+        _check_plain_document(content, request.document)
+        raise PreviewError(
+            422,
+            "document_has_no_treestamp",
+            f"No treestamp found in {_display(request.document)}.",
+        )
+    return None
 
 
 class PreviewService:
@@ -470,11 +539,23 @@ class PreviewService:
     def close(self) -> None:
         self._snapshots.close()
 
+    async def browse(self, repo: Repository) -> dict[str, object]:
+        snapshot, acquired = await self._preview_snapshot(repo)
+        entries = _browse_entries(tree_from_records(snapshot.records))
+        if acquired:
+            self._snapshots.put(repo, snapshot)
+        return {
+            "repository": {"owner": repo.owner, "name": repo.name},
+            "entries": entries,
+        }
+
     async def preview(self, request: PreviewRequest) -> Preview:
         repo = request.repository
         snapshot, acquired = await self._preview_snapshot(repo)
         loaded = await self._load_document(snapshot, request, acquired)
         root = request.root if loaded is None else loaded[0].settings.root
+        if loaded is None:
+            _require_new_root(snapshot, root)
         target = await self._target(repo, snapshot, root, acquired)
         settings = Settings(root=root) if loaded is None else loaded[0].settings
         self._preflight(target.node, settings)
@@ -503,6 +584,12 @@ class PreviewService:
             opening=True,
             warnings=[request.notice] if request.notice else [],
         )
+        if loaded is not None:
+            from treestamp_web.placement import summary
+
+            review = Reconciliation(loaded[0].tree, session)
+            if review.total:
+                result = replace(result, placement=summary(review, session))
         if acquired:
             self._snapshots.put(repo, snapshot)
         return result
@@ -525,7 +612,7 @@ class PreviewService:
             request.envelope.generation,
             request.envelope.revision + int(request.op.type != "restore"),
         )
-        return self._compose(
+        result = self._compose(
             request.repository,
             target,
             session,
@@ -533,6 +620,32 @@ class PreviewService:
             envelope,
             reveal=request.reveal,
         )
+        if request.op.type != "restore":
+            self._snapshots.renew(request.repository)
+        return result
+
+    async def place(self, request: PlacementRequest) -> Preview:
+        from treestamp_web.placement import replay, summary
+
+        opening = request.opening
+        snapshot = self._cached_snapshot(opening.repository)
+        if snapshot is None:
+            raise _snapshot_unavailable()
+        target = await self._target(opening.repository, snapshot, opening.root, False)
+        self._preflight(target.node, opening.envelope.curation.settings)
+        session, review = replay(target.node, request)
+        envelope = replace(
+            opening.envelope, curation=session.state(), revision=len(request.decisions)
+        )
+        result = self._compose(
+            opening.repository, target, session, opening.document, envelope
+        )
+        placement = summary(
+            review, session, expanded=request.expanded, reveal=opening.reveal
+        )
+        if request.decisions:
+            self._snapshots.renew(opening.repository)
+        return replace(result, placement=placement)
 
     async def _load_document(
         self, snapshot: Snapshot, request: PreviewRequest, acquired: bool
@@ -564,17 +677,7 @@ class PreviewService:
             raise PreviewError(
                 422, "curation", f"{request.document} is larger than the service reads"
             ) from None
-        try:
-            parsed = parse_document(
-                content,
-                location=request.document,
-                allow_absent=not request.explicit_document,
-            )
-            if parsed is None:
-                return None
-            return parsed, extract_region(content, location=request.document)
-        except MarkerError as exc:
-            raise PreviewError(422, "curation", str(exc)) from None
+        return _loaded_document(content, request)
 
     async def _blob(
         self,

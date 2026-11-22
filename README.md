@@ -45,7 +45,7 @@ treestamp can be accessed locally in your terminal, or online via the web editor
 
 #### In the browser
 
-[Open the web editor](https://treestamp.reponomics.org/); enter a public GitHub repository URL (or `OWNER/REPONAME` form); and choose **Load repo → Create treestamp**. The server will fetch the directory structure of the repository at the HEAD of the default branch, and render a basic tree as a starting point.
+[Open the web editor](https://treestamp.reponomics.org/); enter a public GitHub repository URL (or `OWNER/REPONAME` form); and choose **Browse repository**. Select a folder in the repository tree, then choose **Create treestamp here**. To edit an existing treestamp, select its file and choose **Load treestamp from document**. A document without a treestamp shows a warning and remains selected, so you can choose another document to load. The server reads the repository's default branch and renders a basic tree as a starting point.
 
 #### In your terminal
 
@@ -133,9 +133,9 @@ The `hidden` array records paths that the user has elected to hide, so that when
 
 ### 4. Update an existing treestamp
 
-To load an existing treestamp for editing, enter the path to its document in the editor interface, or run `treestamp --load docs/structure.md` to open it directly. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the draft when loaded into the editor:
+To load an existing treestamp for editing, enter the path to its document in the editor interface, or run `treestamp --load docs/structure.md` to open it directly. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the tree when loaded into the editor:
 
-(i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the draft;
+(i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the tree;
 
 (ii) new tracked entries (files and folders) will be added if they appear beneath already-expanded directories, including the tree root. Entries beneath collapsed directories remain unexpanded, and newly added directories start collapsed.
 
@@ -190,7 +190,7 @@ The editor has to define a reserved sequence to be the delimiter between a filen
 
 Currently, there is also the potential for a treestamp to be corrupted if it contains filenames that have trailing whitespace, and this whitespace is truncated or edited by some automation such as a linter.
 
-When a loaded treestamp has annotations whose rows disappeared, the terminal editor offers to place them before editing begins. One source stays at the top while you navigate the updated tree: Enter places it, <kbd>s</kbd> skips it, and <kbd>u</kbd> undoes the last decision. Placing a directory also carries annotations at matching relative paths inside it, recursively; unmatched or conflicting descendants remain in the queue. Declining placement or skipping annotations leaves them out of the written tree. The web editor drops annotations on moved entries when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
+When a loaded treestamp has annotations whose rows disappeared, the terminal and web editors offer to place them before editing begins. One source stays at the top while you navigate the updated tree: Enter places it, <kbd>s</kbd> skips it, and <kbd>u</kbd> undoes the last decision. Placing a directory also carries annotations at matching relative paths inside it, recursively; unmatched or conflicting descendants remain in the queue. Declining placement or skipping annotations leaves them out of the written tree. Placement is a one-time preparation step; restoring a saved web draft opens the editor directly. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
 
 treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on preserving the generated tree and configuration between its boundary markers. Manual edits to annotations are supported. Other changes to the tree or configuration should be made through the editor so treestamp can reliably reload the document.
 
@@ -210,7 +210,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ./
 ├── .github/ (9 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (10 files, 1 folder)
+├── docs/ (11 files, 1 folder)
 ├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -233,7 +233,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (3 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (14 files, 2 folders)
+│   ├── tests/ (15 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -256,7 +256,7 @@ The alternate styles below are generated from the same tree and checked for fres
 ./
 |-- .github/ (9 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
-|-- docs/ (10 files, 1 folder)
+|-- docs/ (11 files, 1 folder)
 |-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
@@ -279,7 +279,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (3 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (14 files, 2 folders)
+|   |-- tests/ (15 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
@@ -300,7 +300,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 - .github/ (9 files, 2 folders)
 - assets/ (2 files, 1 folder)
-- docs/ (10 files, 1 folder)
+- docs/ (11 files, 1 folder)
 - scripts/ (10 files, 1 folder)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
@@ -323,7 +323,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (3 files)
   - src/ (1 folder)
-  - tests/ (14 files, 2 folders)
+  - tests/ (15 files, 2 folders)
   - Dockerfile
   - README.md
   - fly.preview.toml

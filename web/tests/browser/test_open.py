@@ -21,7 +21,7 @@ def test_updated_open_shows_compact_completion_without_a_confirmation(
         route.fulfill(response=response, json=data)
 
     page.route("**/api/preview*", change_notice)
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#notice")).to_be_hidden()
     expect(page.locator("#stage-status")).to_have_text("Treestamp updated")
@@ -31,7 +31,7 @@ def test_updated_open_shows_compact_completion_without_a_confirmation(
 
 
 def test_unchanged_open_has_no_update_notice(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#notice")).to_be_hidden()
     expect(page.locator("#stage-status")).to_have_text("Treestamp is up to date")
@@ -41,7 +41,7 @@ def test_unchanged_open_has_no_update_notice(page: Page, service: str) -> None:
 def test_unavailable_captured_source_never_falls_back_to_latest_head(
     page: Page, service: str
 ) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     address = page.url
     previews: list[str] = []
@@ -110,7 +110,7 @@ def test_byte_named_row_undo_preserves_identity_after_hiding(
 
     page.route("**/api/preview*", load)
     page.route("**/api/op", operate)
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     row = page.locator('.row[data-path="/git/7372632fff"]')
     expect(row).to_be_visible()
     row.get_by_role("button", name="Hide", exact=True).click()

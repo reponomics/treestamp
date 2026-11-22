@@ -17,7 +17,7 @@ def browser_context_args(browser_context_args: dict) -> dict:
 
 def test_mobile_fold_keeps_page_position(page: Page, service: str) -> None:
     page.set_viewport_size({"width": 390, "height": 500})
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     page.evaluate("document.fonts.ready")
     docs = page.locator('.row[data-path="docs"]')
@@ -43,7 +43,7 @@ def test_directory_row_padding_toggles_once_without_affecting_actions(
     page: Page, service: str, width: int, gesture: str
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     docs = page.locator('.row[data-path="docs"]')
     getattr(docs, gesture)(position={"x": 5, "y": 12})
@@ -65,7 +65,7 @@ def test_pending_fold_respects_scrolling_before_response(
     page: Page, service: str
 ) -> None:
     page.set_viewport_size({"width": 390, "height": 500})
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     page.evaluate("document.fonts.ready")
     page.evaluate("""() => {
@@ -92,7 +92,7 @@ def test_pending_fold_respects_scrolling_before_response(
 
 def test_fold_keeps_desktop_tree_scroll_position(page: Page, service: str) -> None:
     page.set_viewport_size({"width": 1280, "height": 420})
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     src = page.locator('.row[data-path="src"]')
     src.scroll_into_view_if_needed()

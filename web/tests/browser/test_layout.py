@@ -30,7 +30,9 @@ def assert_row_actions_in_view(page: Page) -> None:
     )
 
 
-@pytest.mark.parametrize("width", [320, 390, 1023, 1024, 1025, 1280, 1440, 1920])
+@pytest.mark.parametrize(
+    "width", [320, 390, 767, 768, 900, 1023, 1024, 1025, 1280, 1440, 1920]
+)
 def test_workspace_layout(page: Page, service: str, width: int) -> None:
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(service + "/")
@@ -61,10 +63,9 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
     assert_no_page_overflow(page)
     theme_toggle.click()
 
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
     page.click("#reload")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#submit")).to_be_enabled()
@@ -83,12 +84,22 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
         assert page.evaluate(
             "document.documentElement.scrollHeight <= window.innerHeight"
         )
-        expect(page.locator("#show_counts")).to_be_visible()
-        expect(page.locator(".settings-open")).to_be_hidden()
     else:
-        # Stacked; the settings are a sheet opened from the editor's header.
         assert controls["y"] + controls["height"] <= stage["y"]
         assert controls["width"] == pytest.approx(stage["width"], abs=1)
+    if width >= 768:
+        expect(page.locator("#show_counts")).to_be_visible()
+        expect(page.locator("#reveal")).to_be_visible()
+        expect(page.locator(".settings-open")).to_be_hidden()
+        expect(page.locator(".attribution")).to_be_visible()
+        if width < 1024:
+            repository = page.locator("#form").bounding_box()
+            settings = page.locator("#settings").bounding_box()
+            assert repository is not None and settings is not None
+            assert repository["x"] + repository["width"] <= settings["x"]
+            assert repository["y"] == pytest.approx(settings["y"], abs=1)
+    else:
+        # Phones keep settings in an explicit sheet.
         expect(page.locator("#show_counts")).to_be_hidden()
         page.click(".settings-open")
         expect(page.locator("#show_counts")).to_be_visible()
@@ -103,11 +114,12 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
 
 
 @pytest.mark.parametrize(("width", "height"), [(1280, 800), (1440, 900)])
-def test_desktop_sidebar_fits_and_repository_input_gets_its_own_row(
+def test_desktop_sidebar_fits_with_a_repository_summary(
     page: Page, service: str, width: int, height: int
 ) -> None:
     page.set_viewport_size({"width": width, "height": height})
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     expect(page.locator("#rows .row").first).to_be_visible()
     page.evaluate("document.fonts.ready")
     controls = page.locator(".controls")
@@ -117,12 +129,11 @@ def test_desktop_sidebar_fits_and_repository_input_gets_its_own_row(
         'element => ({scrollHeight: element.scrollHeight, clientHeight: element.clientHeight, children: [...element.querySelectorAll("#form, #form > *, .repo-links, .repo-row, #settings, #settings > *")].map(child => ({id: child.id, class: child.className, rect: child.getBoundingClientRect().toJSON()}))})'
     )
     expect(page.locator("#reveal")).to_be_in_viewport(ratio=1)
-    row = page.locator(".repo-row").bounding_box()
-    field = page.locator("#url").bounding_box()
-    button = page.locator("#submit").bounding_box()
-    assert row is not None and field is not None and button is not None
-    assert field["width"] == pytest.approx(row["width"], abs=1)
-    assert button["y"] >= field["y"] + field["height"]
+    expect(page.locator("#url")).to_be_hidden()
+    expect(page.locator("#active-repository")).to_have_text(
+        "reponomics/reponomics-dashboard"
+    )
+    expect(page.locator("#submit")).to_be_in_viewport(ratio=1)
 
 
 def test_a_tall_tree_scrolls_inside_its_pane_on_a_wide_window(
@@ -131,10 +142,9 @@ def test_a_tall_tree_scrolls_inside_its_pane_on_a_wide_window(
     # A window too short for nine rows: the pane scrolls, the page does not.
     page.set_viewport_size({"width": 1280, "height": 420})
     page.goto(service + "/")
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
     page.click("#reload")
     expect(page.locator("#rows .row")).to_have_count(9)
     assert page.evaluate("document.documentElement.scrollHeight <= window.innerHeight")
@@ -150,10 +160,11 @@ def test_the_settings_sheet_closes_when_the_window_widens(
 ) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     expect(page.locator("#rows .row")).not_to_have_count(0)
     page.click(".settings-open")
     assert page.evaluate("document.getElementById('settings').matches(':popover-open')")
-    page.set_viewport_size({"width": 1280, "height": 800})
+    page.set_viewport_size({"width": 768, "height": 800})
     expect(page.locator("#settings:popover-open")).to_have_count(0)
     expect(page.locator("#show_counts")).to_be_visible()
     expect(page.locator(".settings-open")).to_be_hidden()
@@ -165,10 +176,9 @@ def test_long_note_keeps_other_row_actions_in_view(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(service + "/")
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
     page.click("#reload")
     expect(page.locator("#rows .row")).to_have_count(9)
 
@@ -201,10 +211,9 @@ def test_loaded_tree_is_available_in_first_viewport(
 ) -> None:
     page.set_viewport_size({"width": width, "height": height})
     page.goto(service + "/")
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
     page.click("#reload")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#submit")).to_be_enabled()
@@ -231,7 +240,7 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     page: Page, service: str, width: int
 ) -> None:
     page.set_viewport_size({"width": width, "height": 640})
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#tui-mode")).to_be_visible()
     assert_no_page_overflow(page)
@@ -254,6 +263,7 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
 
     page.locator("#submit").click()
     dialog = page.locator("#reload-settings")
+    expect(page.locator("#reload")).to_be_enabled()
     assert dialog.evaluate("element => element.scrollWidth <= element.clientWidth")
     page.locator("#reload").scroll_into_view_if_needed()
     expect(page.locator("#reload")).to_be_in_viewport(ratio=1)

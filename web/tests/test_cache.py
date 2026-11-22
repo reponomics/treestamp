@@ -33,6 +33,21 @@ def test_snapshots_expire_without_reads_renewing_them() -> None:
     assert cache.stats() == {"trees": 0, "tree_rows": 0, "blobs": 0, "refs": 0}
 
 
+def test_renew_extends_existing_snapshot_but_never_resurrects_it() -> None:
+    clock = Clock()
+    cache = SnapshotCache(make_config(), clock)
+    repo = Repository("o", "r", "a")
+    first = snapshot("a")
+    cache.put(repo, first)
+    clock.now += 3500
+    cache.renew(repo)
+    clock.now += 3599
+    assert cache.get(repo) is first
+    clock.now += 1
+    cache.renew(repo)
+    assert cache.get(repo) is None
+
+
 @pytest.mark.parametrize(
     "limits",
     [

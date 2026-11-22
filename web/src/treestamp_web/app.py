@@ -28,6 +28,7 @@ from treestamp_web.github import (
     UpstreamTimeoutError,
 )
 from treestamp_web.limits import RateLimiter
+from treestamp_web.placement import parse_placement_request
 from treestamp_web.preview import (
     PreviewError,
     PreviewService,
@@ -216,6 +217,27 @@ def create_app(
             }
         )
 
+    @app.get("/api/browse")
+    async def browse(request: Request) -> JSONResponse:
+        identity = _client_identity(request, settings)
+        request.state.client = identity
+        wait = request.app.state.limiter.acquire(identity)
+        if wait is not None:
+            raise PreviewError(
+                429,
+                "rate_limited",
+                "too many requests from this client",
+                retry_after=wait,
+            )
+        params = dict(request.query_params)
+        if params.keys() - {"url", "owner", "repo", "ref"}:
+            raise PreviewError(400, "invalid_settings", "invalid browse parameters")
+        parsed = parse_request(params)
+        request.state.owner = parsed.repository.owner
+        request.state.repo = parsed.repository.name
+        service: PreviewService = request.app.state.service
+        return JSONResponse(await service.browse(parsed.repository))
+
     @app.api_route("/api/preview", methods=["GET", "POST"])
     async def preview(request: Request) -> JSONResponse:
         identity = _client_identity(request, settings)
@@ -284,6 +306,26 @@ def create_app(
             github_calls=client.calls - calls,
             duration_ms=round((clock() - started) * 1000),
         )
+        return JSONResponse(result.to_dict(settings.public_base_url))
+
+    @app.post("/api/placement")
+    async def placement(request: Request) -> JSONResponse:
+        identity = _client_identity(request, settings)
+        request.state.client = identity
+        wait = request.app.state.op_limiter.acquire(identity)
+        if wait is not None:
+            raise PreviewError(
+                429,
+                "rate_limited",
+                "too many operations from this client",
+                retry_after=wait,
+            )
+        data = await _json_body(request, settings.max_state_bytes, "invalid_placement")
+        parsed = parse_placement_request(data)
+        request.state.owner = parsed.opening.repository.owner
+        request.state.repo = parsed.opening.repository.name
+        service: PreviewService = request.app.state.service
+        result = await service.place(parsed)
         return JSONResponse(result.to_dict(settings.public_base_url))
 
     @app.get("/")

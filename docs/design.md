@@ -63,7 +63,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 | `app.py` | Routes, error mapping, security headers, rate limits, and structured logs |
 | `links.py` | Parses user-entered repository links into a validated owner, name, and ref |
 | `github.py` | GitHub REST client with response-size caps, timeouts, and a shared request budget |
-| `cache.py` | Temporary in-memory snapshot retention (one hour per snapshot) |
+| `cache.py` | Temporary in-memory snapshot retention (one hour, renewed by successful edits) |
 | `preview.py` | Opens and edits a document against one snapshot |
 | `limits.py` | Per-client token-bucket rate limits, held in process memory |
 | `proxy.py` | Accepts a visitor address from `CF-Connecting-IP` only when the peer is a configured Cloudflare range |

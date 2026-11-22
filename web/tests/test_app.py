@@ -78,6 +78,103 @@ def test_preview_contract(client: TestClient) -> None:
     assert client.get("/healthz").json()["cache"]["trees"] == 1
 
 
+def test_browse_contract_reads_structure_without_blobs(client: TestClient) -> None:
+    response = client.get("/api/browse", params={"url": "o/r"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["repository"] == {"owner": "o", "name": "r"}
+    entries = {row["path"]: row for row in body["entries"]}
+    assert body["entries"][0] == {
+        "path": ".",
+        "parent": None,
+        "name": ".",
+        "kind": "dir",
+    }
+    assert entries["sub/deep"] == {
+        "path": "sub/deep",
+        "parent": "sub",
+        "name": "deep",
+        "kind": "dir",
+    }
+    assert entries["sub/run.sh"]["kind"] == "file"
+    assert entries["link"]["kind"] == entries["module"]["kind"] == "other"
+    stats = client.get("/healthz").json()["cache"]
+    assert stats["trees"] == 1 and stats["blobs"] == 0
+    # Browsing cannot prevent the following ordinary load from reading its blobs.
+    assert (
+        client.post(
+            "/api/preview", json={"url": "o/r", "root": "sub", "document": ""}
+        ).status_code
+        == 200
+    )
+
+
+def test_browse_preserves_byte_path_identity(client: TestClient, repo: Repo) -> None:
+    name = b"dir\xff/file\xfe.md"
+    oid = repo.git("hash-object", "-w", "--stdin", input_bytes=b"plain text").strip()
+    repo.git(
+        "update-index",
+        "-z",
+        "--index-info",
+        input_bytes=b"100644 " + oid.encode() + b"\t" + name + b"\0",
+    )
+    repo.commit("byte paths", stage=False)
+    body = client.get("/api/browse", params={"url": "o/r"}).json()
+    row = next(
+        row for row in body["entries"] if row["path"] == {"git_bytes": name.hex()}
+    )
+    assert row["parent"] == {"git_bytes": b"dir\xff".hex()}
+    assert row["name"] == {"git_bytes": b"file\xfe.md".hex()}
+    assert row["kind"] == "file"
+
+
+def test_browse_validation_and_rate_limit(fake: FakeGitHub) -> None:
+    app = create_app(
+        make_config(rate_limit_per_minute=2), transport=transport_for(fake)
+    )
+    with TestClient(app) as client:
+        assert (
+            client.get(
+                "/api/browse", params={"url": "o/r", "document": "README.md"}
+            ).status_code
+            == 400
+        )
+        assert client.get("/api/browse", params={"url": "o/r"}).status_code == 200
+        assert client.get("/api/browse", params={"url": "o/r"}).status_code == 429
+
+
+def test_plain_document_load_has_specific_warning_code(
+    client: TestClient, repo: Repo
+) -> None:
+    repo.write("README.md", "# Introduction\n")
+    repo.commit()
+    response = client.post("/api/preview", json={"url": "o/r", "document": "README.md"})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "document_has_no_treestamp"
+    assert response.json()["error"]["message"] == "No treestamp found in README.md."
+    repo.write("README.md", "<!-- treestamp:start -->\n")
+    repo.commit()
+    malformed = client.post(
+        "/api/preview", json={"url": "o/r", "document": "README.md"}
+    )
+    assert malformed.json()["error"]["code"] == "curation"
+
+
+@pytest.mark.parametrize("content", [b"image\x00bytes", b"not UTF-8\xff"])
+def test_plain_binary_file_is_not_a_treestamp_document(
+    client: TestClient, repo: Repo, content: bytes
+) -> None:
+    repo.write("binary.dat").write_bytes(content)
+    repo.commit()
+    response = client.post(
+        "/api/preview",
+        json={"url": "o/r", "document": "binary.dat"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "curation"
+    assert "text document" in response.json()["error"]["message"]
+
+
 def test_application_logs_do_not_include_rate_limit_identity(fake, caplog):
     caplog.set_level("INFO", logger="treestamp_web")
     app = create_app(make_config(trust_proxy=True), transport=transport_for(fake))
@@ -488,6 +585,12 @@ def test_post_preview_opens_byte_sources_and_preserves_spaces(
         {"url": "o/r", "root": {"git_bytes": "xx"}},
         {"url": "o/r", "document": False},
         {"url": "o/r", "depth": "1"},
+        {"url": "o/r", "new_document": True},
+        {"url": "o/r", "document": "README.md", "new_document": False},
+        {"url": "o/r", "document": "", "new_document": True},
+        {"url": "o/r", "document": "README.md", "new_document": "true"},
+        {"url": "o/r", "document": "README.md", "new_document": 1},
+        {"url": "o/r", "document": "README.md", "new_document": None},
     ],
 )
 def test_post_preview_rejects_invalid_selector_values(

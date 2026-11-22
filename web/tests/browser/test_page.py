@@ -16,10 +16,9 @@ REPOSITORY = "fixture/repo"  # the fake maps every name to the fixture checkout
 
 def submit(page: Page, service: str, url: str = REPOSITORY) -> None:
     page.goto(service + "/")
-    page.fill("#url", url)
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
+    page.fill("#entry-url", url)
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
     page.click("#reload")
     expect(page.locator("#reload-settings")).to_be_hidden()
     page.wait_for_selector("#rows .row")
@@ -84,12 +83,12 @@ def test_repository_info_tooltip_does_not_move_the_layout(
     info.press("Escape")
     expect(tooltip).to_be_hidden()
     # A keyboard user can discover the same tooltip by focusing its trigger.
-    page.locator("#url").focus()
+    page.locator("#submit").focus()
     info.focus()
     expect(tooltip).to_be_visible()
     info.press("Escape")
     expect(tooltip).to_be_hidden()
-    expect(page.locator("#submit")).to_have_text("Load repo")
+    expect(page.locator("#submit")).to_have_text("Open another tree")
 
 
 @pytest.mark.parametrize("width", [390, 1280])
@@ -139,7 +138,7 @@ def test_repository_info_keyboard_focus_keeps_tooltip_until_dismissed(
     submit(page, service)
     info = page.get_by_role("button", name="Repository information", exact=True)
     tooltip = page.locator("#repo-tooltip")
-    page.locator("#url").focus()
+    page.locator("#submit").focus()
     page.keyboard.press("Shift+Tab")  # Visit repo
     page.keyboard.press("Shift+Tab")  # Repository information
     expect(info).to_be_focused()
@@ -203,9 +202,11 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
 
 def test_branch_links_open_and_bad_links_explain(page: Page, service: str) -> None:
     submit(page, service, f"https://github.com/{REPOSITORY}/tree/main")
-    page.fill("#url", "not a link")
     page.click("#submit")
-    page.click("#reload")
+    page.click("#entry-change-repo")
+    page.fill("#entry-url", "not a link")
+    page.click("#entry-browse")
+    expect(page.locator("#reload")).to_be_disabled()
     expect(page.locator("#reload-error")).to_be_visible()
     expect(page.locator("#reload-error")).to_contain_text("Accepted forms")
 

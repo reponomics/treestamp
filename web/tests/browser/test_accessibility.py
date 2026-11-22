@@ -11,7 +11,7 @@ pytestmark = pytest.mark.browser
 
 
 def open_editor(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#submit")).to_be_enabled()
 

@@ -19,7 +19,7 @@
 <body class="no-tree">
   <header class="masthead">
     <div class="masthead-inner">
-      <a class="wordmark" href="/">
+      <a class="wordmark" href="/" aria-label="treestamp — choose a repository">
         <svg class="mark" viewBox="0 0 64 64" width="30" height="30" aria-hidden="true" focusable="false">
           <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="5"/>
           <g fill="currentColor">
@@ -43,11 +43,48 @@
     </div>
   </header>
 
-  <main class="workspace">
+  <main id="entry" class="entry">
+    <section id="entry-welcome" class="entry-welcome" aria-labelledby="entry-title">
+      <h2 id="entry-title">Welcome to treestamp</h2>
+      <p class="entry-description">Choose what your directory tree shows. Add a few notes. Copy it into your documentation.</p>
+      <form id="entry-form" autocomplete="off">
+        <label for="entry-url">Public GitHub repository</label>
+        <div class="entry-repo-row">
+          <input id="entry-url" type="text" placeholder="owner/repo or a GitHub link" required spellcheck="false">
+          <button id="entry-browse" type="submit" disabled>Browse repository</button>
+        </div>
+      </form>
+      <p id="entry-error" class="entry-error" role="alert" hidden></p>
+      <div class="entry-offramp"><button id="explore-example" type="button">Explore an example</button></div>
+      <button id="entry-return-welcome" class="entry-return" type="button" hidden>Resume progress</button>
+    </section>
+
+    <section id="reload-settings" class="entry-browser" aria-labelledby="reload-title" hidden>
+      <div class="entry-browser-head">
+        <div><h2 id="reload-title">Where would you like to start?</h2><p id="load-target" class="entry-repository"></p></div>
+        <button id="entry-change-repo" type="button">Back</button>
+      </div>
+      <div class="entry-selection">
+        <div id="source-browser" class="source-browser"></div>
+        <section class="entry-context" aria-label="Selected entry">
+          <div aria-live="polite"><p id="entry-kind" class="entry-eyebrow">Folder</p><h3 id="entry-selection-name">Repository root</h3><p id="entry-explanation">Start a new treestamp with this folder at the top.</p></div>
+          <p id="reload-error" class="entry-error" role="alert" hidden></p>
+          <p id="replace-draft-warning" class="group-note" hidden>A successful load will replace your current tree.</p>
+          <div class="entry-actions"><button id="reload" type="button" disabled>Create treestamp here</button></div>
+        </section>
+      </div>
+      <div class="entry-browser-foot"><button id="entry-return" class="entry-return" type="button" hidden>Resume progress</button></div>
+    </section>
+  </main>
+
+  <input id="root" type="hidden" value=".">
+  <input id="document" type="hidden" value="">
+
+  <main id="workspace" class="workspace" hidden>
     <aside class="controls">
       <form id="form" autocomplete="off">
         <div class="field-head">
-          <label for="url">GitHub repository</label>
+          <span class="repo-heading">Repository</span>
           <div class="repo-links">
             <button id="repo-info" class="icon-button" type="button" aria-label="Repository information" aria-haspopup="dialog" aria-controls="repo-info-dialog" aria-describedby="repo-tooltip" disabled>
               <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.5"/></svg>
@@ -61,22 +98,14 @@
             </a>
           </div>
         </div>
-        <div class="repo-row">
-          <input id="url" name="url" type="text" required spellcheck="false" placeholder="owner/repo or a GitHub link">
+        <div class="repo-row repo-summary">
+          <input id="url" name="url" type="hidden">
+          <p id="active-repository"></p>
           <div class="repo-actions">
-            <button id="submit" type="submit">Load repo</button>
+            <button id="submit" type="submit">Open another tree</button>
           </div>
         </div>
         <p id="status" class="status" role="status" aria-live="polite"></p>
-        <details id="examples" class="examples">
-          <summary><span class="examples-show">Show examples</span><span class="examples-hide">Hide examples</span></summary>
-          <p id="examples-label">Load an example:</p>
-          <div class="example-options" role="group" aria-label="Example repositories">
-            <button type="button" data-example="reponomics-dashboard">reponomics-dashboard</button>
-            <button type="button" data-example="reponomics-dashboard-action">reponomics-dashboard-action</button>
-            <button type="button" data-example="PolicyChecks">PolicyChecks</button>
-          </div>
-        </details>
       </form>
 
       <section id="error" class="panel error" hidden role="alert">
@@ -106,6 +135,7 @@
             </div>
           </fieldset>
           <p id="loaded-note" hidden></p>
+          <div class="settings-reset"><button id="reset-tree" type="button" disabled>Reset tree</button></div>
         </div>
       </section>
     </aside>
@@ -128,6 +158,7 @@
         <span id="copy-status" role="status" aria-live="polite"></span>
       </div>
 
+      <p id="example-context" class="notice" hidden></p>
       <p id="notice" class="notice" role="status" hidden><span id="notice-text"></span> <button id="notice-undo" type="button" class="link">Undo</button></p>
 
       <p id="stage-status" class="stage-status" role="status" aria-live="polite">Loading…</p>
@@ -174,7 +205,7 @@
                 </li>
                 <li>
                   <h3>Curate your tree</h3>
-                  <p>Expand or fold folders, hide entries, and add single-line notes. Your session uses a frozen snapshot. A failed load or edit keeps your previous draft.</p>
+                  <p>Expand or fold folders, hide entries, and add single-line notes. Your session uses a frozen snapshot. A failed load or edit keeps your previous tree.</p>
                 </li>
                 <li>
                   <h3>Copy into your docs</h3>
@@ -195,6 +226,73 @@
       </div>
     </section>
   </main>
+
+  <dialog id="placement-dialog" class="dialog placement-dialog" aria-label="Place notes before editing">
+    <section id="placement-choice">
+      <p class="placement-eyebrow">Before you edit</p>
+      <h2 id="placement-choice-title">Some notes lost their place.</h2>
+      <p>Place them in the updated tree?</p>
+      <p class="group-note">Choose where each note belongs, or leave it out. Nothing is written to the repository.</p>
+      <div class="dialog-actions">
+        <button id="placement-decline" type="button">Continue without them</button>
+        <button id="placement-start" class="primary" type="button">Place notes</button>
+      </div>
+    </section>
+    <section id="placement-work" hidden>
+      <header class="placement-head">
+        <h2>Place notes</h2>
+        <p id="placement-progress" role="status" aria-live="polite"></p>
+      </header>
+      <div class="placement-source-slot">
+        <span class="placement-eyebrow">From</span>
+        <code id="placement-source"></code>
+      </div>
+      <p id="placement-note"></p>
+      <p id="placement-directory-hint" class="group-note" hidden>Matching notes inside this folder follow it recursively. Others stay in the queue.</p>
+      <div class="placement-tree-head">
+        <span>Choose a destination</span>
+        <label class="check"><input id="placement-reveal" type="checkbox"> Show hidden</label>
+      </div>
+      <ul id="placement-rows" role="tree" aria-label="Note destinations" aria-describedby="placement-key-hint"></ul>
+      <div class="placement-target-slot">
+        <span class="placement-eyebrow">To</span>
+        <code id="placement-target"></code>
+        <button id="placement-folder" type="button" hidden>Open folder</button>
+      </div>
+      <p id="placement-target-hint" class="group-note" aria-live="polite"></p>
+      <p id="placement-error" class="dialog-error" role="alert" hidden></p>
+      <footer class="placement-foot">
+        <div class="placement-decisions">
+          <button id="placement-undo" type="button" disabled>Undo</button>
+          <button id="placement-skip" type="button">Skip note</button>
+          <button id="placement-place" class="primary" type="button">Place here</button>
+        </div>
+        <div class="placement-exit">
+          <p id="placement-key-hint" class="group-note">↑↓ Select · ←→ Folders · Enter Place · S Skip · U Undo</p>
+          <button id="placement-finish" type="button" class="link">Skip remaining and edit</button>
+        </div>
+      </footer>
+    </section>
+  </dialog>
+
+  <dialog id="placement-replace-dialog" class="dialog" aria-labelledby="placement-replace-title">
+    <h2 id="placement-replace-title">Replace this note?</h2>
+    <p id="placement-replace-question"></p>
+    <div class="dialog-actions">
+      <button id="placement-replace-cancel" type="button">Keep existing note</button>
+      <button id="placement-replace-accept" class="primary" type="button">Replace note</button>
+    </div>
+  </dialog>
+
+  <dialog id="reset-dialog" class="dialog" aria-labelledby="reset-title" aria-describedby="reset-description">
+    <div class="dialog-head"><h2 id="reset-title">Reset this tree?</h2></div>
+    <p id="reset-description">Return to the tree as originally opened. Your changes to notes, hidden entries, folds, and formatting will be removed.</p>
+    <p class="dialog-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button id="reset-cancel" type="button">Cancel</button>
+      <button id="reset-confirm" type="button">Reset tree</button>
+    </div>
+  </dialog>
 
   <dialog id="note-dialog" class="dialog" aria-labelledby="note-title" aria-describedby="note-path note-hint">
     <form id="note-form">
@@ -251,37 +349,7 @@
     <p>Commit: <code data-repo-commit></code></p>
   </dialog>
 
-  <dialog id="reload-settings" class="dialog" aria-labelledby="reload-title">
-    <div class="dialog-head">
-      <h2 id="reload-title">Load repo</h2>
-    </div>
-    <p id="load-target" class="dialog-path"></p>
-    <div class="tabs load-tabs" role="tablist" aria-label="Document source">
-      <button id="load-tab-new" type="button" role="tab" aria-selected="true" aria-controls="load-panel-new">New document</button>
-      <button id="load-tab-document" type="button" role="tab" aria-selected="false" aria-controls="load-panel-document" tabindex="-1">Load document</button>
-    </div>
-    <div id="load-panel-new" class="settings-group" role="tabpanel" aria-labelledby="load-tab-new">
-      <div class="field field-wide">
-        <label for="root">Tree root</label>
-        <input id="root" name="root" type="text" value="." spellcheck="false" aria-describedby="root-hint">
-        <p id="root-hint" class="group-note">Relative to the repository root. Use . for the whole project.</p>
-      </div>
-    </div>
-    <div id="load-panel-document" class="settings-group" role="tabpanel" aria-labelledby="load-tab-document" hidden>
-      <p id="reload-hint" class="group-note">Opening an existing treestamp updates its draft from a snapshot of the repository's default branch. This does not write to the repository.</p>
-      <div class="field field-wide">
-        <label for="document">Document</label>
-        <input id="document" name="document" type="text" value="" placeholder="e.g. README.md" spellcheck="false" required aria-describedby="document-hint">
-        <p id="document-hint" class="group-note">Path to an existing treestamp document, relative to the repository root.</p>
-      </div>
-    </div>
-    <p id="reload-error" class="dialog-error" role="alert" hidden></p>
-    <p class="dialog-hint">Current changes in the editor will be discarded.</p>
-    <div class="dialog-actions">
-      <form method="dialog"><button>Cancel</button></form>
-      <button id="reload" type="button">Create treestamp</button>
-    </div>
-  </dialog>
+
 
 
 

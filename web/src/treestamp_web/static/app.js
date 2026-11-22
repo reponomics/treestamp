@@ -2,6 +2,9 @@
 // Decisions that need no DOM live in logic.js and are tested with node --test.
 
 import { EXAMPLES } from "./example.js";
+import { EntryFlow } from "./entry-flow.js";
+import { NotePlacement } from "./placement.js";
+import { saveDraft, draftForLocation } from "./draft.js";
 import {
   DEFAULT_DOCUMENT,
   addressFor,
@@ -16,7 +19,6 @@ import {
   rowName,
   rowSuffix,
   settingsFromValues,
-  sourceSelection,
   treeNavigation,
   valuesFromQuery,
   valuesFromSettings,
@@ -32,10 +34,6 @@ const fields = {
   document: document.getElementById("document"),
 };
 const submit = document.getElementById("submit");
-const reloadButton = document.getElementById("reload");
-const reloadSettings = document.getElementById("reload-settings");
-const loadTabs = { new: document.getElementById("load-tab-new"), document: document.getElementById("load-tab-document") };
-const loadPanels = { new: document.getElementById("load-panel-new"), document: document.getElementById("load-panel-document") };
 const visitRepo = document.getElementById("visit-repo");
 const status = document.getElementById("status");
 const errorPanel = document.getElementById("error");
@@ -44,14 +42,13 @@ const errorHint = document.getElementById("error-hint");
 document.getElementById("error-dismiss").addEventListener("click", (event) => {
   const restoreFocus = document.activeElement === event.currentTarget;
   errorPanel.hidden = true;
-  if (restoreFocus) fields.url.focus({ preventScroll: true });
+  if (restoreFocus) submit.focus({ preventScroll: true });
 });
 const repoInfo = document.getElementById("repo-info");
 const repoTooltip = document.getElementById("repo-tooltip");
 const repoInfoDialog = document.getElementById("repo-info-dialog");
 const loadedNote = document.getElementById("loaded-note");
 const settingsPanel = document.getElementById("settings");
-const examples = document.getElementById("examples");
 const tabs = { editor: document.getElementById("tab-editor"), stamp: document.getElementById("tab-stamp"), info: document.getElementById("tab-info") };
 const panels = { editor: document.getElementById("editor-panel"), stamp: document.getElementById("stamp-panel"), info: document.getElementById("info-panel") };
 const tabNames = Object.keys(tabs);
@@ -76,11 +73,15 @@ const noteText = document.getElementById("note-text");
 const noteSave = document.getElementById("note-save");
 const noteCancel = document.getElementById("note-cancel");
 
+const placement = new NotePlacement();
+
 let controller = null;
 let countdown = null;
 // The editing session: identity of the commit plus the state the server hands back.
 let editor = null;
 let editingSession = 0;
+let userEdited = false;
+const exampleContext = document.getElementById("example-context");
 
 // ---------- settings <-> form
 
@@ -122,7 +123,6 @@ function showSettings(data, preserveSource) {
 function setBusy(busy, opening) {
   rowsList.setAttribute("aria-busy", String(busy));
   if (!opening) return;
-  reloadButton.disabled = busy;
   status.classList.toggle("busy", busy);
   if (busy) {
     submit.disabled = true;
@@ -150,6 +150,7 @@ function showError(message, hint, retryAfter) {
   errorMessage.textContent = message;
   errorHint.textContent = hint || "";
   errorPanel.hidden = false;
+  if (!document.getElementById("entry").hidden) entryFlow.showError(message, hint);
   const dialogError = document.querySelector("dialog[open] .dialog-error");
   if (dialogError) {
     dialogError.textContent = [message, hint].filter(Boolean).join(" ");
@@ -389,6 +390,7 @@ function render(data, opening = false) {
   if (opening) {
     editingSession += 1;
     queue = Promise.resolve(true);
+    userEdited = false;
   }
 
   document.querySelectorAll("[data-repo-branch]").forEach((node) => { node.textContent = data.repository.default_branch || "Unavailable"; });
@@ -398,12 +400,9 @@ function render(data, opening = false) {
 
   const address = prepared.address;
   repoInfo.disabled = false;
-  // A pasted link is long enough to be unreadable in the field; the repository it
-  // resolved to is not. Only a fresh open rewrites it, so typing is never disturbed.
-  if (normalizeField) {
-    fields.url.value = `${data.repository.owner}/${data.repository.name}`;
-    normalizeField = false;
-  }
+  document.getElementById("reset-tree").disabled = false;
+  document.getElementById("active-repository").textContent = `${editor.owner}/${editor.repo}`;
+  fields.url.value = `${editor.owner}/${editor.repo}`;
 
   renderRows(editor.rows);
   document.getElementById("tree-attribution").hidden = !data.state.curation.settings.attribution;
@@ -419,6 +418,7 @@ function render(data, opening = false) {
   showAll.disabled = hiddenCount === 0;
   document.body.classList.remove("no-tree");
   history.replaceState(null, "", address);
+  saveDraft(address);
 }
 
 // The marker and config lines are shown quietly so the tree reads first; the text is unchanged.
@@ -467,9 +467,35 @@ function leaveStage() {
 
 // ---------- requests
 
+async function acceptResponse(body, opening, editing, ticket) {
+  try {
+    preparePreview(body, window.location.origin);
+    if (opening && body.placement?.total > 0) body = await placement.run(body);
+    if (!body || ticket !== generation) return false;
+    if (editing) userEdited = true;
+    if (opening) exampleContext.hidden = true;
+    else if (body.state?.revision > 0) userEdited = true;
+    render(body, opening);
+    if (opening && body.placement?.placed_count > 0) userEdited = true;
+    return true;
+  } catch (err) {
+    showError("The page could not display the tree.", String(err && err.message), null);
+    return false;
+  }
+}
+
+function rejectResponse(body, responseStatus) {
+  if (!editor?.rows.length) leaveStage();
+  const error = (body && body.error) || {};
+  const message = error.message || `The service returned status ${responseStatus}.`;
+  showError(message, hintFor(error.code, responseStatus), error.retry_after || null);
+  return false;
+}
+
 // Previews abort whatever is in flight. Operations never abort: each one waits for the
 // previous response so it carries the newest state, which is what keeps notes from being lost.
-async function call(url, init, { abortable }) {
+async function call(url, init, { abortable, editing = false }) {
+  placement.cancel();
   if (controller) controller.abort();
   const mine = new AbortController();
   if (abortable) controller = mine;
@@ -489,24 +515,14 @@ async function call(url, init, { abortable }) {
   }
   if (mine.signal.aborted || ticket !== generation) return false;
   setBusy(false, abortable);
-  if (response.ok && body) {
-    try { render(body, abortable); } catch (err) { showError("The page could not display the tree.", String(err && err.message), null); return false; }
-    return true;
-  }
-  if (!editor?.rows.length) leaveStage();
-  const error = (body && body.error) || {};
-  const message = error.message || `The service returned status ${response.status}.`;
-  showError(message, hintFor(error.code, response.status), error.retry_after || null);
-  return false;
+  if (response.ok && body) return acceptResponse(body, abortable, editing, ticket);
+  return rejectResponse(body, response.status);
 }
-
-let normalizeField = false;
 
 async function preview(params) {
   const session = editingSession;
   await queue;
   if (session !== editingSession) return false;
-  normalizeField = true;
   if (params instanceof URLSearchParams) return call(`/api/preview?${params}`, {}, { abortable: true });
   return call("/api/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) }, { abortable: true });
 }
@@ -525,7 +541,7 @@ function enqueueEdit(action) {
 async function sendOperation(type, path, text) {
   const accepted = editor;
   const body = opBody(editor, settingsFromForm(editor.state.curation.settings), reveal.checked, type, path, text);
-  const saved = await call("/api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { abortable: false });
+  const saved = await call("/api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { abortable: false, editing: type !== "restore" });
   if (!saved && editor === accepted) {
     fields.style.value = accepted.state.curation.settings.style;
     fields.show_counts.checked = accepted.state.curation.settings.show_counts;
@@ -711,109 +727,89 @@ rowsList.addEventListener("keydown", (event) => {
   enqueueEdit((saved) => runTreeCommand(event.key, saved));
 });
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  openLoadDialog();
+const entryFlow = new EntryFlow({
+  onCreate({ url, root }) {
+    return preview({ url, root, document: "" });
+  },
+  onOpen({ url, document }) {
+    return preview({ url, document });
+  },
+  onExample() { loadExample("reponomics-dashboard"); },
+  onCancel() {
+    entryFlow.hide();
+    fields.url.value = `${editor.owner}/${editor.repo}`;
+    errorPanel.hidden = true;
+    submit.focus({ preventScroll: true });
+  },
 });
 
-let loadTarget = "";
-let confirmingLoad = false;
-let sourceBeforeDialog = null;
-let originalSource = {};
-let loadMode = "new";
+function browseRepository(repo) {
+  if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  repoTooltip.hidden = true;
+  entryFlow.browse(repo, { canReturn: Boolean(editor?.rows.length) });
+  document.getElementById("replace-draft-warning").hidden = !userEdited;
+}
 
-function selectLoadTab(mode) {
-  loadMode = mode;
-  for (const key of Object.keys(loadTabs)) {
-    const active = key === mode;
-    loadTabs[key].setAttribute("aria-selected", String(active));
-    loadTabs[key].tabIndex = active ? 0 : -1;
-    loadPanels[key].hidden = !active;
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  browseRepository(fields.url.value.trim());
+});
+
+document.querySelector(".wordmark").addEventListener("click", (event) => {
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  if (entryFlow.busy || (!editor?.rows.length && rowsList.getAttribute("aria-busy") === "true")) return;
+  if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
+  entryFlow.welcome(repo, Boolean(editor?.rows.length));
+});
+
+const resetDialog = document.getElementById("reset-dialog");
+const resetConfirm = document.getElementById("reset-confirm");
+document.getElementById("reset-tree").addEventListener("click", () => {
+  resetDialog.querySelector(".dialog-error").hidden = true;
+  const startingPoint = editor.document ? "Restore the document’s treestamp from the captured repository version." : "Restore this tree’s starting layout and formatting.";
+  document.getElementById("reset-description").textContent = `${startingPoint} Your changes to notes, hidden entries, folds, and formatting will be removed.`;
+  resetDialog.showModal();
+  document.getElementById("reset-cancel").focus();
+});
+document.getElementById("reset-cancel").addEventListener("click", () => resetDialog.close());
+resetDialog.addEventListener("cancel", (event) => {
+  if (resetConfirm.disabled) event.preventDefault();
+});
+
+async function resetTree() {
+  await waitForEdits();
+  const revealed = reveal.checked;
+  reveal.checked = false;
+  const example = Object.entries(EXAMPLES).find(([, data]) =>
+    data.state.generation === editor.state.generation);
+  if (example) {
+    loadExample(example[0]);
+    return true;
   }
-  fields.root.disabled = mode !== "new";
-  fields.document.disabled = mode !== "document";
-  reloadButton.textContent = mode === "new" ? "Create treestamp" : "Load document";
-  reloadSettings.querySelector(".dialog-error").hidden = true;
+  const accepted = await preview({ owner: editor.owner, repo: editor.repo, ref: editor.ref, root: editor.root, document: editor.document });
+  if (!accepted) reveal.checked = revealed;
+  return accepted;
 }
 
-function openLoadDialog() {
-  loadTarget = fields.url.value.trim();
-  sourceBeforeDialog = {
-    root: fields.root.value,
-    document: fields.document.value,
-  };
-  const sameRepo = editor && loadTarget === `${editor.owner}/${editor.repo}`;
-  originalSource = sameRepo ? { root: editor.root, document: editor.loaded ? editor.document : "" } : {};
-  fields.document.value = sameRepo && editor.loaded ? displayPath(editor.document) : DEFAULT_DOCUMENT;
-  fields.root.value = sameRepo ? displayPath(editor.root) : ".";
-  selectLoadTab(sameRepo && editor.loaded ? "document" : "new");
-  document.getElementById("load-target").textContent = loadTarget;
-  reloadSettings.querySelector(".dialog-error").hidden = true;
-  submit.focus({ preventScroll: true });
-  reloadSettings.showModal();
-  const input = loadMode === "new" ? fields.root : fields.document;
-  input.focus();
-  input.select();
-}
+resetConfirm.addEventListener("click", async () => {
+  resetConfirm.disabled = true;
+  document.getElementById("reset-cancel").disabled = true;
+  try {
+    if (await resetTree()) resetDialog.close();
+  } finally {
+    resetConfirm.disabled = false;
+    document.getElementById("reset-cancel").disabled = false;
+  }
+});
 
-// Display controls apply immediately; source fields wait for Load repo confirmation.
+// Presentation changes apply to the current draft; entry choices stay provisional.
 for (const name of ["style", "show_counts", "attribution"]) {
   fields[name].addEventListener("change", () => { if (editor) operate("present"); });
 }
-reloadButton.addEventListener("click", async () => {
-  if (confirmingLoad) return;
-  if (loadMode === "document" && !fields.document.reportValidity()) return;
-  const selection = sourceSelection(formValues(), originalSource);
-  const source = loadMode === "new" ? { root: selection.root, document: "" } : { document: selection.document };
-  const params = { url: loadTarget, ...source };
-  confirmingLoad = true;
-  const cancel = reloadSettings.querySelector('form[method="dialog"] button');
-  cancel.disabled = true;
-  for (const tab of Object.values(loadTabs)) tab.disabled = true;
-  fields.root.disabled = true;
-  fields.document.disabled = true;
-  try {
-    if (await preview(params)) {
-      sourceBeforeDialog = null;
-      reloadSettings.close();
-    }
-  } finally {
-    confirmingLoad = false;
-    cancel.disabled = false;
-    for (const tab of Object.values(loadTabs)) tab.disabled = false;
-    fields.root.disabled = loadMode !== "new";
-    fields.document.disabled = loadMode !== "document";
-  }
-});
-reloadSettings.addEventListener("cancel", (event) => {
-  if (confirmingLoad) event.preventDefault();
-});
-reloadSettings.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.isComposing && event.target.matches("input")) {
-    event.preventDefault();
-    reloadButton.click();
-  }
-});
-Object.entries(loadTabs).forEach(([mode, tab]) => {
-  tab.addEventListener("click", () => selectLoadTab(mode));
-  tab.addEventListener("keydown", (event) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    event.preventDefault();
-    const next = event.key === "Home" ? "new" : event.key === "End" ? "document" : mode === "new" ? "document" : "new";
-    selectLoadTab(next);
-    loadTabs[next].focus();
-  });
-});
-fields.document.addEventListener("input", () => {
-  reloadSettings.querySelector(".dialog-error").hidden = true;
-});
 reveal.addEventListener("change", () => { if (editor) operate("restore"); });
 showAll.addEventListener("click", () => { if (editor) operate("unhide_all"); });
-
-document.querySelectorAll("button[data-example]").forEach((button) => {
-  button.addEventListener("click", () => loadExample(button.dataset.example));
-});
 
 function loadExample(name) {
   if (controller) controller.abort();
@@ -821,9 +817,11 @@ function loadExample(name) {
   generation += 1;
   editingSession += 1;
   queue = Promise.resolve(true);
-  normalizeField = true;
   reveal.checked = false;
   render(structuredClone(EXAMPLES[name]), true);
+  entryFlow.hide(true);
+  exampleContext.textContent = `Example: ${EXAMPLES[name].repository.owner}/${EXAMPLES[name].repository.name}`;
+  exampleContext.hidden = false;
   setBusy(false, true);
 }
 
@@ -862,13 +860,13 @@ copy.addEventListener("click", async () => {
       return;
     }
     if (typeof editor.region !== "string") {
-      setCopyStatus("No draft to copy");
+      setCopyStatus("No tree to copy");
       return;
     }
     const copied = await copyText(region.textContent, region);
     copyLabel.textContent = copied ? "Copied" : "Copy treestamp";
     copy.classList.toggle("copied", copied);
-    const destination = !saved ? "Copied previous draft" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
+    const destination = !saved ? "Copied previous tree" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
     setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Markdown and select the block to copy it manually.");
   } finally {
     copy.disabled = typeof editor?.region !== "string";
@@ -885,17 +883,9 @@ function selectTab(name) {
   }
 }
 
-reloadSettings.addEventListener("close", () => {
-  if (reloadSettings.open) return;
-  if (sourceBeforeDialog) setValues(sourceBeforeDialog);
-  sourceBeforeDialog = null;
-});
-
-// Wide layouts show settings and examples in the sidebar; narrow layouts reveal them on demand.
-const wideLayout = matchMedia("(min-width: 64rem)");
-examples.open = wideLayout.matches;
+// Wide layouts show settings in the sidebar; narrow layouts use a popover.
+const wideLayout = matchMedia("(min-width: 48rem)");
 wideLayout.addEventListener("change", (event) => {
-  examples.open = event.matches;
   if (event.matches && settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
 });
 
@@ -917,24 +907,39 @@ Object.entries(tabs).forEach(([name, tab]) => {
 
 // Permalinks: /owner/repo or /owner/repo@sha, settings in the query, curation in the fragment.
 (function boot() {
+  const local = draftForLocation(window.location);
+  if (local) {
+    history.replaceState(null, "", local.address);
+  }
   const route = parseRoute(window.location.pathname, window.location.hash);
   const query = new URLSearchParams(window.location.search);
   try { setValues(valuesFromQuery(query)); }
   catch (error) { showError(error.message, "", null); leaveStage(); return; }
   const address = window.location.pathname + window.location.search + window.location.hash;
   const example = Object.entries(EXAMPLES).find(([, data]) => addressFor(data.permalink, data.state, window.location.origin) === address);
-  if (!route || example) {
-    // The landing page and unchanged example links open from bundled snapshots.
-    loadExample(example ? example[0] : "reponomics-dashboard");
+  if (example) {
+    loadExample(example[0]);
+    return;
+  }
+  if (!route) {
+    entryFlow.welcome();
     return;
   }
   const { owner, repo, sha, saved } = route;
+  fields.url.value = `${owner}/${repo}`;
+  document.getElementById("active-repository").textContent = `${owner}/${repo}`;
   if (window.location.hash.startsWith("#s=") && !saved) {
-    showError("This link contains invalid editing state.", "Open the repository to create a new draft.", null);
+    entryFlow.hide();
+    showError("This link contains invalid editing state.", "Open the repository to create a new tree.", null);
     return;
   }
   if (!query.has("document")) fields.document.value = DEFAULT_DOCUMENT;
-  fields.url.value = `${owner}/${repo}`;
+  if (!sha && !saved && !window.location.search && !window.location.hash) {
+    browseRepository(`${owner}/${repo}`);
+    return;
+  }
+  // Captured sessions and explicit source settings open the editor directly.
+  entryFlow.hide();
   const fresh = () => {
     const params = settingsParams();
     params.set("owner", owner);
@@ -945,7 +950,7 @@ Object.entries(tabs).forEach(([name, tab]) => {
   };
   if (saved) {
     if (!sha || !saved.source || !saved.curation?.settings) {
-      showError("This link does not contain a valid captured editing session.", "Open the repository to create a new draft.", null);
+      showError("This link does not contain a valid captured editing session.", "Open the repository to create a new tree.", null);
       return;
     }
     editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };

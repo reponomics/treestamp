@@ -76,12 +76,12 @@ def test_force_pushed_default_head_is_acquired_without_rebinding_old_draft(fake,
     assert client.calls == calls
 
 
-def test_edits_cached_url_and_replacement_never_renew_old_deadline(fake, repo):
+def test_successful_edits_renew_only_the_edited_snapshot(fake, repo):
     clock = Clock()
     service, client = service_for(fake, clock)
     first = preview(service)
     clock.now += 2400
-    op(service, first, "annotate", "", "note")
+    edited = op(service, first, "annotate", "", "note")
     repo.commit("replacement head")
     clock.now += 600
     second = preview(service)
@@ -89,10 +89,27 @@ def test_edits_cached_url_and_replacement_never_renew_old_deadline(fake, repo):
     assert preview(service, **pinned(first.commit)).commit == first.commit
     clock.now += 600
     calls = client.calls
+    assert op(service, edited, "restore").region == edited.region
+    clock.now += 2400
     with pytest.raises(PreviewError, match="snapshot is unavailable"):
         op(service, first, "restore")
     assert client.calls == calls
     assert op(service, second, "restore").commit == second.commit
+
+
+def test_restore_and_rejected_edit_do_not_renew_snapshot(fake):
+    clock = Clock()
+    service, client = service_for(fake, clock)
+    first = preview(service)
+    clock.now += 3500
+    assert op(service, first, "restore").region == first.region
+    with pytest.raises(PreviewError):
+        op(service, first, "annotate", "", "invalid\nannotation")
+    clock.now += 100
+    calls = client.calls
+    with pytest.raises(PreviewError, match="snapshot is unavailable"):
+        op(service, first, "restore")
+    assert client.calls == calls
 
 
 def test_successful_fresh_url_load_renews_same_current_snapshot(fake):

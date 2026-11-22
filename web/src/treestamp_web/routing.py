@@ -22,7 +22,11 @@ _REPLAY_MARKERS = (
     "fly-replay-failed",
     "fly-preferred-instance-unavailable",
 )
-_API_METHODS = {"/api/preview": {"GET", "POST"}, "/api/op": {"POST"}}
+_API_METHODS = {
+    "/api/preview": {"GET", "POST"},
+    "/api/op": {"POST"},
+    "/api/placement": {"POST"},
+}
 
 
 def valid_machine_id(value: str | None) -> str | None:
