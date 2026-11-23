@@ -1,0 +1,68 @@
+# UI review log
+
+One rolling record for the [quick local review](ui-review.md). Keep open items until resolved or explicitly accepted; remove resolved history when it stops being useful. Evidence under `output/` is local and may not exist in another checkout, so retain a short reproduction here.
+
+## Latest scan
+
+2026-11-22, candidate `4ab4670`, clean UI at capture. User requested a review of the whole chrome after reporting oversized source selection and poorly placed repository identities. Reused localhost:54597 and the fixture repository; fresh captures in `output/ui-review/` cover entry, source picker, editor, Settings, and Info at 1280×900 light/dark and 390×667 light.
+
+Three parallel inherited GPT-6 reviewers covered typography + measure, spacing, and color; the coordinator operated the entry → picker and editor → Settings/Info flows. No Sonnet agents were available. The short scan found inconsistent scale/insets between entry and editor, detached picker actions, unstructured repository context, and excessive mobile Info insets. Measured primary-button text contrast: 6.62:1 light / 11.07:1 dark; supporting text on selection: 4.74:1 / 5.77:1. These are sampled pairs, not an accessibility certification.
+
+Coverage is partial: error/recovery, placement/conflict, long names, and exhaustive focus/hover states were not included in this scan. The three-minute target was exceeded because capture initially waited on a hidden desktop Settings button; exact elapsed time was not recorded. No further review waves were started. Implementation is a separate pass explicitly requested by the user.
+
+## Open findings
+
+- **Recovery / verified:** Restore a saved draft whose snapshot is unavailable → empty editor says “Copy your current tree” although Copy is hidden → misleading recovery instruction. Reproduce by saving a fixture draft and returning while `/api/op` responds with `410` / `snapshot_unavailable`. Local evidence: `output/ui-critique/expired-draft.png`.
+- **Mobile source selection / remaining discoverability:** With several top-level folders, files initially sit below the internal tree scroll area → document loading still requires discovery by scrolling. The previously offscreen Load action is fixed at 320×568 and 390×667; this remaining point is not a broken action.
+- **Short-height placement / verified:** At 320×568, place notes from a directory → explanatory content and controls consume most of the dialog and Place here extends below the visible area → scrolling is needed to reach the primary action. Rechecked after this polish pass: action spans y556–600. Local evidence: `output/ui-review/after/320-placement.png`.
+
+## Resolved in the current candidate
+
+`672f924`: removed the hide-specific Undo functionality; shortened discard confirmation to the requested text; made Skip remaining and edit a button; distinguished selected rows from hover. Checked in desktop/mobile screenshots and 102 relevant browser tests. This does not resolve the open layout and recovery findings above.
+
+## Current implementation pass
+
+Resolved the scale/alignment findings: entry and picker now use the editor's 16px text baseline and page insets; picker rows are 36px on desktop and 44px on phones; selection actions follow their explanation. Repository context uses the same icon, subdued owner, and stronger name in the picker/editor, with matching name styling in example context. Reduced mobile Info padding. Replaced the promotional entry heading/copy with “Open a repository” and a short folder/document explanation.
+
+Checked the result in light/dark desktop and mobile screenshots. Additional browser walkthrough covered long example repository names, note and keyboard-help dialogs, document selection and placement at 320, 390, 768 and 1280px; no console errors or page-width overflow. The document Load button fits the initial viewport at both 320×568 and 390×667. Evidence: `output/ui-review/after/`, including measured action bounds in `metrics.json`. Existing layout/entry/source-selection/theme/Info browser suite: 55 passed; targeted entry/example follow-up after final copy and phone-height changes: 24 passed. This is a polish pass, not exhaustive state or accessibility QA.
+
+
+## Follow-up: explain note placement
+
+The placement invitation named a symptom without explaining the document/repository mismatch. Both editors now give that context, count notes whose saved paths are absent, and explain the place-or-leave-out choice. User-facing placement and TUI editing terminology uses “notes”; internal annotation names are unchanged. Checked web prompts at 1280×900 and 390×667, and TUI prompts at 80×24 and 60×20, including singular wording. Evidence: `output/note-context/`. Placement browser tests passed (21); core/TUI tests passed after updating an old error-copy assertion (98 cases). This copy fix does not resolve the remaining short-height placement layout finding.
+
+
+## Follow-up: selected-row actions above the tree
+
+Moved Note and Hide/Unhide from individual rows into a shared toolbar joined to the tree. A persistent selected-path label and matching accent edge on the row identify the target even while a toolbar button has focus; button descriptions also reference the selected path. Removed the duplicate Example banner and no-document “treestamp” caption. Loaded document names now sit in repository context. The toolbar stays above the tree, and tree text has no overlaid actions.
+
+Visually checked 1280px light/dark, 390px dark and 320px light; checked scrolling at 390px and 768px. Evidence: `output/row-toolbar/`. Browser regression coverage: 209 existing cases plus two new queued-target cases across a full run and focused reruns. The first run identified an extra document-caption row and a stale tab-order assertion; both were corrected and checked. Verified note-dialog focus, selection after hiding/folding, and queued actions retaining the clicked target when selection changes. Independent code/complexity review completed; this is task-specific verification, not a new five-lens scan. Previously open recovery and short-height placement findings remain open.
+
+
+## Mobile correction: reserve the viewport for the tree
+
+The first toolbar pass left the example tree at about one third of a 390×844 screen. Reduced mobile chrome buttons to 36px, collapsed repository actions into labeled icon controls on one line, and show the repository name without repeating its owner in the visible mobile header; full identity remains accessible and is shown in Repository information. Removed masthead/tab wrapping at narrow widths. Phones now use a fixed-height workspace with an internally scrolling tree, so a short tree does not leave unused space below its pane. The selected-path toolbar remains visible; tablet page scrolling still uses the sticky toolbar with measured keyboard scroll clearance.
+
+Measured example pane: 603px / 844px (71%) at 390px wide, and 327px / 568px (58%) at 320px wide. Added regression contracts for more than half the viewport, viewport containment, accessible icon actions, internal scroll stability and Home selection visibility. The focused mobile/layout/editing/modal checks cover 98 passing cases across targeted runs; prior broader browser coverage is retained. Screenshot evidence in `output/row-toolbar/` was refreshed. This corrects the earlier mobile proportion finding for the editor; remaining source-selection/recovery/placement findings above are separate.
+
+## Tree-first picker and tablet correction
+
+Removed the picker's question heading, repeated selected path, folder/document label, description, and replacement warning. Two short instructions now lead directly to the tree: “New tree — Select folder (root)” and “Load tree — Select file.” The New tree / Load tree action shares the footer with Resume progress. The tree scrolls internally and fills the available height at every width. Removed the now-unused replacement-warning state.
+
+Tablet editing now uses the compact stacked workspace and Settings popover through 1023px, replacing the large settings panel and its divider. Repository actions, view controls, and selected-row actions occupy three rows beneath the masthead. The selected path is no longer printed above the tree; the selected-row highlight, matching action marker, and accessible path descriptions remain. Existing palette and 16px IBM Plex type are retained.
+
+Measured tree panes: editor 807px / 1024px (79%) at 768×1024 and 483px / 700px (69%) at 900×700; picker 348px / 568px (61%) at 320×568. Screenshots: `output/tree-first/`, covering 320, 390, 768, 900, and 1280px in light/dark themes. Independent GPT-6 screenshot/diff review found no material issue within this scope; a separate code review confirmed the warning-state removal has no other behavioral effect. This is a task-specific review, not a fresh five-lens pre-push scan. Safari and browser zoom were not independently checked.
+
+125 targeted browser cases passed: 47 picker/layout/keyboard/focus and 78 editing/reload/draft/placement. New contracts verify tree area, internal scrolling, and both footer actions remaining visible on the same line even with a long source tree. Existing open recovery and short-height placement findings remain; source-file discovery on very short screens still requires tree scrolling.
+
+## Picker tree consistency
+
+The source picker had separate 36px desktop / 44px phone rows, a narrower indentation step, and dot placeholders for files. Replaced those with the editor's shared 32px row rhythm, 16px IBM Plex Mono, four-character indentation, folder weight, and continuous branch guides. Both views now use the same guide-rendering helpers. Removed file dots; a compact 24px disclosure button follows folders that have children, because expanding a folder must remain independent of selecting it as the new root.
+
+Screenshots in `output/picker-density/` compare both views at 390, 768, and 1280px, with measured 32px rows throughout. Independent code review checked sibling/ancestor branch endings and the unchanged selection/toggle behavior. 61 focused browser cases passed, including touch input, matched density/indentation, disclosure independence, branch continuity, picker flows, responsive layout, and editor row interactions. The earlier open recovery and short-height placement findings remain outside this change.
+
+## Note dialog alignment
+
+Removed the duplicate visible Note label while retaining the input's accessible label. Grouped the heading and path on a shared baseline, with long paths wrapping to their own full-width line. Keyboard shortcuts and Cancel/Apply now share a compact footer, wrapping cleanly on phones. Checked light/dark screenshots and long paths at 320, 390, and 1280px in `output/note-polish/`; input naming, focus, Escape, and action visibility were checked manually. Seven existing focused dialog/mobile checks passed. No editing behavior changed.
+
+The note-dialog context was still too verbose: replaced the full path with only the selected file/folder name. Long names stay on one line with ellipsis. The prior long-path wrapping treatment is superseded; full paths are not displayed in this dialog.

@@ -137,7 +137,7 @@ class Reconciliation:
     def _source(self) -> Node:
         source = self.current
         if source is None:
-            raise MarkerError("No annotation is awaiting a decision.")
+            raise MarkerError("No note is awaiting a decision.")
         return source
 
     def skip_current(self) -> None:
@@ -176,12 +176,12 @@ class Reconciliation:
         shown = destination or "."
         if holder is not None:
             return (
-                f"Replace the annotation placed on {shown}? "
+                f"Replace the note placed on {shown}? "
                 f"{holder} will return to the review queue."
             )
         existing = self.session.annotations.get(destination, "")
         if existing and existing != source.annotation:
-            return f"Replace the annotation on {shown}? Undo will restore it."
+            return f"Replace the note on {shown}? Undo will restore it."
         return None
 
     def _reveal(self, destination: str) -> None:
@@ -245,7 +245,7 @@ class Reconciliation:
         source = self._source()
         destination = self._destination(destination)
         if not replace and self.conflict(destination) is not None:
-            raise MarkerError("Placement would replace an existing annotation.")
+            raise MarkerError("Placement would replace an existing note.")
         before = self._decisions()
         collapsed = frozenset(self.session.collapsed)
         hidden = frozenset(self.session.hidden)
@@ -268,7 +268,7 @@ class Reconciliation:
             )
         )
         carried = len(pairs) - 1
-        suffix = f" and {carried} descendant annotations" if carried else ""
+        suffix = f" and {carried} descendant notes" if carried else ""
         return (
             f"Placed {source.path} → {destination or '.'}{suffix}; "
             f"{self.remaining} remain."

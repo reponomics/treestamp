@@ -94,7 +94,8 @@ def test_navigation_leaves_note_carets_and_native_button_space_intact(
     expect(row(page, "docs/api.md")).to_have_count(1)
     expect(docs).to_be_focused()
 
-    docs.locator('[data-action="note"]').focus()
+    docs.focus()
+    page.locator("#row-note").focus()
     page.keyboard.press("Space")
     note = page.locator("#note-text")
     expect(note).to_be_focused()
@@ -106,7 +107,7 @@ def test_navigation_leaves_note_carets_and_native_button_space_intact(
         note.press(key)
         expect(note).to_be_focused()
     note.press("Escape")
-    expect(docs.locator('[data-action="note"]')).to_be_focused()
+    expect(page.locator("#row-note")).to_be_focused()
     expect(row(page, "docs/api.md")).to_have_count(1)
     docs.focus()
     for key in [
@@ -126,7 +127,8 @@ def test_navigation_handles_excluded_children_without_jumping_to_a_sibling(
     open_editor(page, service)
     for path in ["docs/api.md", "docs/guide.md"]:
         child = row(page, path)
-        child.locator('[data-action="visibility"]').click()
+        child.focus()
+        page.locator("#row-visibility").click()
         expect(child).to_have_count(0)
     docs = row(page, "docs")
     docs.focus()

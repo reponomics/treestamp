@@ -173,9 +173,9 @@ def test_empty_queue_actions_are_safe_or_rejected() -> None:
     state = reconcile(notes={})
     assert state.current is None and state.total == 0
     assert not state.can_undo
-    with pytest.raises(MarkerError, match="No annotation"):
+    with pytest.raises(MarkerError, match="No note"):
         state.skip_current()
-    with pytest.raises(MarkerError, match="No annotation"):
+    with pytest.raises(MarkerError, match="No note"):
         state.place("new/a")
 
 
@@ -190,7 +190,7 @@ def test_unannotated_grandparent_groups_recursive_annotations() -> None:
     assert state.total == state.remaining == state.unplaced == 3
     before = state.snapshot(), state.session.state()
     message = state.place("new")
-    assert "3 descendant annotations" in message
+    assert "3 descendant notes" in message
     assert state.current is None and state.remaining == state.unplaced == 0
     assert state.placed_count == 3
     assert state.session.annotations == {

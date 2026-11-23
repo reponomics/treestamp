@@ -85,10 +85,10 @@ def open_document(page: Page, base: str) -> None:
     page.get_by_label("Public GitHub repository").fill("fixture/repo")
     page.get_by_role("button", name="Browse repository", exact=True).click()
     page.locator('#source-browser [data-path="README.md"]').click()
-    page.get_by_role("button", name="Load treestamp from document", exact=True).click()
+    page.get_by_role("button", name="Load tree", exact=True).click()
     expect(page.locator("#placement-dialog")).to_be_visible()
-    expect(page.locator("#placement-choice-title")).to_have_text(
-        "4 notes lost their place."
+    expect(page.locator("#placement-choice-summary")).to_have_text(
+        "4 notes refer to paths that are no longer in the tree."
     )
 
 
@@ -302,8 +302,8 @@ def test_fresh_same_document_load_restarts_placement_without_losing_saved_draft(
     page.locator("#submit").click()
     page.locator('#source-browser [data-path="README.md"]').click()
     page.locator("#reload").click()
-    expect(page.locator("#placement-choice-title")).to_have_text(
-        "4 notes lost their place."
+    expect(page.locator("#placement-choice-summary")).to_have_text(
+        "4 notes refer to paths that are no longer in the tree."
     )
     page.locator("#placement-start").click()
     expect(page.locator("#placement-source")).to_have_text("old-tools/")
@@ -417,7 +417,8 @@ def test_discard_restores_post_placement_session_without_reopening_queue(
     baseline = page.locator("#region").text_content()
     assert baseline and "Historical importer" not in baseline
     assert ("Data preparation tools" in baseline) == transfer
-    page.locator('.row[data-path="keep.py"] [data-action="note"]').click()
+    page.locator('.row[data-path="keep.py"]').focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("An edit after placing")
     page.locator("#note-save").click()
     expect(page.locator("#region")).to_contain_text("An edit after placing")
@@ -457,7 +458,8 @@ def test_failed_discard_of_placed_document_preserves_storage_and_can_retry(
     start(page, placement_service)
     place_folder_and_finish(page)
     baseline = page.locator("#region").text_content()
-    page.locator('.row[data-path="keep.py"] [data-action="note"]').click()
+    page.locator('.row[data-path="keep.py"]').focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("Keep this until discard succeeds")
     page.locator("#note-save").click()
     expect(page.locator("#region")).to_contain_text("Keep this until discard succeeds")

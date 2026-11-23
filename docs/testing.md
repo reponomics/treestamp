@@ -42,6 +42,8 @@ Non-trivial changes must add or update automated tests in the same pull request,
 
 Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the relevant suites, need no new tests. Run focused checks while implementing a change and the relevant complete checks before review. Automated browser tests do not replace manual checks of keyboard operation, terminal display, or clipboard delivery.
 
+Before pushing web UI changes, use the [quick local UI review](ui-review.md): five narrow lenses, a three-minute total time box, and one [rolling findings log](ui-review-log.md). This is report-only: no automatic fixes or push gate. It complements the automated checks without making the maintainer the first person to see incomplete UI states.
+
 ## Suites and commands
 
 Run commands from the repository root after `make install`; use the Node version in `.nvmrc` through nvm. The frontend needs no npm installation or bundling step.

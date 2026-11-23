@@ -27,17 +27,19 @@ def test_first_visit_waits_for_intent_and_browsing_does_not_create_a_draft(
         ),
     )
     page.goto(service + "/")
-    expect(page.get_by_role("heading", name="Welcome to treestamp")).to_be_visible()
+    expect(page.get_by_role("heading", name="Open a repository")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("dialog[open]")).to_have_count(0)
     assert requests == []
     page.get_by_label("Public GitHub repository").fill("fixture/repo")
     page.get_by_role("button", name="Browse repository", exact=True).click()
     choose(page, "src")
-    expect(page.locator("#entry-selection-name")).to_have_text("src")
+    expect(page.locator('.source-row[data-path="src"]')).to_have_attribute(
+        "aria-selected", "true"
+    )
     assert all("/api/browse?" in url for url in requests)
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") is None
-    page.get_by_role("button", name="Create treestamp here", exact=True).click()
+    page.get_by_role("button", name="New tree", exact=True).click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#rows .row")).to_have_count(3)
     expect(page.locator("#region")).to_contain_text('root = "src"')
@@ -61,9 +63,11 @@ def test_example_offramp_opens_one_curated_editor_without_requests(
     page.get_by_role("button", name="Explore an example", exact=True).click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#entry")).to_be_hidden()
-    expect(page.locator("#example-context")).to_have_text(
-        "Example: reponomics/reponomics-dashboard"
+    expect(page.locator("#example-context")).to_have_count(0)
+    expect(page.locator("#active-repository")).to_have_text(
+        "reponomics/reponomics-dashboard"
     )
+    expect(page.locator(".canvas-caption")).to_be_hidden()
     expect(page.locator("#rows")).to_contain_text(
         "Choose repositories and publishing options"
     )
@@ -76,7 +80,7 @@ def test_bare_repository_starts_in_tree_chooser(page: Page, service: str) -> Non
     expect(page.locator("#load-target")).to_have_text("fixture/repo")
     expect(page.locator("#workspace")).to_be_hidden()
     choose(page, "README.md")
-    page.get_by_role("button", name="Load treestamp from document", exact=True).click()
+    page.get_by_role("button", name="Load tree", exact=True).click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#tree-document")).to_have_text("README.md")
@@ -88,22 +92,24 @@ def test_plain_document_warns_without_changing_selection_or_creating_a_tree(
     page.goto(f"{service}/fixture/repo")
     page.get_by_role("button", name="Expand docs", exact=True).click()
     choose(page, "docs/guide.md")
-    page.get_by_role("button", name="Load treestamp from document", exact=True).click()
+    page.get_by_role("button", name="Load tree", exact=True).click()
     expect(page.locator("#reload-error")).to_contain_text(
         "No treestamp found in docs/guide.md"
     )
     expect(page.locator("#reload-error")).to_contain_text(
         "Choose another document to load"
     )
-    expect(page.locator("#entry-selection-name")).to_have_text("docs/guide.md")
+    expect(page.locator('.source-row[data-path="docs/guide.md"]')).to_have_attribute(
+        "aria-selected", "true"
+    )
     selected = page.locator('#source-browser [data-path="docs/guide.md"]')
     expect(selected).to_have_attribute("aria-selected", "true")
     expect(selected).to_be_focused()
-    expect(page.locator("#reload")).to_have_text("Load treestamp from document")
+    expect(page.locator("#reload")).to_have_text("Load tree")
     expect(page.locator("#workspace")).to_be_hidden()
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") is None
     choose(page, "README.md")
-    page.get_by_role("button", name="Load treestamp from document", exact=True).click()
+    page.get_by_role("button", name="Load tree", exact=True).click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#tree-document")).to_have_text("README.md")
 
@@ -125,12 +131,14 @@ def test_malformed_document_stays_an_error_and_does_not_offer_creation(
             },
         ),
     )
-    page.get_by_role("button", name="Load treestamp from document", exact=True).click()
+    page.get_by_role("button", name="Load tree", exact=True).click()
     expect(page.locator("#reload-error")).to_contain_text(
         "Incomplete treestamp markers"
     )
-    expect(page.locator("#entry-selection-name")).to_have_text("README.md")
-    expect(page.locator("#reload")).to_have_text("Load treestamp from document")
+    expect(page.locator('.source-row[data-path="README.md"]')).to_have_attribute(
+        "aria-selected", "true"
+    )
+    expect(page.locator("#reload")).to_have_text("Load tree")
 
 
 def test_abandoning_repository_choices_returns_to_accepted_draft(
@@ -191,7 +199,9 @@ def test_late_initial_restore_does_not_interrupt_new_source_selection(
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#entry")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
-    expect(page.locator("#entry-selection-name")).to_have_text("src")
+    expect(page.locator('.source-row[data-path="src"]')).to_have_attribute(
+        "aria-selected", "true"
+    )
 
 
 def test_back_and_wordmark_navigation_preserve_the_current_tree(
@@ -199,7 +209,8 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
 ) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    page.locator('.row[data-path="src"] [data-action="note"]').click()
+    page.locator('.row[data-path="src"]').focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("Keep this work")
     page.locator("#note-save").click()
     expect(page.locator("#region")).to_contain_text("Keep this work")
@@ -246,7 +257,7 @@ def test_entry_controls_are_readable_and_fit_without_full_width_mobile_button(
         assert button["width"] < field["width"]
     page.locator("#entry-browse").click()
     expect(page.locator("#reload")).to_be_enabled()
-    assert page.locator("#entry-explanation").evaluate(
+    assert page.locator(".entry-instructions").evaluate(
         "element => parseFloat(getComputedStyle(element).fontSize) >= 16"
     )
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
@@ -274,3 +285,63 @@ def test_wordmark_does_not_abandon_an_initial_tree_request(
     page.evaluate("window.finishOpening()")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#submit")).to_be_enabled()
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), [(320, 568), (390, 844), (768, 1024), (1280, 900)]
+)
+def test_picker_gives_tree_the_space_and_keeps_actions_at_its_foot(
+    page: Page, service: str, width: int, height: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(f"{service}/fixture/repo?root=.")
+    expect(page.locator("#rows .row")).to_have_count(9)
+    page.route(
+        "**/api/browse*",
+        lambda route: route.fulfill(
+            json={
+                "entries": [
+                    {"path": ".", "parent": None, "name": ".", "kind": "dir"},
+                    *[
+                        {
+                            "path": f"file-{i}.md",
+                            "parent": ".",
+                            "name": f"file-{i}.md",
+                            "kind": "file",
+                        }
+                        for i in range(60)
+                    ],
+                ]
+            }
+        ),
+    )
+    page.locator("#submit").click()
+    expect(page.locator("#reload")).to_be_enabled()
+    page.evaluate("document.fonts.ready")
+    expect(page.locator(".entry-instructions")).to_contain_text("New tree")
+    expect(page.locator(".entry-instructions")).to_contain_text("Select folder (root)")
+    expect(page.locator(".entry-instructions")).to_contain_text("Load tree")
+    expect(page.locator(".entry-instructions")).to_contain_text("Select file")
+    expect(
+        page.locator("#reload-title, .entry-context, #entry-selection-name")
+    ).to_have_count(0)
+    tree = page.locator(".source-tree")
+    bounds = tree.bounding_box()
+    assert bounds is not None and bounds["height"] > height / 2
+    assert tree.evaluate("node => node.scrollHeight > node.clientHeight")
+    page.locator('.source-row[data-path="file-59.md"]').click()
+    expect(page.locator("#reload")).to_have_text("Load tree")
+    primary = page.locator("#reload")
+    resume = page.locator("#entry-return")
+    expect(primary).to_be_in_viewport(ratio=1)
+    expect(resume).to_be_in_viewport(ratio=1)
+    primary_bounds = primary.bounding_box()
+    resume_bounds = resume.bounding_box()
+    assert primary_bounds is not None and resume_bounds is not None
+    assert primary_bounds["y"] == pytest.approx(resume_bounds["y"], abs=1)
+    assert primary_bounds["y"] >= bounds["y"] + bounds["height"]
+    assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    assert tree.evaluate("node => node.scrollTop > 0")
+    resume.click()
+    expect(page.locator("#workspace")).to_be_visible()

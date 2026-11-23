@@ -130,7 +130,7 @@ def replay(
         session = TreeSession.restore(target, envelope.curation)
         review = Reconciliation(document.tree, session)
         if not review.total:
-            raise MarkerError("the loaded document has no annotations to place")
+            raise MarkerError("the loaded document has no notes to place")
         for index, decision in enumerate(request.decisions):
             # Undo replays a shorter log, so retain at most one core undo snapshot.
             # This bounds memory instead of retaining a queue copy per decision.

@@ -16,18 +16,22 @@ def assert_no_page_overflow(page: Page) -> None:
 
 
 def assert_row_actions_in_view(page: Page) -> None:
+    """Shared actions stay above the tree, never covering a row's text."""
     docs = page.locator('.row[data-path="docs"]')
-    docs.locator(".name").hover()
-    actions = docs.locator(".row-actions")
-    expect(actions).to_have_css("opacity", "1")
-    action_bounds = actions.bounding_box()
+    docs.focus()
+    expect(page.locator("#selected-path")).to_contain_text("docs")
     tree_bounds = page.locator(".tree-scroll").bounding_box()
-    assert action_bounds is not None and tree_bounds is not None
-    assert action_bounds["x"] >= tree_bounds["x"]
-    assert (
-        action_bounds["x"] + action_bounds["width"]
-        <= tree_bounds["x"] + tree_bounds["width"]
-    )
+    assert tree_bounds is not None
+    expect(page.locator("#rows .row-actions")).to_have_count(0)
+    for selector in ["#row-note", "#row-visibility"]:
+        action_bounds = page.locator(selector).bounding_box()
+        assert action_bounds is not None
+        assert action_bounds["x"] >= tree_bounds["x"]
+        assert (
+            action_bounds["x"] + action_bounds["width"]
+            <= tree_bounds["x"] + tree_bounds["width"]
+        )
+        assert action_bounds["y"] + action_bounds["height"] <= tree_bounds["y"]
 
 
 @pytest.mark.parametrize(
@@ -55,7 +59,8 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
         "&& style.backgroundColor !== 'rgba(0, 0, 0, 0)'; }"
     )
     docs_bounds = docs_link.bounding_box()
-    assert docs_bounds is not None and docs_bounds["height"] >= 44
+    assert docs_bounds is not None
+    assert docs_bounds["height"] >= (36 if width < 1024 else 44)
     theme_toggle = page.locator("#theme-toggle")
     theme_toggle.click()
     expect(theme_toggle).to_have_text("Light mode")
@@ -87,19 +92,13 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
     else:
         assert controls["y"] + controls["height"] <= stage["y"]
         assert controls["width"] == pytest.approx(stage["width"], abs=1)
-    if width >= 768:
+    if width >= 1024:
         expect(page.locator("#show_counts")).to_be_visible()
         expect(page.locator("#reveal")).to_be_visible()
         expect(page.locator(".settings-open")).to_be_hidden()
         expect(page.locator(".attribution")).to_be_visible()
-        if width < 1024:
-            repository = page.locator("#form").bounding_box()
-            settings = page.locator("#settings").bounding_box()
-            assert repository is not None and settings is not None
-            assert repository["x"] + repository["width"] <= settings["x"]
-            assert repository["y"] == pytest.approx(settings["y"], abs=1)
     else:
-        # Phones keep settings in an explicit sheet.
+        # Phones and tablets keep settings out of the tree workspace.
         expect(page.locator("#show_counts")).to_be_hidden()
         page.click(".settings-open")
         expect(page.locator("#show_counts")).to_be_visible()
@@ -165,6 +164,9 @@ def test_the_settings_sheet_closes_when_the_window_widens(
     page.click(".settings-open")
     assert page.evaluate("document.getElementById('settings').matches(':popover-open')")
     page.set_viewport_size({"width": 768, "height": 800})
+    expect(page.locator("#settings:popover-open")).to_have_count(1)
+    expect(page.locator(".settings-open")).to_be_visible()
+    page.set_viewport_size({"width": 1024, "height": 800})
     expect(page.locator("#settings:popover-open")).to_have_count(0)
     expect(page.locator("#show_counts")).to_be_visible()
     expect(page.locator(".settings-open")).to_be_hidden()
@@ -184,7 +186,8 @@ def test_long_note_keeps_other_row_actions_in_view(
 
     src = page.locator('.row[data-path="src"]')
     src.locator(".name").hover()
-    src.get_by_role("button", name="Note", exact=True).click()
+    src.focus()
+    page.locator("#row-note").click()
     note = (
         "A lengthy annotation describing the application source and supporting modules. "
         * 3
@@ -245,7 +248,8 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     expect(page.locator("#tui-mode")).to_be_visible()
     assert_no_page_overflow(page)
 
-    page.locator('.row[data-path="docs"] [data-action="note"]').click()
+    page.locator('.row[data-path="docs"]').focus()
+    page.locator("#row-note").click()
     dialog = page.locator("#note-dialog")
     expect(dialog).to_be_visible()
     expect(page.locator("#note-text")).to_be_focused()
@@ -268,3 +272,36 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     page.locator("#reload").scroll_into_view_if_needed()
     expect(page.locator("#reload")).to_be_in_viewport(ratio=1)
     assert_no_page_overflow(page)
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), [(390, 844), (320, 568), (768, 1024), (900, 600)]
+)
+def test_phone_and_tablet_example_give_most_of_the_viewport_to_the_tree(
+    page: Page, service: str, width: int, height: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(service + "/")
+    page.locator("#explore-example").click()
+    expect(page.locator("#rows .row")).not_to_have_count(0)
+    page.evaluate("document.fonts.ready")
+    tree = page.locator(".tree-scroll").bounding_box()
+    assert tree is not None
+    assert tree["height"] > height / 2
+    assert tree["y"] + tree["height"] <= height
+    assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
+    assert_no_page_overflow(page)
+    for name in ["Open another tree", "Visit repo"]:
+        expect(
+            page.get_by_role(
+                "button" if name == "Open another tree" else "link",
+                name=name,
+                exact=True,
+            )
+        ).to_be_in_viewport(ratio=1)
+    page.locator('.row[data-path=".github/workflows"] .fold').click()
+    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
+    page.locator("#rows .row").last.scroll_into_view_if_needed()
+    expect(page.locator("#row-note")).to_be_in_viewport(ratio=1)
+    expect(page.locator("#row-visibility")).to_be_in_viewport(ratio=1)
+    assert page.evaluate("window.scrollY") == 0

@@ -139,7 +139,6 @@ def test_repository_info_keyboard_focus_keeps_tooltip_until_dismissed(
     info = page.get_by_role("button", name="Repository information", exact=True)
     tooltip = page.locator("#repo-tooltip")
     page.locator("#submit").focus()
-    page.keyboard.press("Shift+Tab")  # Visit repo
     page.keyboard.press("Shift+Tab")  # Repository information
     expect(info).to_be_focused()
     expect(tooltip).to_be_visible()
@@ -177,7 +176,8 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
 
     scripts = page.locator('.row[data-path="scripts"]')
     scripts.hover()
-    scripts.locator("button", has_text="Hide").click()
+    scripts.focus()
+    page.locator("#row-visibility").click()
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
     page.click("#tab-stamp")
     expect(page.locator("#region")).to_contain_text('"scripts"')
@@ -187,12 +187,14 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
     hidden = page.locator('.row.hidden-row[data-path="scripts"]')
     expect(hidden).to_have_count(1)
     hidden.hover()
-    hidden.get_by_role("button", name="Unhide", exact=True).click()
+    hidden.focus()
+    page.locator("#row-visibility").click()
     expect(page.locator('.row[data-path="scripts"]:not(.hidden-row)')).to_have_count(1)
 
     src = page.locator('.row[data-path="src"]')
     src.hover()
-    src.get_by_role("button", name="Note", exact=True).click()
+    src.focus()
+    page.locator("#row-note").click()
     page.fill("#note-text", "application code")
     page.press("#note-text", "Enter")
     expect(src.locator(".note")).to_have_text("# application code")

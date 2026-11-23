@@ -14,7 +14,8 @@ pytestmark = pytest.mark.browser
 
 def add_note(page: Page, text: str) -> None:
     row = page.locator('.row[data-path="docs"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill(text)
     page.locator("#note-text").press("Enter")
     expect(row.locator(".note")).to_have_text(f"# {text}")
@@ -101,9 +102,8 @@ def test_successful_reopen_discards_unwritten_notes_hiding_and_folds(
     original = page.locator("#region").text_content()
     add_note(page, "discard this")
     page.locator('.row[data-path="docs"] .fold').click()
-    page.locator('.row[data-path="scripts"]').get_by_role(
-        "button", name="Hide", exact=True
-    ).click()
+    page.locator('.row[data-path="scripts"]').focus()
+    page.locator("#row-visibility").click()
     page.locator("#submit").click()
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_response("**/api/preview*") as response:
@@ -193,11 +193,11 @@ def test_selected_entry_determines_creation_or_opening(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
     page.goto(f"{service}/fixture/repo")
-    expect(page.locator("#reload")).to_have_text("Create treestamp here")
+    expect(page.locator("#reload")).to_have_text("New tree")
     page.locator('.source-row[data-path="README.md"]').click()
-    expect(page.locator("#reload")).to_have_text("Load treestamp from document")
+    expect(page.locator("#reload")).to_have_text("Load tree")
     page.locator('.source-row[data-path="src"]').click()
-    expect(page.locator("#reload")).to_have_text("Create treestamp here")
+    expect(page.locator("#reload")).to_have_text("New tree")
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_request("**/api/preview") as request:
         page.locator("#reload").click()

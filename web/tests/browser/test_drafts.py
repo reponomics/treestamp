@@ -13,19 +13,19 @@ pytestmark = pytest.mark.browser
 def curate(page: Page, service: str) -> str:
     page.goto(f"{service}/fixture/repo?root=.")
     row = page.locator('.row[data-path="docs"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("Remember this work")
     page.locator("#note-text").press("Enter")
     expect(row.locator(".note")).to_have_text("# Remember this work")
-    page.locator('.row[data-path="scripts"]').get_by_role(
-        "button", name="Hide", exact=True
-    ).click()
+    page.locator('.row[data-path="scripts"]').focus()
+    page.locator("#row-visibility").click()
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
     return page.locator("#region").text_content() or ""
 
 
 @pytest.mark.parametrize("destination", ["/", "/fixture/repo"])
-def test_return_restores_notes_hides_and_replacement_warning(
+def test_return_restores_notes_hides_and_can_resume_from_picker(
     page: Page, service: str, destination: str
 ) -> None:
     original = curate(page, service)
@@ -35,7 +35,10 @@ def test_return_restores_notes_hides_and_replacement_warning(
     expect(page.locator("#draft-status, #forget-draft")).to_have_count(0)
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
     page.locator("#submit").click()
-    expect(page.locator("#replace-draft-warning")).to_be_visible()
+    expect(page.locator("#replace-draft-warning")).to_have_count(0)
+    page.locator("#entry-return").click()
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#region")).to_have_text(original)
 
 
 def test_opening_another_repository_replaces_the_one_saved_draft(
@@ -96,9 +99,8 @@ def test_failed_edit_keeps_the_last_accepted_local_draft(
             status=503, json={"error": {"message": "Try later"}}
         ),
     )
-    page.locator('.row[data-path="docs"]').get_by_role(
-        "button", name="Hide", exact=True
-    ).click()
+    page.locator('.row[data-path="docs"]').focus()
+    page.locator("#row-visibility").click()
     expect(page.locator("#error")).to_contain_text("Try later")
     expect(page.locator("#region")).to_have_text(original)
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == saved
@@ -121,9 +123,8 @@ def test_storage_failure_does_not_prevent_editing(page: Page, service: str) -> N
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#error")).to_be_hidden()
     expect(page.locator("#draft-status, #forget-draft")).to_have_count(0)
-    page.locator('.row[data-path="scripts"]').get_by_role(
-        "button", name="Hide", exact=True
-    ).click()
+    page.locator('.row[data-path="scripts"]').focus()
+    page.locator("#row-visibility").click()
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
     expect(page.locator("#copy")).to_be_enabled()
 

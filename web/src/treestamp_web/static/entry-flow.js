@@ -1,8 +1,23 @@
 // Repository and source selection before adopting a new editing session.
-import { displayPath, hintFor } from "./logic.js";
+import { hintFor } from "./logic.js";
 import { SourceBrowser } from "./source-browser.js";
 
 const element = (id) => document.getElementById(id);
+
+// Keep repository context consistent for links, typed names, and restored sessions.
+export function renderRepository(container, label) {
+  container.title = label;
+  const match = /^(?:https?:\/\/github\.com\/)?([^/\s]+)\/([^/\s]+)\/?$/.exec(label);
+  if (!match) { container.textContent = label; return; }
+  const parts = [match[1], "/", match[2]];
+  const classes = ["repository-owner", "repository-separator", "repository-name"];
+  container.replaceChildren(...parts.map((text, index) => {
+    const span = document.createElement("span");
+    span.className = classes[index];
+    span.textContent = text;
+    return span;
+  }));
+}
 
 export class EntryFlow {
   constructor({ onCreate, onOpen, onExample, onCancel }) {
@@ -53,10 +68,10 @@ export class EntryFlow {
     this.canReturn = canReturn;
     this.url = repo;
     element("entry-url").value = repo;
-    element("entry-title").textContent = canReturn ? "Open another tree" : "Welcome to treestamp";
+    element("entry-title").textContent = canReturn ? "Open another tree" : "Open a repository";
     document.querySelector(".entry-description").textContent = canReturn
       ? "Choose a repository, then select a folder or document."
-      : "Choose what your directory tree shows. Add a few notes. Copy it into your documentation.";
+      : "Choose a folder for a new treestamp, or load one from a document.";
     element("entry-browse").disabled = !repo.trim();
     this.clearError();
     this.showPanel("welcome");
@@ -67,7 +82,7 @@ export class EntryFlow {
     this.url = repo;
     this.canReturn = canReturn;
     this.clearError();
-    element("load-target").textContent = repo;
+    renderRepository(element("load-target"), repo);
     this.browser.reset();
     this.browser.setMode("entry");
     this.browser.select(".");
@@ -101,23 +116,8 @@ export class EntryFlow {
   renderSelection() {
     const selected = this.browser.selectedEntry();
     const directory = selected?.kind !== "file";
-    this.renderDescription(selected, directory);
-    element("reload").textContent = this.busy ? "Opening…" : directory ? "Create treestamp here" : "Load treestamp from document";
+    element("reload").textContent = this.busy ? "Opening…" : directory ? "New tree" : "Load tree";
     element("reload").disabled = this.busy || this.loading || !selected;
-  }
-
-  renderDescription(selected, directory) {
-    const path = selected ? displayPath(selected.path) : ".";
-    element("reload-title").textContent = "Where would you like to start?";
-    element("entry-kind").textContent = directory ? "Folder" : "Document";
-    element("entry-selection-name").textContent = path === "." ? "Repository root" : path;
-    element("entry-explanation").textContent = this.selectionExplanation(directory);
-  }
-
-  selectionExplanation(directory) {
-    return directory
-      ? "Start a new treestamp with this folder at the top."
-      : "Load the existing treestamp from this document to edit it.";
   }
 
   async submit() {

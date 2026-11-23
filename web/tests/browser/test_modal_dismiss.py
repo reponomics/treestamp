@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.browser
 
 DIALOGS = [
-    ("#note-dialog", '.row[data-path="src"] [data-action="note"]'),
+    ("#note-dialog", "#row-note"),
     ("#keymap-dialog", "#tui-help"),
     ("#repo-info-dialog", "#repo-info"),
 ]
@@ -49,6 +49,8 @@ def test_backdrop_dismisses_dialog_without_applying_edits(
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     original_region = page.locator("#region").text_content()
+    if selector == "#note-dialog":
+        page.locator('.row[data-path="src"]').focus()
     origin = page.locator(opener)
     origin.click()
     dialog = page.locator(selector)
@@ -76,6 +78,8 @@ def test_drag_from_dialog_to_backdrop_keeps_dialog_open(
 ) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
+    if selector == "#note-dialog":
+        page.locator('.row[data-path="src"]').focus()
     page.locator(opener).click()
     dialog = page.locator(selector)
     bounds = dialog.bounding_box()
@@ -109,7 +113,8 @@ def test_in_flight_actions_cannot_be_dismissed_by_outside_clicks(
         };
     }""")
     if operation == "note":
-        page.locator('.row[data-path="src"] [data-action="note"]').click()
+        page.locator('.row[data-path="src"]').focus()
+        page.locator("#row-note").click()
         page.locator("#note-text").fill("saved after outside click")
         page.locator("#note-save").click()
         dialog = page.locator("#note-dialog")

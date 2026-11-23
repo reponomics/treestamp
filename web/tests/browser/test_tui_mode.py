@@ -61,10 +61,11 @@ def test_tui_mode_starts_off_and_preserves_native_button_activation(
     expect(row(page, "docs/api.md")).to_have_count(0)
     docs.locator(".fold").press("Enter")
     expect(row(page, "docs/api.md")).to_have_count(1)
-    docs.get_by_role("button", name="Note", exact=True).press("Space")
+    docs.focus()
+    page.locator("#row-note").press("Space")
     expect(page.locator("#note-text")).to_be_focused()
     page.locator("#note-text").press("Escape")
-    expect(docs.get_by_role("button", name="Note", exact=True)).to_be_focused()
+    expect(page.get_by_role("button", name="Note", exact=True)).to_be_focused()
 
 
 def test_tui_mode_leaves_modified_and_composing_keys_to_the_browser(
@@ -337,7 +338,7 @@ def test_show_all_button_works_without_tui_mode(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
     open_editor(page, service, tui_mode=False)
-    if width < 768:
+    if width < 1024:
         page.locator(".settings-open").click()
     with page.expect_response("**/api/op") as response:
         page.get_by_role("button", name="Unhide all", exact=True).click()
@@ -365,3 +366,34 @@ def test_tui_count_key_toggles_one_boolean(page: Page, service: str) -> None:
         expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
         expect(page.locator("#show_counts")).to_be_checked(checked=shown)
         expect(docs).to_be_focused()
+
+
+@pytest.mark.parametrize("width", [390, 768])
+def test_home_keeps_selected_row_visible_below_toolbar(
+    page: Page, service: str, width: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": 500})
+    page.goto(service + "/")
+    page.locator("#explore-example").click()
+    page.locator('.row[data-path=".github/workflows"] .fold').click()
+    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
+    page.locator("#tui-mode").click()
+    page.locator("#rows .row").last.focus()
+    page.locator(".tree-scroll").evaluate(
+        "node => { node.scrollTop = node.scrollHeight; }"
+    )
+    root = row(page, "")
+    toolbar = page.locator(".editor-toolbar")
+    before = root.bounding_box()
+    toolbar_before = toolbar.bounding_box()
+    assert before is not None and toolbar_before is not None
+    assert before["y"] < toolbar_before["y"] + toolbar_before["height"]
+
+    page.keyboard.press("Home")
+    expect(root).to_be_focused()
+    expect(root).to_have_attribute("data-selected", "true")
+    expect(root.locator(".name")).to_be_in_viewport(ratio=1)
+    selected_bounds = root.bounding_box()
+    toolbar_bounds = toolbar.bounding_box()
+    assert selected_bounds is not None and toolbar_bounds is not None
+    assert selected_bounds["y"] >= (toolbar_bounds["y"] + toolbar_bounds["height"] - 1)

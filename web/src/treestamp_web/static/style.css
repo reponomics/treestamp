@@ -130,10 +130,12 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   font-family: var(--sans);
   font-size: var(--t-base);
   font-weight: var(--weight-body);
@@ -145,20 +147,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 main { flex: 1; }
-a { color: var(--accent); }
+a { color: var(--accent); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--accent-hover); }
 code { font-family: var(--mono); font-size: inherit; }
 h1, h2, h3 { margin: 0; font-weight: var(--weight-strong); line-height: 1.2; }
 p { margin: 0; }
 
 /* One measure for the header and the workspace. */
-.masthead-inner, .workspace {
+.masthead-inner, .workspace, .entry {
   width: 100%;
   max-width: var(--frame);
   margin: 0 auto;
   padding-inline: var(--s4);
 }
 @media (min-width: 40rem) {
-  .masthead-inner, .workspace { padding-inline: var(--s6); }
+  .masthead-inner, .workspace, .entry { padding-inline: var(--s6); }
 }
 
 /* ---------- masthead */
@@ -192,50 +195,42 @@ p { margin: 0; }
 
 /* The first choice supplies context before the editor appears. Keep instructions
    at reading size and action widths tied to their labels, not the whole canvas. */
-.entry { flex: 1; min-height: 0; width: 100%; max-width: 72rem; margin-inline: auto; padding: var(--s7) var(--s6); overflow-y: auto; font-size: 1.125rem; }
-.entry-welcome { max-width: 46rem; margin: var(--s6) auto; padding: var(--s7); border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--controls-surface); }
-.entry-welcome h2 { font-size: 2.25rem; margin-bottom: var(--s4); }
-.entry-description { max-width: 50ch; font-size: var(--t-md); line-height: 1.6; color: var(--ink-secondary); }
+.entry { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-block: var(--s3); overflow-y: auto; }
+.entry-welcome { max-width: 46rem; margin: var(--s5) auto; padding: var(--s5); border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--controls-surface); }
+.entry-welcome h2 { font-size: var(--t-md); margin-bottom: var(--s4); }
+.entry-description { max-width: 55ch; line-height: 1.5; color: var(--ink-secondary); }
 #entry-form { margin-block: var(--s6) var(--s5); }
 #entry-form label { display: block; font-weight: var(--weight-strong); margin-bottom: var(--s2); }
 .entry-repo-row { display: flex; align-items: stretch; gap: var(--s3); }
 #entry-url { flex: 1; width: 100%; min-width: 0; background: var(--document-surface); }
-.entry button { min-height: 2.75rem; }
 #entry-browse { flex: none; white-space: nowrap; }
-#entry-browse:enabled, .entry-actions > #reload:enabled { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: var(--weight-strong); }
-#entry-browse:enabled:hover, .entry-actions > #reload:enabled:hover { background: var(--accent-hover); color: var(--accent-ink); }
+#entry-browse:enabled, .entry-browser-foot > #reload:enabled { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: var(--weight-strong); }
+#entry-browse:enabled:hover, .entry-browser-foot > #reload:enabled:hover { background: var(--accent-hover); color: var(--accent-ink); }
 .entry-offramp { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); padding-top: var(--s5); border-top: 1px solid var(--rule); color: var(--ink-secondary); }
 .entry-return { margin-top: var(--s4); }
-.entry-browser-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); margin-bottom: var(--s5); }
-.entry-browser-head h2 { font-size: var(--t-lg); margin-bottom: var(--s3); }
-.entry-repository { font-family: var(--mono); overflow-wrap: anywhere; color: var(--ink-secondary); }
+.entry-browser { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: var(--s2); }
+.entry-browser-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+.entry-instructions { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s6); }
+.entry-instructions p { display: flex; align-items: baseline; gap: var(--s2); }
+.entry-instructions span { color: var(--ink-secondary); }
 .entry-browser-head > button { flex: none; }
-.entry-selection { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(18rem, .8fr); border: 1px solid var(--rule); border-radius: var(--r-lg); overflow: hidden; }
-.entry-selection .source-browser { min-width: 0; margin: 0; padding-block: var(--s3); background: var(--document-surface); }
-.entry-selection .source-tree { border: 0; border-radius: 0; max-height: min(60dvh, 34rem); }
-.entry-selection .source-row { min-height: 2.75rem; }
-.entry-selection .source-browser-status { padding: var(--s3) var(--s4); }
-.entry-context { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s4); padding: var(--s6); border-left: 1px solid var(--rule); background: var(--controls-surface); }
-.entry-eyebrow { color: var(--ink-secondary); font-weight: var(--weight-strong); margin-bottom: var(--s2); }
-#entry-selection-name { font-family: var(--mono); font-size: var(--t-md); overflow-wrap: anywhere; margin-bottom: var(--s4); }
-#entry-explanation { line-height: 1.6; }
-.entry-actions { max-width: 100%; margin-top: auto; padding-top: var(--s4); display: flex; flex-wrap: wrap; gap: var(--s3); }
-.entry-actions > #reload { max-width: 100%; }
-.entry-error { color: var(--error-ink); margin-top: var(--s4); overflow-wrap: anywhere; }
-.entry-browser-foot { display: flex; justify-content: space-between; gap: var(--s5); align-items: baseline; margin-top: var(--s5); }
-.entry-browser-foot .entry-return { flex: none; margin: 0; }
+.entry-selection { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.entry-repository { flex: none; padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule); background: var(--controls-surface); }
+.entry-selection .source-browser { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; margin: 0; background: var(--document-surface); }
+.entry-selection .source-tree { flex: 1; min-height: 0; border: 0; border-radius: 0; max-height: none; }
+.entry-selection .source-browser-status { padding: var(--s3); }
+.entry-error { color: var(--error-ink); overflow-wrap: anywhere; }
+#entry-error { margin-top: var(--s4); }
+.entry-browser-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s2); }
+.entry-browser-foot .entry-return { margin: 0 auto 0 0; }
 @media (max-width: 47.999rem) {
-  .entry { padding: var(--s5) var(--s4); }
   .entry-welcome { padding: var(--s5); margin-block: var(--s4); }
-  .entry-welcome h2 { font-size: var(--t-lg); }
-  .entry-description { font-size: inherit; }
   .entry-repo-row { flex-direction: column; align-items: flex-start; }
   #entry-browse { margin-top: var(--s1); }
-  .entry-selection { grid-template-columns: minmax(0, 1fr); }
-  .entry-selection .source-tree { max-height: 38dvh; }
-  .entry-context { border-left: 0; border-top: 1px solid var(--rule); padding: var(--s5); }
-  .entry-browser-head { flex-wrap: wrap; }
-  .entry-browser-foot { flex-direction: column; gap: var(--s3); }
+  .entry-instructions { display: grid; gap: 0; }
+  .entry-instructions p { display: grid; grid-template-columns: 4.5rem auto; }
+  .entry-browser-head { gap: var(--s2); }
+  .entry-browser-head button { padding-inline: var(--s2); }
 }
 
 .workspace {
@@ -253,7 +248,6 @@ p { margin: 0; }
 }
 .controls { padding: var(--s4); background: var(--controls-surface, var(--card)); }
 @media (min-width: 64rem) {
-  body { height: 100dvh; }
   .workspace {
     min-height: 0;
     padding-block: var(--s5);
@@ -278,9 +272,16 @@ body.no-tree #copy, body.no-tree .settings-open { display: none; }
 .field-head .github-link { margin-left: auto; white-space: nowrap; }
 .repo-row { display: flex; flex-direction: column; gap: var(--s3); }
 .repo-summary { min-width: 0; }
-#active-repository { font-family: var(--mono); font-size: var(--t-md); overflow-wrap: anywhere; }
-#form .field-head { flex-wrap: wrap; }
+.repository-context { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.repository-context > .control-icon { color: var(--ink-secondary); }
+.repository-identity { min-width: 0; font-family: var(--mono); font-size: var(--t-base); overflow-wrap: anywhere; }
+.repository-owner, .repository-separator { color: var(--ink-secondary); }
+.repository-name { font-weight: var(--weight-strong); }
+.repository-separator { padding-inline: 0.15em; }
+#form .repository-context { flex: 1; }
+#form .field-head { flex-wrap: nowrap; margin-bottom: var(--s3); }
 #reset-tree { align-self: flex-start; }
+.repo-action-icon { display: none; }
 .repo-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--s2); }
 .repo-links { position: relative; display: flex; align-items: center; gap: var(--s1); flex: none; margin-left: auto; }
 .repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; padding: 0; }
@@ -385,15 +386,6 @@ button.primary {
 }
 button.primary:enabled:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
 button:disabled { cursor: default; background: var(--well); border-color: var(--rule-strong); color: var(--ink-secondary); }
-button.link {
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--accent);
-  text-decoration: underline;
-  white-space: normal;
-}
-
 .hint { color: inherit; margin-top: var(--s2); }
 .group-note, .counts, .quiet { color: var(--ink-secondary); }
 
@@ -408,12 +400,12 @@ button.link {
 
 /* ---------- settings
 
-   On phones the settings are a sheet opened from the editor header. Tablet and
-   desktop layouts keep these editing controls visible beside the repository. */
+   Below desktop width, settings open from the editor header so the tree keeps
+   the available height. Desktop layouts keep settings beside the repository. */
 
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s4); }
 .settings h2 { font-size: var(--t-md); }
-@media (min-width: 48rem) {
+@media (min-width: 64rem) {
   .settings {
     display: block;
     position: static;
@@ -430,7 +422,7 @@ button.link {
   }
   .settings-head button, .settings-open { display: none; }
 }
-@media (max-width: 47.999rem) {
+@media (max-width: 63.999rem) {
   .settings:popover-open {
     position: fixed;
     inset: 0;
@@ -468,8 +460,18 @@ button.link {
 .dialog h2 { font-size: var(--t-md); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s5); }
 .dialog-error { color: var(--error-ink); margin-top: var(--s3); }
-.dialog-path { font-family: var(--mono); overflow-wrap: anywhere; margin-bottom: var(--s3); }
 .dialog-hint { margin-top: var(--s2); }
+.note-heading { display: flex; align-items: baseline; gap: var(--s1) var(--s3); margin-bottom: var(--s4); }
+.note-heading h2 { flex: none; }
+#note-name { min-width: 0; font-family: var(--mono); color: var(--ink-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#note-text { display: block; width: 100%; }
+.note-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--s4); margin-top: var(--s4); }
+.note-shortcuts { display: flex; flex-wrap: wrap; gap: var(--s3); color: var(--ink-secondary); }
+.note-shortcuts span { white-space: nowrap; }
+.note-footer .dialog-actions { margin: 0 0 0 auto; }
+@media (max-width: 47.999rem) {
+  .note-shortcuts { display: none; }
+}
 .keymap-heading { margin-top: var(--s5); font-size: var(--t-base); }
 .keymap { margin: var(--s2) 0 0; }
 .keymap > div { display: grid; grid-template-columns: minmax(9rem, 2fr) 3fr; align-items: baseline; gap: var(--s3); padding-block: var(--s2); border-bottom: 1px solid var(--rule); }
@@ -502,25 +504,10 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
 #show-all { align-self: flex-start; margin-top: var(--s1); }
 .meta-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
 
-/* The tablet controls share one horizontal surface, independent of the masthead
-   breakpoint: repository context on the left, editing settings on the right. */
-@media (min-width: 48rem) and (max-width: 63.999rem) {
-  .controls { display: grid; grid-template-columns: minmax(15rem, .8fr) minmax(0, 1.2fr); gap: var(--s4) var(--s5); }
-  #form { grid-column: 1; grid-row: 1; min-width: 0; }
-  .controls > #error { grid-column: 1; grid-row: 2; margin-top: 0; }
-  .settings { grid-column: 2; grid-row: 1 / 3; min-width: 0; margin: 0; padding: 0 0 0 var(--s5); border-top: 0; border-left: 1px solid var(--rule); }
-  .settings-head { margin-bottom: var(--s4); }
-  .settings-body { grid-template-columns: minmax(0, 1fr) auto; gap: var(--s4); }
-  .settings-group { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
-  #loaded-note { margin-top: 0; align-self: center; }
-  .settings-reset { grid-column: 2; }
-}
-
 /* ---------- stage: document views and project information */
 
 .stage { position: relative; background: var(--workspace-surface, var(--card)); box-shadow: var(--lift); }
-/* From tablet width the tabs and the copy button stay at the top of the window while
-   a long tree scrolls; on a phone they would take too much of it. */
+/* View switching and document actions sit above the tree-specific toolbar. */
 .stage-head {
   display: flex;
   align-items: center;
@@ -559,16 +546,19 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
 .stage[data-view="info"] #copy-status,
 .stage[data-view="info"] .settings-open,
 .stage[data-view="info"] .stage-status { display: none; }
-.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-bottom: var(--s3); }
-.canvas-caption { flex: 1 1 auto; min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); padding: var(--s2) var(--s3); border: 1px solid var(--rule); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; background: var(--controls-surface); }
+.selection-context { color: var(--ink-secondary); }
+.selection-actions { display: flex; gap: var(--s2); padding-left: var(--s2); border-left: 3px solid var(--accent); }
+.editor-toolbar .tree-tools { margin-left: auto; padding-left: var(--s3); border-left: 1px solid var(--rule); }
+.editor-toolbar button { padding-inline: var(--s2); }
+.canvas-caption { min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.tui-short-label { display: none; }
 .tree-tools { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .tree-tools button { padding-inline: var(--s2); }
 #tui-mode[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 #tree-document { font-family: var(--mono); color: var(--ink); }
 .output-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); margin-bottom: var(--s3); }
 .output-toolbar select { width: auto; min-width: 11rem; }
-.notice { padding: var(--s3) var(--s4) 0; }
-.notice .link { white-space: nowrap; }
 
 pre {
   font-family: var(--mono);
@@ -583,17 +573,14 @@ pre {
   white-space: pre;
   tab-size: 4;
 }
-@media (min-width: 48rem) and (max-width: 63.999rem) {
-  .stage-head { position: sticky; top: 0; z-index: 1; }
+@media (max-width: 63.999rem) {
+  .editor-toolbar { position: sticky; top: 0; z-index: 2; }
+  .row { scroll-margin-top: var(--selection-toolbar-height, 0px); }
 }
 @media (max-width: 47.999rem) {
   /* Share rows before reducing type sizes or tap targets. */
   .workspace { padding-top: var(--s3); gap: var(--s3); }
-  #form { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2); }
-  #form .field-head { grid-column: 1 / -1; margin-bottom: 0; }
-  .repo-row { display: contents; }
-  .repo-summary { grid-column: 1 / -1; }
-  .repo-actions { grid-column: 1; }
+  #form { min-width: 0; }
   .examples { grid-column: 2; margin-top: 0; align-self: start; }
   .examples[open] { grid-column: 1 / -1; }
   #status { grid-column: 1 / -1; margin-top: 0; }
@@ -620,8 +607,9 @@ pre {
     white-space: nowrap;
   }
   #editor-panel, #stamp-panel, #info-panel { padding: var(--s3); }
-  .editor-toolbar { margin-bottom: var(--s2); }
-  .canvas-caption:not(.no-document) .caption-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .editor-toolbar { padding-inline: var(--s2); gap: var(--s2); }
+  .selection-context { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .editor-toolbar .tree-tools { padding-left: 0; border-left: 0; }
 }
 
 /* ---------- project information: one reading surface, with headings beside the copy
@@ -644,6 +632,9 @@ pre {
 .info-steps li + li { margin-top: var(--s4); }
 .info-steps li::marker { color: var(--accent); font-weight: var(--weight-strong); }
 .info-steps p { margin-top: var(--s1); }
+@media (max-width: 47.999rem) {
+  .info-content { padding: var(--s4); }
+}
 @container (min-width: 40rem) {
   .info-content { padding: var(--s6); }
   .info-section { grid-template-columns: 11rem minmax(0, 1fr); gap: var(--s5); }
@@ -665,63 +656,61 @@ pre {
   border: 1px solid var(--rule);
   border-radius: var(--r);
 }
-.rows {
+.rows, .source-tree {
   --tree-step: 4ch;
+  font-family: var(--mono);
+  line-height: 2;
+}
+.rows {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: var(--mono);
-  line-height: 2;
   width: max-content;
   min-width: 100%;
 }
 .tree-attribution { margin: var(--s3) var(--s4) 0; color: var(--ink-secondary); }
-.row { display: flex; align-items: center; gap: var(--s1); padding: 0 var(--s4); white-space: nowrap; }
+.row, .source-row { display: flex; align-items: center; gap: var(--s1); padding: 0 var(--s4); white-space: nowrap; }
 .row.dir:not([data-path=""]) { cursor: pointer; }
-.row:hover, .row:focus-within { background: var(--row-hover); }
+.row:hover:not([data-selected="true"]) { background: var(--well); }
+.row[data-selected="true"] { background: var(--row-hover); box-shadow: inset 3px 0 var(--accent); }
+#editor-panel .tree-scroll { border-top-left-radius: 0; border-top-right-radius: 0; }
 .row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
 
-/* Source selection uses the same tree vocabulary as the editor. */
+/* Source selection shares editor density and branch geometry. Its disclosure
+   button expands folders independently of choosing them as a new root. */
 .source-browser { margin-top: var(--s3); }
 .source-browser-status:empty { display: none; }
 .source-tree {
   list-style: none;
-  padding: var(--s2) 0;
+  padding: var(--s3) 0;
   margin: 0;
   max-height: min(38dvh, 22rem);
   overflow: auto;
   background: var(--document-surface, var(--paper));
   border: 1px solid var(--rule);
   border-radius: var(--r);
-  font-family: var(--mono);
 }
-.source-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s1);
-  min-height: 2.25rem;
-  padding: var(--s1) var(--s3);
-  padding-left: calc(var(--s2) + var(--source-depth) * 1.5rem);
-  width: max-content;
-  min-width: 100%;
-  cursor: pointer;
-}
-.source-row[aria-selected="true"] { background: var(--accent-soft); font-weight: var(--weight-strong); }
-.source-row:hover:not([aria-disabled="true"]) { background: var(--row-hover); }
+.source-row { width: max-content; min-width: 100%; cursor: pointer; }
+.source-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+.source-row:hover:not([aria-disabled="true"]):not([aria-selected="true"]) { background: var(--well); }
 .source-row[aria-disabled="true"] { cursor: default; color: var(--ink-secondary); }
 .source-row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
 .source-name { white-space: pre; }
+.source-row[data-kind="dir"] .source-name { font-weight: var(--weight-strong); }
 .source-toggle {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
-  width: 1.75rem;
-  min-height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  color: inherit;
+  color: var(--ink-secondary);
   font-family: var(--mono);
-  text-align: center;
+  line-height: 1;
 }
 .source-toggle:hover { background: var(--accent-soft); color: var(--ink); }
 .row.hidden-row .name, .row.hidden-row .counts { text-decoration: line-through; }
@@ -771,36 +760,11 @@ pre {
 /* One ink for the document; weight and geometry carry its hierarchy. */
 .rows .counts, .rows .note { color: var(--ink); }
 .note { margin-left: var(--s1); }
-/* Row actions keep their place but appear only on the row under the pointer or
-   holding focus, so at rest the tree is only the tree. A row takes focus when it is
-   clicked or tapped, which is what offers the actions where there is no pointer to
-   hover; hover is then an enhancement that costs nothing where it does not apply. */
-.row-actions {
-  cursor: default;
-  position: sticky;
-  right: 0;
-  margin-left: auto;
-  display: flex;
-  gap: var(--s2);
-  padding-left: var(--s3);
-  background: var(--document-surface, var(--well));
-  opacity: 0;
-}
-.row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; background: var(--row-hover); }
-.row-actions button {
-  font-family: var(--sans);
-  min-height: 1.75rem;
-  padding: 0 var(--s2);
-  border-radius: var(--r-sm);
-  line-height: 1.7;
-}
-.row-actions button:hover { border-color: var(--accent); color: var(--accent); }
-.row-actions button:disabled { opacity: 0.5; }
 /* A focused row is offering its actions, not asking to be read as a text selection. */
 .row:focus { outline: none; }
 .row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
 
-.entry-actions > #reload { white-space: normal; }
+.entry-browser-foot > #reload { white-space: normal; }
 
 /* Placement is a short, focused step between loading and ordinary editing. */
 .placement-dialog { position: fixed; inset: 0; margin: auto; overflow: auto; width: min(38rem, calc(100vw - 2rem)); }
@@ -821,8 +785,8 @@ pre {
 .placement-tree-head .check { margin: 0; }
 #placement-rows { flex: 1 1 22rem; min-height: 7rem; overflow: auto; margin: 0; padding: var(--s2) 0; list-style: none; border: 1px solid var(--rule); background: var(--paper); font-family: var(--mono); }
 .placement-row { display: flex; align-items: baseline; gap: var(--s3); min-height: 2.25rem; padding: var(--s1) var(--s3); padding-left: calc(var(--s3) + var(--placement-depth) * 2ch); min-width: 100%; width: max-content; cursor: pointer; white-space: pre; }
-.placement-row[aria-selected="true"] { background: var(--accent-soft); }
-.placement-row:hover { background: var(--row-hover); }
+.placement-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+.placement-row:hover:not([aria-selected="true"]) { background: var(--well); }
 .placement-row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
 .placement-row[data-kind="dir"] .placement-name { font-weight: var(--weight-strong); }
 .placement-counts, .placement-row-note { color: var(--ink-secondary); }
@@ -853,4 +817,59 @@ pre {
 @media (max-height: 40rem) {
   #placement-work { max-height: none; }
   #placement-rows { flex: 0 0 9rem; }
+}
+
+/* Keep row actions and keyboard controls together on the narrowest phones. */
+@media (max-width: 23rem) {
+  .tui-full-label { display: none; }
+  .tui-short-label { display: inline; }
+}
+
+/* Stacked editors keep compact chrome above a tree that fills the viewport. */
+@media (max-width: 63.999rem) {
+  .masthead { flex-shrink: 0; }
+  .masthead-inner { padding-block: var(--s1); }
+  .wordmark h1 { font-size: 1.5rem; }
+  .wordmark .mark { width: 1.75rem; height: 1.75rem; }
+  .masthead button, .masthead .docs { min-height: 2.25rem; }
+  .workspace { display: flex; flex-direction: column; align-items: stretch; flex: 1; min-height: 0; gap: var(--s2); padding-block: var(--s2); overflow: hidden; }
+  .controls { flex: none; padding: 0; border: 0; background: none; }
+  #form { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--s1) var(--s2); align-items: center; }
+  #form .field-head, .repo-summary { display: contents; }
+  #form .repository-context { grid-column: 1; grid-row: 1; }
+  #form .repository-context > .control-icon { display: none; }
+  .controls .repository-identity { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .repo-links { grid-column: 3; grid-row: 1; }
+  .repo-actions { grid-column: 2; grid-row: 1; gap: var(--s1); flex-wrap: nowrap; }
+  .repo-actions button, .repo-actions .button-link, .repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; min-height: 2.25rem; padding: 0; background: transparent; border-color: transparent; }
+  #submit:enabled { background: transparent; border-color: transparent; }
+  #submit:enabled:hover { background: var(--accent-soft); }
+  .repo-action-icon { display: inline; }
+  .canvas-caption, #status { grid-column: 1 / -1; }
+  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .stage-head { flex: none; padding: var(--s1) var(--s2); gap: var(--s1); }
+  .tabs { gap: var(--s1); }
+  .tabs [role="tab"] { min-height: 2.25rem; padding-block: var(--s1); }
+  .stage-head > #copy, .stage-head > .settings-open { min-width: 2.25rem; width: 2.25rem; height: 2.25rem; min-height: 2.25rem; }
+  .stage-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #editor-panel, #stamp-panel, #info-panel { padding: var(--s2); }
+  .editor-toolbar { flex: none; padding-block: var(--s1); gap: var(--s1) var(--s2); }
+  .editor-toolbar button { min-height: 2.25rem; }
+  .tree-scroll, .region, .info-sheet { flex: 1; min-height: 0; overflow: auto; }
+}
+
+@media (max-width: 23rem) {
+  .wordmark .mark { display: none; }
+  .wordmark h1 { font-size: var(--t-md); }
+}
+
+@media (max-width: 47.999rem) {
+  .controls .repository-owner, .controls .repository-separator { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; }
+  .repo-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .repo-actions button, .repo-actions .button-link { width: auto; gap: var(--s2); padding-inline: var(--s2); }
+  .stage-head > #copy, .stage-head > .settings-open { width: auto; padding-inline: var(--s2); }
+  .canvas-caption { display: none; }
 }

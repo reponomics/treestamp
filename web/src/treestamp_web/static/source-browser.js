@@ -1,5 +1,6 @@
 // Browse source paths without replacing the editor's current draft.
 import { displayPath, pathKey } from "./logic.js";
+import { treeGuides, appendTreeGuides } from "./tree-view.js";
 
 const navigationKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Enter", " "]);
 
@@ -214,7 +215,7 @@ export class SourceBrowser {
     }
   }
 
-  row(entry, depth) {
+  row(entry, depth, guides) {
     const key = pathKey(entry.path);
     const item = document.createElement("li");
     item.className = "source-row";
@@ -224,42 +225,44 @@ export class SourceBrowser {
     item.setAttribute("aria-level", String(depth + 1));
     item.setAttribute("aria-selected", String(this.selectable(entry) && pathKey(this.selected[this.mode]) === key));
     item.setAttribute("aria-disabled", String(this.disabled || !this.navigable(entry)));
-    item.style.setProperty("--source-depth", depth);
     item.tabIndex = !this.disabled && this.focused === key ? 0 : -1;
     item.addEventListener("focus", () => { this.focused = key; });
     item.addEventListener("click", () => this.activate(entry));
-    this.appendToggle(item, entry);
+    appendTreeGuides(item, guides);
     const label = document.createElement("span");
     label.className = "source-name";
     label.textContent = entry.parent === null ? "./" : displayPath(entry.name) + (entry.kind === "dir" ? "/" : "");
     item.appendChild(label);
+    this.appendToggle(item, entry);
     return item;
   }
 
   appendToggle(item, entry) {
     const key = pathKey(entry.path);
-    const hasChildren = entry.kind === "dir" && this.children.has(key);
-    const toggle = document.createElement(hasChildren ? "button" : "span");
+    if (entry.kind !== "dir" || !this.children.has(key)) return;
+    const expanded = this.expanded.has(key);
+    item.setAttribute("aria-expanded", String(expanded));
+    const toggle = document.createElement("button");
     toggle.className = "source-toggle";
-    toggle.textContent = hasChildren ? (this.expanded.has(key) ? "▾" : "▸") : "·";
-    if (hasChildren) {
-      item.setAttribute("aria-expanded", String(this.expanded.has(key)));
-      toggle.type = "button";
-      toggle.tabIndex = -1;
-      toggle.disabled = this.disabled;
-      toggle.setAttribute("aria-label", `${this.expanded.has(key) ? "Collapse" : "Expand"} ${displayPath(entry.path)}`);
-      toggle.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (!this.disabled) this.toggle(entry);
-      });
-    } else toggle.setAttribute("aria-hidden", "true");
+    toggle.textContent = expanded ? "▾" : "▸";
+    toggle.type = "button";
+    toggle.tabIndex = -1;
+    toggle.disabled = this.disabled;
+    const action = `${expanded ? "Collapse" : "Expand"} ${displayPath(entry.path)}`;
+    toggle.setAttribute("aria-label", action);
+    toggle.title = action;
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!this.disabled) this.toggle(entry);
+    });
     item.appendChild(toggle);
   }
 
   render() {
     const visible = this.visibleEntries();
     if (!visible.some(({ entry }) => pathKey(entry.path) === this.focused && this.navigable(entry))) this.focused = ".";
-    this.tree.replaceChildren(...visible.map(({ entry, depth }) => this.row(entry, depth)));
+    const guides = treeGuides(visible);
+    this.tree.replaceChildren(...visible.map(({ entry, depth }, index) => this.row(entry, depth, guides[index])));
     this.tree.hidden = visible.length === 0;
   }
 }

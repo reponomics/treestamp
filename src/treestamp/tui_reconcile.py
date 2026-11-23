@@ -29,7 +29,7 @@ class PlacementChoiceScreen(ModalScreen[bool]):
     """Offer placement once, before editing a newly loaded draft."""
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("enter,y,Y", "place", "Place annotations", priority=True),
+        Binding("enter,y,Y", "place", "Place notes", priority=True),
         Binding("escape,n,N", "skip", "Continue without them", priority=True),
     ]
     DEFAULT_CSS = """
@@ -38,6 +38,7 @@ class PlacementChoiceScreen(ModalScreen[bool]):
                         border: round $accent; background: $surface; }
     #placement-choice Static { height: auto; }
     #placement-choice-title { text-style: bold; margin-bottom: 1; }
+    #placement-choice-summary { margin-bottom: 1; }
     #placement-choice-keys { margin-top: 1; }
     """
 
@@ -47,18 +48,28 @@ class PlacementChoiceScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         noun = (
-            "annotation lost its place"
+            "note refers to a path that is"
             if self.count == 1
-            else "annotations lost their place"
+            else "notes refer to paths that are"
         )
         pronoun = "it" if self.count == 1 else "them"
         with Vertical(id="placement-choice"):
             yield Static(
-                f"{self.count} {noun}.", markup=False, id="placement-choice-title"
+                "This treestamp no longer matches the repository.",
+                markup=False,
+                id="placement-choice-title",
             )
-            yield Static(f"Place {pronoun} in the updated tree?", markup=False)
             yield Static(
-                f"Enter Place annotations\nEsc Continue without {pronoun}",
+                f"{self.count} {noun} no longer in the tree.",
+                markup=False,
+                id="placement-choice-summary",
+            )
+            yield Static(
+                "Choose where each note belongs in the updated tree, or leave it out.",
+                markup=False,
+            )
+            yield Static(
+                f"Enter Place notes\nEsc Continue without {pronoun}",
                 markup=False,
                 id="placement-choice-keys",
             )
@@ -207,7 +218,7 @@ class ReconcileScreen(ModalScreen[str]):
         note = (
             "# " + source.annotation
             if source.annotation
-            else "Matching annotations follow this directory, recursively."
+            else "Matching notes follow this directory, recursively."
         )
         self.note_widget.update(safe_text(note))
         self.keys_widget.update(self._keys())
@@ -283,7 +294,7 @@ class ReconcileScreen(ModalScreen[str]):
         target = self.rows[self.cursor.selected][0]
         if source.is_dir != target.is_dir:
             message = (
-                "This annotation belongs on a directory. Choose a folder."
+                "This note belongs on a directory. Choose a folder."
                 if source.is_dir
                 else "Choose a file. Press → to browse this folder."
             )
@@ -339,17 +350,17 @@ class ReconcileScreen(ModalScreen[str]):
         source = self.state.current
         lines = [self._source_text()]
         if source is not None:
-            lines.extend(["", "Annotation", source.annotation])
+            lines.extend(["", "Note", source.annotation])
         lines.extend(["", "Destination", self.cursor.path or "."])
         annotation = self.session.annotations.get(self.cursor.path)
         if annotation:
-            lines.extend(["", "Current destination annotation", annotation])
+            lines.extend(["", "Current destination note", annotation])
         lines.extend(
             [
                 "",
-                "Enter places the annotation and reveals its destination in the draft.",
-                "s skips this item. Skipped annotations are left out when writing.",
-                "Directories carry pending annotations at matching relative paths,",
+                "Enter places the note and reveals its destination in the draft.",
+                "s skips this item. Skipped notes are left out when writing.",
+                "Directories carry pending notes at matching relative paths,",
                 "including nested paths. Missing or conflicting entries stay queued.",
                 "Browsing leaves the saved tree unchanged. H reveals hidden rows.",
                 "u undoes the last decision, including a whole directory placement.",
@@ -366,6 +377,6 @@ class ReconcileScreen(ModalScreen[str]):
 
     def action_back(self) -> None:
         self.dismiss(
-            f"Placement finished: {self.state.placed_count} annotations placed, "
+            f"Placement finished: {self.state.placed_count} notes placed, "
             f"{self.state.unplaced} left out. w writes the draft."
         )

@@ -39,7 +39,7 @@ def test_example_is_a_direct_offline_opt_in(
     expect(page.locator("#workspace")).to_be_hidden()
     page.locator("#explore-example").click()
     expect(page.locator("#url")).to_have_value("reponomics/reponomics-dashboard")
-    expect(page.locator("#example-context")).to_contain_text("Example:")
+    expect(page.locator("#example-context")).to_have_count(0)
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#reload-settings")).to_be_hidden()
     assert requests == []
@@ -117,7 +117,8 @@ def test_reselecting_example_replaces_notes_with_its_original_curation(
     page.locator("#explore-example").click()
     original = page.locator("#region").text_content()
     row = page.locator('.row[data-path="config.yaml"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("My custom note")
     page.locator("#note-text").press("Enter")
     expect(row.locator(".note")).to_have_text("# My custom note")

@@ -69,7 +69,7 @@ export class NotePlacement {
     element("placement-work").hidden = true;
     element("placement-error").hidden = true;
     const count = initial.placement.total;
-    element("placement-choice-title").textContent = `${count} ${count === 1 ? "note lost its place" : "notes lost their place"}.`;
+    element("placement-choice-summary").textContent = `${count} ${count === 1 ? "note refers to a path that is" : "notes refer to paths that are"} no longer in the tree.`;
     element("placement-reveal").checked = false;
     this.dialog.showModal();
     element("placement-start").focus();

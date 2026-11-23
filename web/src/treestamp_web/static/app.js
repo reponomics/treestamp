@@ -1,8 +1,9 @@
 // Preview and editor page. Talks to /api/preview and /api/op; renders text as text, never HTML.
 // Decisions that need no DOM live in logic.js and are tested with node --test.
 
+import { treeGuides, appendTreeGuides } from "./tree-view.js";
 import { EXAMPLES } from "./example.js";
-import { EntryFlow } from "./entry-flow.js";
+import { EntryFlow, renderRepository } from "./entry-flow.js";
 import { NotePlacement } from "./placement.js";
 import { saveDraft, draftForLocation } from "./draft.js";
 import {
@@ -55,12 +56,14 @@ const tabNames = Object.keys(tabs);
 const stage = document.getElementById("result");
 let generation = 0; // responses from an older request generation are ignored
 const rowsList = document.getElementById("rows");
+const treeToolbar = document.querySelector(".editor-toolbar");
+const rowNote = document.getElementById("row-note");
+const rowVisibility = document.getElementById("row-visibility");
+const selectedPathLabel = document.getElementById("selected-path");
+let selectedPath = "";
 const reveal = document.getElementById("reveal");
 const revealLabel = document.getElementById("reveal-label");
 const showAll = document.getElementById("show-all");
-const notice = document.getElementById("notice");
-const noticeText = document.getElementById("notice-text");
-const noticeUndo = document.getElementById("notice-undo");
 const region = document.getElementById("region");
 const copy = document.getElementById("copy");
 const copyLabel = document.getElementById("copy-label");
@@ -80,8 +83,6 @@ let countdown = null;
 // The editing session: identity of the commit plus the state the server hands back.
 let editor = null;
 let editingSession = 0;
-let userEdited = false;
-const exampleContext = document.getElementById("example-context");
 
 // ---------- settings <-> form
 
@@ -177,48 +178,30 @@ function showError(message, hint, retryAfter) {
 // ---------- rendering
 
 function treeRowElements(rows) {
-  // Only visible siblings keep a branch open; collapsed/hidden descendants
-  // should not leave dangling guide lines in the editor.
-  const hasNextSibling = rows.map(() => false);
-  const previousAtDepth = [];
-  rows.forEach((row, index) => {
-    previousAtDepth.length = row.depth + 1;
-    const previous = previousAtDepth[row.depth];
-    if (previous !== undefined) hasNextSibling[previous] = true;
-    previousAtDepth[row.depth] = index;
-  });
-  const trail = [];
-  return rows.map((row, index) => {
-    trail.length = row.depth;
-    if (row.depth) trail[row.depth - 1] = hasNextSibling[index];
-    const guides = trail.map((continues, level) => {
-      if (level === row.depth - 1) return continues ? "branch" : "branch last";
-      return continues ? "trunk" : "";
-    });
-    return rowElement(row, guides);
-  });
+  const guides = treeGuides(rows);
+  return rows.map((row, index) => rowElement(row, guides[index]));
 }
 
 function rowElement(row, guides) {
   const item = document.createElement("li");
   item.className = `row ${row.kind === "dir" ? "dir" : "leaf"}${row.hidden ? " hidden-row" : ""}`;
   item.dataset.path = row.path;
-  // Clicking or tapping a row focuses it, which is what reveals its actions where there
-  // is no pointer to hover with. Controls inside the row keep the focus they take.
+  const canFold = row.kind === "dir" && row.path !== "";
+  // Focus selects the row for the shared toolbar; folder controls still fold it.
   item.tabIndex = row.path === "" ? 0 : -1;
   item.addEventListener("click", (event) => {
-    if (event.target.closest("button, input, .row-actions")) return;
+    if (event.target.closest("button, input")) return;
     item.focus({ preventScroll: true });
     if (canFold && window.getSelection().isCollapsed) operate("toggle", row.path);
   });
-  for (const guide of guides) {
-    const indent = document.createElement("span");
-    indent.className = `indent ${guide}`;
-    indent.setAttribute("aria-hidden", "true");
-    item.appendChild(indent);
-  }
+  appendTreeGuides(item, guides);
 
-  const canFold = row.kind === "dir" && row.path !== "";
+  item.appendChild(createRowName(row, canFold));
+  appendRowDetails(item, row);
+  return item;
+}
+
+function createRowName(row, canFold) {
   const name = document.createElement(canFold ? "button" : "span");
   name.className = canFold ? "name fold" : "name";
   name.textContent = rowName(row);
@@ -232,50 +215,70 @@ function rowElement(row, guides) {
       operate("toggle", row.path);
     });
   }
-  item.appendChild(name);
+  return name;
+}
 
+function appendRowDetails(item, row) {
   if (rowSuffix(row)) item.appendChild(Object.assign(document.createElement("span"), { className: "target", textContent: rowSuffix(row) }));
   if (row.kind === "dir" && row.collapsed && row.counts) item.appendChild(Object.assign(document.createElement("span"), { className: "counts", textContent: row.counts }));
   if (row.annotation) item.appendChild(Object.assign(document.createElement("span"), { className: "note", textContent: `# ${row.annotation}` }));
-
-  const actions = document.createElement("span");
-  actions.className = "row-actions";
-  const note = document.createElement("button");
-  note.type = "button";
-  note.dataset.action = "note";
-  note.textContent = "Note";
-  note.addEventListener("click", () => enqueueEdit((saved) => {
-    const current = editor.rows.find((entry) => entry.path === row.path);
-    if (current && !document.querySelector("dialog[open]")) editAnnotation(current, "note");
-    return saved;
-  }));
-  actions.appendChild(note);
-  const hide = document.createElement("button");
-  hide.type = "button";
-  hide.dataset.action = "visibility";
-  hide.textContent = row.hidden ? "Unhide" : "Hide";
-  hide.disabled = row.path === "";
-  if (hide.disabled) hide.title = "The root is always included";
-  hide.addEventListener("click", () => {
-    if (row.hidden) { operate("unhide", row.path); return; }
-    operate("hide", row.path).then((ok) => { if (ok) showNotice(`Hidden ${rowName(row)}`, row.path); });
-  });
-  actions.appendChild(hide);
-  item.appendChild(actions);
-  return item;
 }
+
+function selectRow(path) {
+  const row = editor?.rows.find((entry) => entry.path === path);
+  selectedPath = row?.path ?? "";
+  for (const item of rowsList.children) {
+    const selected = Boolean(row) && item.dataset.path === selectedPath;
+    item.dataset.selected = String(selected);
+    item.tabIndex = selected ? 0 : -1;
+    if (selected) item.setAttribute("aria-current", "true");
+    else item.removeAttribute("aria-current");
+  }
+  renderSelectionToolbar(row);
+}
+
+function renderSelectionToolbar(row) {
+  const label = row ? (displayPath(row.identity) || ".") + (row.kind === "dir" ? "/" : "") : "No selection";
+  selectedPathLabel.textContent = label;
+  selectedPathLabel.title = label;
+  rowNote.disabled = !row;
+  rowVisibility.disabled = !row || row.path === "";
+  rowVisibility.textContent = row?.hidden ? "Unhide" : "Hide";
+  rowVisibility.title = row?.path === "" ? "The root is always included" : "";
+}
+
+rowsList.addEventListener("focusin", (event) => {
+  const item = event.target.closest(".row");
+  if (item) selectRow(item.dataset.path);
+});
+
+rowNote.addEventListener("click", () => {
+  const path = selectedPath;
+  enqueueEdit((saved) => {
+    const row = editor.rows.find((entry) => entry.path === path);
+    if (row && !document.querySelector("dialog[open]")) editAnnotation(row, "note");
+    return saved;
+  });
+});
+rowVisibility.addEventListener("click", () => {
+  const path = selectedPath;
+  enqueueEdit((saved) => {
+    const row = editor.rows.find((entry) => entry.path === path);
+    return row?.path ? toggleRowVisibility(row) : saved;
+  });
+});
 
 let noteEditing = null;
 
 function restoreTreeFocus(path, action) {
   const row = Array.from(rowsList.children).find((item) => item.dataset.path === path);
-  const control = action && row?.querySelector(`button[data-action="${action}"]:not(:disabled)`);
+  const control = action === "note" ? rowNote : action && row?.querySelector(`button[data-action="${action}"]:not(:disabled)`);
   (control || row)?.focus({ preventScroll: true });
 }
 
 function editAnnotation(row, action) {
   noteEditing = { path: row.path, original: row.annotation || "", action, session: editingSession, saving: false, request: null, savedBefore: undefined };
-  document.getElementById("note-path").textContent = displayPath(row.identity) || "./";
+  document.getElementById("note-name").textContent = row.path ? row.name : "./";
   document.getElementById("note-error").hidden = true;
   noteText.value = noteEditing.original;
   noteText.readOnly = false;
@@ -343,7 +346,11 @@ function renderRows(rows) {
   const path = focusedRow?.dataset.path;
   const action = focused.dataset.action;
   const index = Array.from(rowsList.children).indexOf(focusedRow);
+  const selectedIndex = Array.from(rowsList.children).findIndex((item) => item.dataset.path === selectedPath);
   rowsList.replaceChildren(...treeRowElements(rows));
+  const selected = rows.find((row) => row.path === selectedPath) || rows[Math.max(0, Math.min(selectedIndex, rows.length - 1))];
+  selectRow(selected?.path);
+  if (focused === rowVisibility && rowVisibility.disabled) rowNote.focus({ preventScroll: true });
   if (index >= 0) {
     const replacement = Array.from(rowsList.children).find((row) => row.dataset.path === path)
       || rowsList.children[Math.min(index, rowsList.children.length - 1)];
@@ -380,17 +387,16 @@ function render(data, opening = false) {
   };
   showSettings(data, !opening && Boolean(previous?.rows.length));
   document.getElementById("tree-document").textContent = displayPath(data.document);
-  document.querySelector(".caption-label").textContent = data.document ? "treestamp for " : "treestamp";
-  document.querySelector(".canvas-caption").classList.toggle("no-document", !data.document);
+  document.querySelector(".canvas-caption").hidden = !data.document;
   loadedNote.textContent = data.loaded ? "Document opened" : "";
   loadedNote.hidden = !data.loaded;
   stageStatus.textContent = opening && data.loaded
     ? (data.dirty ? "Treestamp updated" : "Treestamp is up to date") : "";
   status.textContent = "";
   if (opening) {
+    selectedPath = "";
     editingSession += 1;
     queue = Promise.resolve(true);
-    userEdited = false;
   }
 
   document.querySelectorAll("[data-repo-branch]").forEach((node) => { node.textContent = data.repository.default_branch || "Unavailable"; });
@@ -401,7 +407,7 @@ function render(data, opening = false) {
   const address = prepared.address;
   repoInfo.disabled = false;
   document.getElementById("reset-tree").disabled = false;
-  document.getElementById("active-repository").textContent = `${editor.owner}/${editor.repo}`;
+  renderRepository(document.getElementById("active-repository"), `${editor.owner}/${editor.repo}`);
   fields.url.value = `${editor.owner}/${editor.repo}`;
 
   renderRows(editor.rows);
@@ -412,7 +418,6 @@ function render(data, opening = false) {
   copyLabel.textContent = "Copy treestamp";
   setCopyStatus("");
   copy.classList.remove("copied");
-  notice.hidden = true;
   const hiddenCount = data.state.curation.hidden.length;
   revealLabel.textContent = hiddenCount ? `Reveal hidden entries (${hiddenCount})` : "Reveal hidden entries";
   showAll.disabled = hiddenCount === 0;
@@ -431,35 +436,6 @@ function renderRegion(text) {
   }));
 }
 
-// A one-line confirmation under the tree with a way back, for changes that remove a row.
-let noticePath = null;
-function showNotice(text, undoPath) {
-  noticeText.textContent = text;
-  noticePath = undoPath;
-  noticeUndo.hidden = undoPath === null;
-  notice.hidden = false;
-}
-noticeUndo.addEventListener("click", async () => {
-  if (noticePath === null || noticeUndo.getAttribute("aria-disabled") === "true") return;
-  const path = noticePath;
-  const session = editingSession;
-  let restoreFocus = document.activeElement === noticeUndo;
-  const trackFocus = (event) => { if (event.target !== noticeUndo) restoreFocus = false; };
-  document.addEventListener("focusin", trackFocus);
-  // Keep the focused action present while saving, and available again on failure.
-  noticeUndo.setAttribute("aria-disabled", "true");
-  try {
-    const saved = await operate("unhide", path);
-    if (!saved || session !== editingSession || !restoreFocus) return;
-    const restored = Array.from(rowsList.children).find((row) => row.dataset.path === path);
-    restored?.focus({ preventScroll: true });
-    restored?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  } finally {
-    document.removeEventListener("focusin", trackFocus);
-    noticeUndo.removeAttribute("aria-disabled");
-  }
-});
-
 // A first load failed and there is no tree to keep showing.
 function leaveStage() {
   stageStatus.textContent = "No tree";
@@ -467,16 +443,12 @@ function leaveStage() {
 
 // ---------- requests
 
-async function acceptResponse(body, opening, editing, ticket) {
+async function acceptResponse(body, opening, ticket) {
   try {
     preparePreview(body, window.location.origin);
     if (opening && body.placement?.total > 0) body = await placement.run(body);
     if (!body || ticket !== generation) return false;
-    if (editing) userEdited = true;
-    if (opening) exampleContext.hidden = true;
-    else if (body.state?.revision > 0) userEdited = true;
     render(body, opening);
-    if (opening && body.placement?.placed_count > 0) userEdited = true;
     return true;
   } catch (err) {
     showError("The page could not display the tree.", String(err && err.message), null);
@@ -494,7 +466,7 @@ function rejectResponse(body, responseStatus) {
 
 // Previews abort whatever is in flight. Operations never abort: each one waits for the
 // previous response so it carries the newest state, which is what keeps notes from being lost.
-async function call(url, init, { abortable, editing = false }) {
+async function call(url, init, { abortable }) {
   placement.cancel();
   if (controller) controller.abort();
   const mine = new AbortController();
@@ -515,7 +487,7 @@ async function call(url, init, { abortable, editing = false }) {
   }
   if (mine.signal.aborted || ticket !== generation) return false;
   setBusy(false, abortable);
-  if (response.ok && body) return acceptResponse(body, abortable, editing, ticket);
+  if (response.ok && body) return acceptResponse(body, abortable, ticket);
   return rejectResponse(body, response.status);
 }
 
@@ -541,7 +513,7 @@ function enqueueEdit(action) {
 async function sendOperation(type, path, text) {
   const accepted = editor;
   const body = opBody(editor, settingsFromForm(editor.state.curation.settings), reveal.checked, type, path, text);
-  const saved = await call("/api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { abortable: false, editing: type !== "restore" });
+  const saved = await call("/api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { abortable: false });
   if (!saved && editor === accepted) {
     fields.style.value = accepted.state.curation.settings.style;
     fields.show_counts.checked = accepted.state.curation.settings.show_counts;
@@ -627,6 +599,7 @@ repoInfo.addEventListener("click", () => {
   repoInfo.focus({ preventScroll: true });
   repoTooltipRestoringFocus = true;
   repoTooltip.hidden = true;
+  renderRepository(document.getElementById("repo-info-name"), fields.url.value);
   repoInfoDialog.showModal();
 });
 repoInfoDialog.addEventListener("close", () => {
@@ -660,12 +633,14 @@ function navigateTree(key, saved) {
   const index = editor.rows.findIndex((row) => row.path === item?.dataset.path);
   if (index < 0) return saved;
   const pane = rowsList.parentElement.getBoundingClientRect();
-  const visibleHeight = Math.min(pane.bottom, window.innerHeight) - Math.max(pane.top, 0);
+  const toolbar = treeToolbar.getBoundingClientRect();
+  const visibleHeight = Math.min(pane.bottom, window.innerHeight) - Math.max(pane.top, toolbar.bottom, 0);
   const pageSize = Math.max(1, Math.floor(visibleHeight / item.getBoundingClientRect().height) - 1);
   const next = treeNavigation(editor.rows, editor.state.curation.expanded.map(pathKey), index, key, pageSize);
   if (next.operation) return sendOperation(next.operation, item.dataset.path);
   const target = rowsList.children[next.index];
   target.focus({ preventScroll: true });
+  rowsList.style.setProperty("--selection-toolbar-height", `${toolbar.height}px`);
   target.scrollIntoView({ block: "nearest", inline: "nearest" });
   // Moving the selection must not clear a failed edit before the next Copy.
   return saved;
@@ -701,10 +676,7 @@ function runTreeCommand(key, saved) {
 }
 
 function toggleRowVisibility(row) {
-  return sendOperation(row.hidden ? "unhide" : "hide", row.path).then((ok) => {
-    if (ok && !row.hidden) showNotice(`Hidden ${rowName(row)}`, row.path);
-    return ok;
-  });
+  return sendOperation(row.hidden ? "unhide" : "hide", row.path);
 }
 
 function cycleCounts() {
@@ -747,7 +719,6 @@ function browseRepository(repo) {
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
   repoTooltip.hidden = true;
   entryFlow.browse(repo, { canReturn: Boolean(editor?.rows.length) });
-  document.getElementById("replace-draft-warning").hidden = !userEdited;
 }
 
 form.addEventListener("submit", (event) => {
@@ -768,7 +739,6 @@ const resetDialog = document.getElementById("reset-dialog");
 const resetConfirm = document.getElementById("reset-confirm");
 document.getElementById("reset-tree").addEventListener("click", () => {
   resetDialog.querySelector(".dialog-error").hidden = true;
-  document.getElementById("reset-description").textContent = "Return to the start of editing. Annotation transfers are kept; later changes to notes, hidden entries, folds, and formatting are discarded.";
   resetDialog.showModal();
   document.getElementById("reset-cancel").focus();
 });
@@ -789,7 +759,6 @@ async function resetTree() {
   }
   const accepted = await operate("reset");
   if (!accepted) reveal.checked = revealed;
-  else userEdited = false;
   return accepted;
 }
 
@@ -820,8 +789,6 @@ function loadExample(name) {
   reveal.checked = false;
   render(structuredClone(EXAMPLES[name]), true);
   entryFlow.hide(true);
-  exampleContext.textContent = `Example: ${EXAMPLES[name].repository.owner}/${EXAMPLES[name].repository.name}`;
-  exampleContext.hidden = false;
   setBusy(false, true);
 }
 
@@ -884,7 +851,7 @@ function selectTab(name) {
 }
 
 // Wide layouts show settings in the sidebar; narrow layouts use a popover.
-const wideLayout = matchMedia("(min-width: 48rem)");
+const wideLayout = matchMedia("(min-width: 64rem)");
 wideLayout.addEventListener("change", (event) => {
   if (event.matches && settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
 });
@@ -927,7 +894,7 @@ Object.entries(tabs).forEach(([name, tab]) => {
   }
   const { owner, repo, sha, saved } = route;
   fields.url.value = `${owner}/${repo}`;
-  document.getElementById("active-repository").textContent = `${owner}/${repo}`;
+  renderRepository(document.getElementById("active-repository"), `${owner}/${repo}`);
   if (window.location.hash.startsWith("#s=") && !saved) {
     entryFlow.hide();
     showError("This link contains invalid editing state.", "Open the repository to create a new tree.", null);

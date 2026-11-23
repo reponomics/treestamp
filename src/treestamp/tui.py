@@ -52,7 +52,7 @@ _HELP = (
     "",
     "EDIT",
     "h               Hide or unhide the selected entry",
-    "a               Edit the selected entry's annotation",
+    "a               Edit the selected entry's note",
     "S               Unhide all entries",
     "",
     "VIEW AND APPEARANCE",
@@ -71,12 +71,12 @@ _HELP = (
     "q / Esc         Quit; confirm if there are unwritten changes",
     "",
     "ON DOCUMENT LOAD",
-    "If annotations lost their rows, choose whether to place them first.",
+    "If saved paths are gone, choose where their notes belong in the new tree.",
     "One source stays at the top; navigate only the destination tree.",
     "Enter places; s skips; u undoes the last decision during placement.",
-    "Directories carry matching annotations recursively by relative path.",
+    "Directories carry matching notes recursively by relative path.",
     "Browsing folders leaves the draft unchanged. Placing reveals the target.",
-    "Placement ends before editing. Skipped annotations are left out.",
+    "Placement ends before editing. Skipped notes are left out.",
     "",
     "Collapsing a folder preserves its curation during this session.",
     "Reopening restores only printed rows and recorded hiding.",
@@ -124,7 +124,7 @@ class TreestampApp(App[bool]):
         Binding("h", "hide", "Hide/unhide"),
         Binding("H", "reveal", "Reveal hidden"),
         Binding("S", "show_all", "Unhide all"),
-        Binding("a", "annotate", "Annotate"),
+        Binding("a", "annotate", "Note"),
         Binding("c", "counts", "Show counts"),
         Binding("s", "style", "Tree style"),
         Binding("t", "attribution", "Attribution trailer"),
@@ -177,7 +177,7 @@ class TreestampApp(App[bool]):
         yield self.status_widget
         yield Static(
             "[bold]Tree[/]     ↑↓ Select  ←→ Expand/collapse  Space Toggle  "
-            "h Hide/unhide  a Annotate",
+            "h Hide/unhide  a Note",
             classes="controls",
         )
         yield self.summary_widget
@@ -332,27 +332,25 @@ class TreestampApp(App[bool]):
         self._sync_cursor()
         path = self.cursor.path
         self.push_screen(
-            PromptScreen("Annotation", self.session.annotations.get(path, "")),
+            PromptScreen("Note", self.session.annotations.get(path, "")),
             partial(self._accept_annotation, path),
         )
 
     async def _accept_annotation(self, path: str, value: str | None) -> None:
         if value is None:
-            self._set_status("Annotation edit cancelled.")
+            self._set_status("Note edit cancelled.")
             return
         accepted, error = self._apply_edit(
             partial(self.session.set_annotation, path, value)
         )
         if not accepted:
             self.push_screen(
-                PromptScreen("Annotation", value, description=error),
+                PromptScreen("Note", value, description=error),
                 partial(self._accept_annotation, path),
             )
             return
         message = (
-            "Annotation updated in draft."
-            if value.strip()
-            else "Annotation removed from draft."
+            "Note updated in draft." if value.strip() else "Note removed from draft."
         )
         await self.refresh_tree(message)
 
@@ -415,7 +413,7 @@ class TreestampApp(App[bool]):
             self.push_screen(ReconcileScreen(self.editor), self._after_reconcile)
         else:
             await self._after_reconcile(
-                "Continued without placing removed annotations. w writes the draft."
+                "Continued without these notes. w writes the draft."
             )
 
     async def _after_reconcile(self, status: str | None) -> None:

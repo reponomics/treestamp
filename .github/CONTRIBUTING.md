@@ -50,3 +50,5 @@ Run `make check:pre-commit` on staged changes before committing and `make check:
 Stage source additions, deletions, and moves before running `venv/bin/treestamp update README.md`; inspect and stage the resulting README separately. Treestamp and its hooks never stage or commit files. `make integration-check` verifies the staged tree against the README. After committing a candidate, `make hook-check` verifies hooks installed from that HEAD; it does not cover uncommitted changes.
 
 Preserve exact path identity, frozen editing snapshots, and draft recovery on failed operations. Keep Markdown prose unwrapped. Include release notes when a change requires users to modify their documents or workflows. Update the documentation a change affects in the same pull request, and treat errors in the documentation as bugs.
+
+For web UI changes, run the [quick local review](../docs/ui-review.md) before pushing. It records findings within three minutes; it does not launch automatic repairs or block a push. Keep outstanding rough edges in the [rolling log](../docs/ui-review-log.md).

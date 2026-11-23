@@ -11,7 +11,8 @@ pytestmark = pytest.mark.browser
 
 
 def annotate(page: Page) -> None:
-    page.locator('.row[data-path="src"] [data-action="note"]').click()
+    page.locator('.row[data-path="src"]').focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("A temporary note")
     page.locator("#note-save").click()
     expect(page.locator("#region")).to_contain_text("A temporary note")
@@ -103,7 +104,8 @@ def test_example_discard_stays_local_and_keeps_its_curated_content(
     page.locator("#reset-confirm").click()
     expect(page.locator("#reset-dialog")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original)
-    expect(page.locator("#example-context")).to_be_visible()
+    expect(page.locator("#example-context")).to_have_count(0)
+    expect(page.locator("#active-repository")).to_contain_text("reponomics/")
     assert requests == []
 
 
@@ -114,7 +116,8 @@ def test_edited_example_can_discard_after_reloading_the_page(
     page.locator("#explore-example").click()
     original = page.locator("#region").text_content()
     row = page.locator('.row[data-path="config.yaml"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("My own configuration note")
     page.locator("#note-save").click()
     expect(row.locator(".note")).to_have_text("# My own configuration note")
@@ -131,5 +134,6 @@ def test_edited_example_can_discard_after_reloading_the_page(
     page.locator("#reset-confirm").click()
     expect(page.locator("#reset-dialog")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original)
-    expect(page.locator("#example-context")).to_be_visible()
+    expect(page.locator("#example-context")).to_have_count(0)
+    expect(page.locator("#active-repository")).to_contain_text("reponomics/")
     assert requests == []
