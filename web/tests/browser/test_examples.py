@@ -9,16 +9,11 @@ from playwright.sync_api import Page, expect  # noqa: E402
 
 pytestmark = pytest.mark.browser
 
-EXAMPLES = [
-    ("reponomics-dashboard", ".", "Choose repositories and publishing options"),
-    ("reponomics-dashboard-action", ".", "GitHub Action entry point"),
-    ("PolicyChecks", "src", "Start the badge service"),
-]
+EXAMPLES = [("treestamp", ".", "Package metadata and dependencies")]
 
 
 def explore_from_editor(page: Page) -> None:
     page.locator("#submit").click()
-    page.locator("#entry-change-repo").click()
     page.locator("#explore-example").click()
 
 
@@ -38,7 +33,7 @@ def test_example_is_a_direct_offline_opt_in(
     expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
     page.locator("#explore-example").click()
-    expect(page.locator("#url")).to_have_value("reponomics/reponomics-dashboard")
+    expect(page.locator("#url")).to_have_value("reponomics/treestamp")
     expect(page.locator("#example-context")).to_have_count(0)
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#reload-settings")).to_be_hidden()
@@ -52,9 +47,9 @@ def test_markdown_format_keeps_the_curated_tree_editable(
     page.set_viewport_size({"width": width, "height": 844})
     page.goto(service + "/")
     page.locator("#explore-example").click()
-    config = page.locator('.row[data-path="config.yaml"]')
-    workflows = page.locator('.row[data-path=".github/workflows"]')
-    note = "Choose repositories and publishing options"
+    config = page.locator('.row[data-path="pyproject.toml"]')
+    workflows = page.locator('.row[data-path="src/treestamp"]')
+    note = "Package metadata and dependencies"
     expect(config.locator(".note")).to_have_text(f"# {note}")
     expect(page.get_by_label("Format", exact=True)).to_be_hidden()
 
@@ -62,7 +57,7 @@ def test_markdown_format_keeps_the_curated_tree_editable(
         page.locator("#tab-stamp").click()
         page.get_by_label("Format", exact=True).select_option(style)
         expect(page.locator("#region")).not_to_contain_text("style =")
-        expect(page.locator("#region")).to_contain_text(connector + ".github/")
+        expect(page.locator("#region")).to_contain_text(connector + "src/")
         expect(page.locator("#region")).to_contain_text(note)
         expect(page.locator("#tab-stamp")).to_have_attribute("aria-selected", "true")
 
@@ -70,10 +65,10 @@ def test_markdown_format_keeps_the_curated_tree_editable(
         expect(page.get_by_label("Format", exact=True)).to_be_hidden()
         expect(config.locator(".note")).to_have_text(f"# {note}")
         expect(page.locator('.row[data-path="README.md"]')).to_have_count(0)
-        expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(0)
+        expect(page.locator('.row[data-path^="src/treestamp/"]')).to_have_count(0)
 
     workflows.locator(".fold").click()
-    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
+    expect(page.locator('.row[data-path^="src/treestamp/"]')).not_to_have_count(0)
     expect(config.locator(".note")).to_have_text(f"# {note}")
     page.locator("#tab-stamp").click()
     expect(page.get_by_label("Format", exact=True)).to_have_value("list")
@@ -116,7 +111,7 @@ def test_reselecting_example_replaces_notes_with_its_original_curation(
     page.goto(service + "/")
     page.locator("#explore-example").click()
     original = page.locator("#region").text_content()
-    row = page.locator('.row[data-path="config.yaml"]')
+    row = page.locator('.row[data-path="pyproject.toml"]')
     row.focus()
     page.locator("#row-note").click()
     page.locator("#note-text").fill("My custom note")
@@ -147,7 +142,7 @@ def test_example_replaces_queued_edits_without_accepting_late_responses(
     page.locator("#style").select_option("unicode")
     page.wait_for_function("window.delayedCalls === 1")
     explore_from_editor(page)
-    expect(page.locator("#url")).to_have_value("reponomics/reponomics-dashboard")
+    expect(page.locator("#url")).to_have_value("reponomics/treestamp")
     region = page.locator("#region").text_content()
     address = page.url
     page.evaluate(

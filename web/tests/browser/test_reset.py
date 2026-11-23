@@ -39,6 +39,7 @@ def test_discard_cancel_preserves_edits_and_reset_survives_a_return(
     expect(page.locator("#reset-dialog")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original)
     page.goto(service + "/")
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).to_have_text(original)
 
@@ -115,7 +116,7 @@ def test_edited_example_can_discard_after_reloading_the_page(
     page.goto(service + "/")
     page.locator("#explore-example").click()
     original = page.locator("#region").text_content()
-    row = page.locator('.row[data-path="config.yaml"]')
+    row = page.locator('.row[data-path="pyproject.toml"]')
     row.focus()
     page.locator("#row-note").click()
     page.locator("#note-text").fill("My own configuration note")

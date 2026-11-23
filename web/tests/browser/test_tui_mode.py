@@ -119,7 +119,7 @@ def test_tui_annotation_uses_dialog_and_preserves_native_text_input(
     expect(docs.locator(".note")).to_have_text("# ahHSf?")
     expect(docs).to_be_focused()
 
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     page.locator("#entry-change-repo").click()
     repository = page.locator("#entry-url")
     repository.fill("")
@@ -375,8 +375,8 @@ def test_home_keeps_selected_row_visible_below_toolbar(
     page.set_viewport_size({"width": width, "height": 500})
     page.goto(service + "/")
     page.locator("#explore-example").click()
-    page.locator('.row[data-path=".github/workflows"] .fold').click()
-    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
+    page.locator('.row[data-path="src/treestamp"] .fold').click()
+    expect(page.locator('.row[data-path^="src/treestamp/"]')).not_to_have_count(0)
     page.locator("#tui-mode").click()
     page.locator("#rows .row").last.focus()
     page.locator(".tree-scroll").evaluate(

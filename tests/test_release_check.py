@@ -27,6 +27,8 @@ SDIST = Path("treestamp-0.1.0.tar.gz")
         ".env",
         "venv/bin/python",
         "scripts/private_notes.md",
+        "scripts/local_debug.py",
+        "scripts/reconcile_demo.py",
         "src/treestamp/__pycache__/cli.pyc",
     ],
 )

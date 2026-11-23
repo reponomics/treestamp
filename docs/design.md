@@ -48,7 +48,7 @@ The modules in `src/treestamp/` have narrow responsibilities:
 - **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
 - **Start or load.** In the terminal editor, the opening filesystem tree lets the user select a folder for **Create treestamp here** or a file for **Load treestamp from document**. Creation captures the chosen subtree; loading reads the document and restores its tree, hidden entries, and settings against the captured index.
 - **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
-- **Write.** `update` and the editor's **Write to document** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. The editor offers writing only for a loaded document, and always writes back to that document. New trees are copied or printed for insertion into a document.
+- **Write.** `update` and the editor's **Write to document** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. The editor offers writing only for a loaded document, and always writes back to that document. New treestamps are copied or printed for insertion into a document.
 - **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
 - **Copy.** The editor sends the complete treestamp to a native clipboard command if one is on `PATH`, otherwise to the terminal through OSC 52.
 
@@ -94,7 +94,7 @@ The Python modules are not a supported library interface.
 
 `treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents a visual folder/document chooser. `treestamp` with no command is equivalent to `treestamp tui`.
 
-With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new tree if the README is absent or unmarked; malformed or empty marked regions remain errors.
+With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new treestamp if the README is absent or unmarked; malformed or empty marked regions remain errors.
 
 `treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` to match the snapshot. An explicit document path resolves from cwd (or is absolute) and selects its containing repository. An omitted document selects the repository-root README in cwd's repository. `--target` selects a Git ref in the document's repository instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
 
@@ -146,12 +146,14 @@ The browser application uses these endpoints. They exist to serve that applicati
 | --- | --- | --- |
 | `GET /` | None | The browser application |
 | `GET /{owner}/{repo}` | A repository owner and name in the path | The browser application, which then opens that repository |
+| `GET /api/browse` | Repository `url` | Source entries for selecting a root folder or document |
 | `GET /api/preview` | Query parameters `url`, or `owner` and `repo`; optional `ref` (a commit id), `root`, `document` | A preview: repository, resolved commit and tree, settings, rendered tree and region, display rows, warnings, permalink, and state envelope |
 | `POST /api/preview` | The same fields as a JSON object | The same as `GET` |
 | `POST /api/op` | JSON with `owner`, `repo`, `ref` (a 40-character commit id), `root`, `document`, `state` (the envelope), `op` (`type` plus `path` or `text`), and `reveal` | An updated preview |
+| `POST /api/placement` | Captured source and opening `state`, bounded `decisions`, browsing `expanded` paths, and `reveal` | Provisional placement state and destination rows |
 | `GET /healthz` | None | Liveness, versions, build commit, credential type, last observed GitHub budget, and cache statistics |
 
-The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the loaded document's original bytes, and a revision counter; the browser returns it unchanged with each operation. Operation types:
+The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the loaded document's original bytes, an optional `initial_curation` baseline, and a revision counter; the browser returns it unchanged with each operation. Operation types:
 
 | Type | Effect |
 | --- | --- |
@@ -160,6 +162,7 @@ The state envelope carries the curation (expanded and hidden paths, annotations,
 | `unhide_all` | Show all hidden entries |
 | `annotate` | Set the annotation of `path` to `text`; empty text removes it |
 | `present` | Re-render with the settings in the state, such as drawing style or counts |
-| `restore` | Re-render the state without counting as an edit, for example after a page reload |
+| `restore` | Re-render a captured session without counting as an edit |
+| `reset` | Restore `initial_curation`, captured after note placement, against the same snapshot |
 
-`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`.
+`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `409`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`.

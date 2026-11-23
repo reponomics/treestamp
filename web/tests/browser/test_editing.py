@@ -23,7 +23,6 @@ def open_editor(page: Page, service: str) -> None:
 
 def browse_other_repository(page: Page, repository: str) -> None:
     page.locator("#submit").click()
-    page.locator("#entry-change-repo").click()
     page.locator("#entry-url").fill(repository)
     page.locator("#entry-browse").click()
 
@@ -48,7 +47,7 @@ def test_exploring_the_example_opens_it_without_a_request(
     page.goto(service + "/")
     page.locator("#explore-example").click()
     expect(page.locator("#rows .row")).not_to_have_count(0)
-    expect(page.locator("#url")).to_have_value("reponomics/reponomics-dashboard")
+    expect(page.locator("#url")).to_have_value("reponomics/treestamp")
     expect(page.locator("#error")).to_be_hidden()
     expect(page.locator("#stage-status")).to_be_hidden()
     expect(page.locator("#status")).to_have_text("")
@@ -63,7 +62,7 @@ def test_a_failed_load_keeps_the_open_tree(page: Page, service: str) -> None:
         ),
     )
     browse_other_repository(page, "fixture/elsewhere")
-    expect(page.locator("#reload")).to_have_text("New tree")
+    expect(page.locator("#reload")).to_have_text("Create")
     page.click("#reload")
     expect(page.locator("#reload-error")).to_contain_text("Repository unavailable.")
     expect(page.locator("#reload-settings")).to_be_visible()
@@ -89,7 +88,7 @@ def test_cancelling_load_preserves_tree_and_restores_source_fields(
     )
     browse_other_repository(page, "fixture/another-repository")
     expect(page.locator("#reload-settings")).to_be_visible()
-    expect(page.locator("#reload")).to_have_text("New tree")
+    expect(page.locator("#reload")).to_have_text("Create")
     page.locator('.source-row[data-path="src"]').click()
     page.locator("#entry-return").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
@@ -340,9 +339,7 @@ def test_attribution_toggle_updates_copy_and_survives_reload(
     open_editor(page, service)
     if tui_mode:
         page.locator("#tui-mode").click()
-    attribution = page.get_by_role(
-        "checkbox", name="Add “Maintained with treestamp” footer"
-    )
+    attribution = page.get_by_role("checkbox", name="Add treestamp footer")
     trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
     expect(attribution).not_to_be_checked()
     visible_trailer = page.locator("#tree-attribution")
@@ -454,7 +451,7 @@ def test_reopening_after_a_failed_edit_allows_copy(
     page.locator('.row[data-path="docs"] .fold').click()
     expect(page.locator("#error")).to_be_visible()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous tree")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
     assert page.evaluate("window.copiedBlocks") == [original_region]
     browse_other_repository(page, "fixture/reopened")
     page.locator("#reload").click()
@@ -539,7 +536,7 @@ def test_cancelling_failed_note_preserves_an_earlier_failed_edit(
     note.press("Escape")
     expect(page.locator("#note-dialog")).to_be_hidden()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous tree")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
 
 
 @pytest.mark.parametrize("close", ["Cancel", "Escape"])
@@ -753,10 +750,11 @@ def test_expired_saved_link_does_not_export_an_unvalidated_placeholder(
         ),
     )
     page.reload()
-    expect(page.locator("#error")).to_contain_text("Load the repository URL again")
+    expect(page.locator("#error")).to_contain_text("Choose Open a tree")
+    expect(page.locator("#error")).not_to_contain_text("Copy your current tree")
     expect(page.locator("#rows .row")).to_have_count(0)
     page.locator("#copy").evaluate("button => button.click()")
-    expect(page.locator("#copy-status")).to_have_text("No tree to copy")
+    expect(page.locator("#copy-status")).to_have_text("No treestamp to copy")
     expect(page.locator("#copy")).to_be_disabled()
     assert page.evaluate("window.copiedBlocks") == []
 

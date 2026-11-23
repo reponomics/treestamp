@@ -31,7 +31,7 @@ def test_return_from_chooser_preserves_curation_and_source(
     add_note(page, "keep current work")
     original = page.locator("#region").text_content()
     address = page.url
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     page.locator('.source-row[data-path="src"]').click()
     page.locator("#entry-return").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
@@ -61,7 +61,7 @@ def test_failed_explicit_open_preserves_draft_and_cannot_initialize_new(
             },
         ),
     )
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     page.locator('.source-row[data-path="README.md"]').click()
     page.locator("#reload").click()
     expect(page.locator("#reload-error")).to_contain_text("Malformed")
@@ -104,7 +104,7 @@ def test_successful_reopen_discards_unwritten_notes_hiding_and_folds(
     page.locator('.row[data-path="docs"] .fold').click()
     page.locator('.row[data-path="scripts"]').focus()
     page.locator("#row-visibility").click()
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_response("**/api/preview*") as response:
         page.locator("#reload").click()
@@ -179,7 +179,7 @@ def test_visual_selection_retains_exact_source_identity(
             status=404, json={"error": {"message": "Exact path not found."}}
         ),
     )
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     page.locator(".source-row").nth(1).click()
     with page.expect_request("**/api/preview") as request:
         page.locator("#reload").click()
@@ -193,11 +193,11 @@ def test_selected_entry_determines_creation_or_opening(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
     page.goto(f"{service}/fixture/repo")
-    expect(page.locator("#reload")).to_have_text("New tree")
+    expect(page.locator("#reload")).to_have_text("Create")
     page.locator('.source-row[data-path="README.md"]').click()
-    expect(page.locator("#reload")).to_have_text("Load tree")
+    expect(page.locator("#reload")).to_have_text("Load")
     page.locator('.source-row[data-path="src"]').click()
-    expect(page.locator("#reload")).to_have_text("New tree")
+    expect(page.locator("#reload")).to_have_text("Create")
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_request("**/api/preview") as request:
         page.locator("#reload").click()

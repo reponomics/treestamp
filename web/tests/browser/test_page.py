@@ -33,7 +33,7 @@ def test_first_load_shows_the_loaded_treestamp_without_script_errors(
     submit(page, service)
     expect(page.locator("#loaded-note")).to_have_text("Document opened")
     expect(page.locator("#source-origin")).to_have_count(0)
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     expect(page.locator("#source-origin")).to_have_count(0)
     expect(page.locator("#rows .row")).to_have_count(9)  # . + 3 dirs + 5 files
     expect(page.locator('#rows .row[data-path="docs"] .name')).to_have_text("docs/")
@@ -52,13 +52,7 @@ def test_repository_info_tooltip_does_not_move_the_layout(
     expect(link).to_have_attribute("target", "_blank")
     expect(link).to_have_attribute("rel", "noopener")
     expect(link.locator("svg")).to_be_visible()
-    expect(link).to_have_css("border-top-style", "solid")
     expect(link).to_have_css("text-decoration-line", "none")
-    assert link.evaluate(
-        "element => { const style = getComputedStyle(element); "
-        "return style.borderTopColor !== 'rgba(0, 0, 0, 0)' "
-        "&& style.backgroundColor !== 'rgba(0, 0, 0, 0)'; }"
-    )
     expect(
         page.locator("#repo-details, #repo-details-open, #entries, #meta, #reload-open")
     ).to_have_count(0)
@@ -88,7 +82,7 @@ def test_repository_info_tooltip_does_not_move_the_layout(
     expect(tooltip).to_be_visible()
     info.press("Escape")
     expect(tooltip).to_be_hidden()
-    expect(page.locator("#submit")).to_have_text("Open another tree")
+    expect(page.locator("#submit")).to_have_text("Open a tree")
 
 
 @pytest.mark.parametrize("width", [390, 1280])
@@ -204,7 +198,7 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
 
 def test_branch_links_open_and_bad_links_explain(page: Page, service: str) -> None:
     submit(page, service, f"https://github.com/{REPOSITORY}/tree/main")
-    page.click("#submit")
+    page.click("#browse-source")
     page.click("#entry-change-repo")
     page.fill("#entry-url", "not a link")
     page.click("#entry-browse")

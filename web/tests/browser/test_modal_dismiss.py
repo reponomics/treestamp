@@ -119,7 +119,7 @@ def test_in_flight_actions_cannot_be_dismissed_by_outside_clicks(
         page.locator("#note-save").click()
         dialog = page.locator("#note-dialog")
     else:
-        page.locator("#submit").click()
+        page.locator("#browse-source").click()
         page.locator("#reload").click()
         dialog = page.locator("#reload-settings")
     expect(page.locator("html")).to_have_attribute("data-operation-pending", "true")

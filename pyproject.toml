@@ -73,7 +73,6 @@ include = [
     "/scripts/installed_editor_check.py",
     "/scripts/release_check.py",
     "/scripts/readme_styles.py",
-    "/scripts/reconcile_demo.py",
     "/pyproject.toml",
     "/README.md",
     "/LICENSE",

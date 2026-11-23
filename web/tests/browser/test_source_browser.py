@@ -13,7 +13,7 @@ pytestmark = pytest.mark.browser
 def open_source_browser(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     expect(page.locator('.source-row[data-path="."]')).to_be_visible()
 
 
@@ -30,9 +30,7 @@ def test_choose_folder_and_create_without_typing(
     expect(src).to_have_attribute("aria-expanded", "false")
     src.locator(".source-name").click()
     expect(src).to_have_attribute("aria-selected", "true")
-    expect(page.locator('.source-row[data-path="src"]')).to_have_attribute(
-        "aria-selected", "true"
-    )
+    expect(src).to_have_attribute("aria-expanded", "true")
     page.locator("#reload").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#rows .row")).to_have_count(3)
@@ -45,7 +43,7 @@ def test_unified_keyboard_visits_files_and_expands_folders(
     open_source_browser(page, service)
     tree = page.locator(".source-tree")
     src = tree.locator('[data-path="src"]')
-    src.locator(".source-name").click()
+    src.focus()
     src.press("ArrowRight")
     expect(src).to_have_attribute("aria-expanded", "true")
     file = tree.locator('[data-path="src/app.py"]')
@@ -62,11 +60,15 @@ def test_unified_keyboard_visits_files_and_expands_folders(
     scripts = tree.locator('[data-path="scripts"]')
     scripts.focus()
     scripts.press("Enter")
+    expect(scripts).to_have_attribute("aria-expanded", "true")
+    scripts.press("ArrowLeft")
+    expect(scripts).to_have_attribute("aria-expanded", "false")
     src.focus()
     src.press("ArrowUp")
     scripts = tree.locator('[data-path="scripts"]')
     expect(scripts).to_be_focused()
-    scripts.press("Enter")
+    scripts.press("Space")
+    expect(scripts).to_have_attribute("aria-expanded", "true")
     expect(page.locator('.source-row[data-path="scripts"]')).to_have_attribute(
         "aria-selected", "true"
     )
@@ -81,20 +83,17 @@ def test_failed_document_load_preserves_selection_and_accepted_draft(
     previous = page.locator("#region").text_content()
     address = page.url
     saved = page.evaluate("localStorage.getItem('treestamp.current-draft')")
-    page.get_by_role("button", name="Expand docs", exact=True).click()
+    page.locator('.source-row[data-path="docs"]').click()
     selected = page.locator('.source-row[data-path="docs/guide.md"]')
     selected.locator(".source-name").click()
     page.locator("#reload").click()
     expect(page.locator("#reload-error")).to_contain_text("No treestamp found")
-    expect(page.locator('.source-row[data-path="docs/guide.md"]')).to_have_attribute(
-        "aria-selected", "true"
-    )
     expect(selected).to_have_attribute("aria-selected", "true")
     expect(selected).to_be_focused()
     expect(page.locator('.source-row[data-path="docs"]')).to_have_attribute(
         "aria-selected", "false"
     )
-    expect(page.locator("#reload")).to_have_text("Load tree")
+    expect(page.locator("#reload")).to_have_text("Load")
     expect(page.locator("#region")).to_have_text(previous)
     assert page.url == address
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == saved
@@ -134,7 +133,7 @@ def test_source_browser_failure_preserves_the_existing_draft(
             json={"error": {"code": "upstream_unavailable", "message": "Try again"}},
         ),
     )
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     expect(page.locator("#reload-error")).to_contain_text("Try again")
     expect(page.locator("#reload")).to_be_disabled()
     expect(page.locator("#region")).to_have_text(previous)
@@ -205,7 +204,7 @@ def test_picker_matches_editor_tree_density_and_indentation(
         }"""
         root_before = editor_root.evaluate(geometry, ".name")
         folder_before = editor_folder.evaluate(geometry, ".name")
-        page.locator("#submit").click()
+        page.locator("#browse-source").click()
         source_root = page.locator('.source-row[data-path="."]')
         source_folder = page.locator('.source-row[data-path="src"]')
         expect(source_folder).to_be_visible()
@@ -220,23 +219,21 @@ def test_picker_matches_editor_tree_density_and_indentation(
         file = page.locator('.source-row[data-path="README.md"]')
         expect(file.locator(".source-toggle")).to_have_count(0)
         expect(file).to_have_text("README.md")
-        label = source_folder.locator(".source-name").bounding_box()
-        toggle = source_folder.locator(".source-toggle").bounding_box()
-        assert label is not None and toggle is not None
-        assert toggle["x"] >= label["x"] + label["width"]
-        assert toggle["height"] >= 24
+        expect(
+            page.locator(".source-tree .source-toggle, .source-tree button")
+        ).to_have_count(0)
 
 
-def test_picker_disclosure_preserves_selection_and_branch_continuity(
+def test_picker_row_activation_selects_toggles_and_keeps_branch_continuity(
     page: Page, service: str
 ) -> None:
     open_source_browser(page, service)
     tree = page.locator(".source-tree")
     root = tree.locator('[data-path="."]')
     docs = tree.locator('[data-path="docs"]')
-    page.get_by_role("button", name="Expand docs", exact=True).click()
-    expect(root).to_have_attribute("aria-selected", "true")
-    expect(docs).to_have_attribute("aria-selected", "false")
+    page.locator('.source-row[data-path="docs"]').click()
+    expect(root).to_have_attribute("aria-selected", "false")
+    expect(docs).to_have_attribute("aria-selected", "true")
     expect(docs).to_have_attribute("aria-expanded", "true")
     first_file = tree.locator('[data-path="docs/api.md"]')
     last_file = tree.locator('[data-path="docs/guide.md"]')
@@ -249,9 +246,12 @@ def test_picker_disclosure_preserves_selection_and_branch_continuity(
     expect(tree.locator('[data-path="."] .indent')).to_have_count(0)
     last_file.locator(".source-name").click()
     expect(last_file).to_have_attribute("aria-selected", "true")
-    page.get_by_role("button", name="Collapse docs", exact=True).click()
+    page.locator('.source-row[data-path="docs"]').click()
     expect(last_file).to_have_count(0)
-    expect(docs).to_have_attribute("aria-selected", "false")
-    page.get_by_role("button", name="Expand docs", exact=True).click()
-    expect(last_file).to_have_attribute("aria-selected", "true")
+    expect(docs).to_have_attribute("aria-selected", "true")
+    expect(docs).to_have_attribute("aria-expanded", "false")
+    page.locator('.source-row[data-path="docs"]').click()
+    expect(docs).to_have_attribute("aria-selected", "true")
+    expect(docs).to_have_attribute("aria-expanded", "true")
+    expect(last_file).to_have_attribute("aria-selected", "false")
     expect(last_file.locator(".indent.branch.last")).to_have_count(1)

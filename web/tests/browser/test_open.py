@@ -58,7 +58,7 @@ def test_unavailable_captured_source_never_falls_back_to_latest_head(
     )
     page.reload()
     expect(page.locator("#error")).to_contain_text("Captured snapshot unavailable.")
-    expect(page.locator("#stage-status")).to_have_text("No tree")
+    expect(page.locator("#stage-status")).to_have_text("No treestamp")
     assert page.url == address
     assert previews == []
 

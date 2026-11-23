@@ -83,6 +83,7 @@ let countdown = null;
 // The editing session: identity of the commit plus the state the server hands back.
 let editor = null;
 let editingSession = 0;
+let pendingDraft = draftForLocation(window.location);
 
 // ---------- settings <-> form
 
@@ -372,6 +373,7 @@ function render(data, opening = false) {
   document.querySelectorAll(".dialog-error").forEach((node) => { node.hidden = true; });
   clearCountdown();
   const previous = editor;
+  pendingDraft = null;
   editor = {
     owner: data.repository.owner,
     repo: data.repository.name,
@@ -438,7 +440,7 @@ function renderRegion(text) {
 
 // A first load failed and there is no tree to keep showing.
 function leaveStage() {
-  stageStatus.textContent = "No tree";
+  stageStatus.textContent = "No treestamp";
 }
 
 // ---------- requests
@@ -451,7 +453,7 @@ async function acceptResponse(body, opening, ticket) {
     render(body, opening);
     return true;
   } catch (err) {
-    showError("The page could not display the tree.", String(err && err.message), null);
+    showError("The page could not display the treestamp.", String(err && err.message), null);
     return false;
   }
 }
@@ -460,7 +462,12 @@ function rejectResponse(body, responseStatus) {
   if (!editor?.rows.length) leaveStage();
   const error = (body && body.error) || {};
   const message = error.message || `The service returned status ${responseStatus}.`;
-  showError(message, hintFor(error.code, responseStatus), error.retry_after || null);
+  const hint = error.code === "snapshot_unavailable" && !editor?.rows.length
+    ? document.getElementById("entry").hidden
+      ? "Choose Open a tree to load the repository again."
+      : "Browse the repository to start a new treestamp."
+    : hintFor(error.code, responseStatus);
+  showError(message, hint, error.retry_after || null);
   return false;
 }
 
@@ -706,33 +713,63 @@ const entryFlow = new EntryFlow({
   onOpen({ url, document }) {
     return preview({ url, document });
   },
-  onExample() { loadExample("reponomics-dashboard"); },
-  onCancel() {
-    entryFlow.hide();
-    fields.url.value = `${editor.owner}/${editor.repo}`;
-    errorPanel.hidden = true;
-    submit.focus({ preventScroll: true });
-  },
+  onExample() { loadExample("treestamp"); },
+  onCancel: resumeSession,
 });
 
 function browseRepository(repo) {
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
   repoTooltip.hidden = true;
-  entryFlow.browse(repo, { canReturn: Boolean(editor?.rows.length) });
+  entryFlow.browse(repo, { canReturn: Boolean(editor?.rows.length || pendingDraft) });
 }
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  openWelcome();
+});
+
+document.getElementById("browse-source").addEventListener("click", () => {
   browseRepository(fields.url.value.trim());
 });
+
+function openWelcome() {
+  if (entryFlow.busy) return;
+  if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  repoTooltip.hidden = true;
+  const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
+  entryFlow.welcome(repo, Boolean(editor?.rows.length || pendingDraft));
+}
+
+async function resumeSession() {
+  if (editor?.rows.length) {
+    entryFlow.hide();
+    fields.url.value = `${editor.owner}/${editor.repo}`;
+    errorPanel.hidden = true;
+    submit.focus({ preventScroll: true });
+    return;
+  }
+  if (!pendingDraft || entryFlow.busy) return;
+  const address = new URL(pendingDraft.address, window.location.origin);
+  const example = exampleAt(pendingDraft.address);
+  if (example) { loadExample(example[0]); return; }
+  const { owner, repo, sha, saved } = parseRoute(address.pathname, address.hash);
+  editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };
+  fields.url.value = `${owner}/${repo}`;
+  setValues(valuesFromSettings(saved.curation.settings));
+  entryFlow.clearError();
+  entryFlow.setBusy(true);
+  try {
+    if (await operate("restore")) entryFlow.hide(true);
+  } finally {
+    entryFlow.setBusy(false);
+  }
+}
 
 document.querySelector(".wordmark").addEventListener("click", (event) => {
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   if (entryFlow.busy || (!editor?.rows.length && rowsList.getAttribute("aria-busy") === "true")) return;
-  if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
-  const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
-  entryFlow.welcome(repo, Boolean(editor?.rows.length));
+  openWelcome();
 });
 
 const resetDialog = document.getElementById("reset-dialog");
@@ -827,13 +864,13 @@ copy.addEventListener("click", async () => {
       return;
     }
     if (typeof editor.region !== "string") {
-      setCopyStatus("No tree to copy");
+      setCopyStatus("No treestamp to copy");
       return;
     }
     const copied = await copyText(region.textContent, region);
     copyLabel.textContent = copied ? "Copied" : "Copy treestamp";
     copy.classList.toggle("copied", copied);
-    const destination = !saved ? "Copied previous tree" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
+    const destination = !saved ? "Copied previous treestamp" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
     setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Markdown and select the block to copy it manually.");
   } finally {
     copy.disabled = typeof editor?.region !== "string";
@@ -873,17 +910,25 @@ Object.entries(tabs).forEach(([name, tab]) => {
 });
 
 // Permalinks: /owner/repo or /owner/repo@sha, settings in the query, curation in the fragment.
+function exampleAt(address) {
+  return Object.entries(EXAMPLES).find(([, data]) => addressFor(data.permalink, data.state, window.location.origin) === address);
+}
+
 (function boot() {
-  const local = draftForLocation(window.location);
-  if (local) {
-    history.replaceState(null, "", local.address);
+  if (pendingDraft) {
+    const address = new URL(pendingDraft.address, window.location.origin);
+    const { owner, repo } = parseRoute(address.pathname, address.hash);
+    fields.url.value = `${owner}/${repo}`;
+    if (window.location.pathname === "/") entryFlow.welcome(fields.url.value, true);
+    else browseRepository(fields.url.value);
+    return;
   }
   const route = parseRoute(window.location.pathname, window.location.hash);
   const query = new URLSearchParams(window.location.search);
   try { setValues(valuesFromQuery(query)); }
   catch (error) { showError(error.message, "", null); leaveStage(); return; }
   const address = window.location.pathname + window.location.search + window.location.hash;
-  const example = Object.entries(EXAMPLES).find(([, data]) => addressFor(data.permalink, data.state, window.location.origin) === address);
+  const example = exampleAt(address);
   if (example) {
     loadExample(example[0]);
     return;
@@ -897,7 +942,7 @@ Object.entries(tabs).forEach(([name, tab]) => {
   renderRepository(document.getElementById("active-repository"), `${owner}/${repo}`);
   if (window.location.hash.startsWith("#s=") && !saved) {
     entryFlow.hide();
-    showError("This link contains invalid editing state.", "Open the repository to create a new tree.", null);
+    showError("This link contains invalid editing state.", "Open the repository to create a new treestamp.", null);
     return;
   }
   if (!query.has("document")) fields.document.value = DEFAULT_DOCUMENT;
@@ -917,7 +962,7 @@ Object.entries(tabs).forEach(([name, tab]) => {
   };
   if (saved) {
     if (!sha || !saved.source || !saved.curation?.settings) {
-      showError("This link does not contain a valid captured editing session.", "Open the repository to create a new tree.", null);
+      showError("This link does not contain a valid captured editing session.", "Open the repository to create a new treestamp.", null);
       return;
     }
     editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };

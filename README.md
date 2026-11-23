@@ -18,7 +18,7 @@
 
 # treestamp
 
-treestamp is an editor for creating and maintaining directory trees for project documentation. Easily select which files and folders to include, and add brief annotations. The application reloads your treestamp when you want to update it, and automated checks can notify you when there is any drift between treestamp and the repository, making it easy to keep documentation up to date.
+treestamp is an editor for creating and maintaining annotated directory trees—treestamps—for project documentation. Easily select which files and folders to include, and add brief annotations. The application reloads your treestamp when you want to update it, and automated checks can notify you when there is any drift between treestamp and the repository, making it easy to keep documentation up to date.
 
 
 <p align="center">
@@ -230,9 +230,9 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── tui_entry.py
 │       ├── tui_reconcile.py
 │       └── tui_rows.py
-├── tests/ (21 files)  # Contract and integration tests
+├── tests/ (22 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
-│   ├── scripts/ (3 files)
+│   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
 │   ├── tests/ (16 files, 2 folders)
 │   ├── Dockerfile
@@ -277,9 +277,9 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- tui_entry.py
 |       |-- tui_reconcile.py
 |       `-- tui_rows.py
-|-- tests/ (21 files)  # Contract and integration tests
+|-- tests/ (22 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
-|   |-- scripts/ (3 files)
+|   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
 |   |-- tests/ (16 files, 2 folders)
 |   |-- Dockerfile
@@ -322,9 +322,9 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - tui_entry.py
     - tui_reconcile.py
     - tui_rows.py
-- tests/ (21 files)  # Contract and integration tests
+- tests/ (22 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
-  - scripts/ (3 files)
+  - scripts/ (4 files)
   - src/ (1 folder)
   - tests/ (16 files, 2 folders)
   - Dockerfile

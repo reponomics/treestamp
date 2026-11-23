@@ -101,17 +101,37 @@ def test_bundled_example_can_fold_expand_and_annotate_offline(
     assert "# My example note" in annotated.json()["tree"]
 
 
+@pytest.mark.parametrize("name", EXAMPLES)
+def test_bundled_example_can_hide_and_restore_entries_offline(
+    offline_client: TestClient, name: str
+) -> None:
+    example = EXAMPLES[name]
+    visible_file = next(row["path"] for row in example["rows"] if row["kind"] == "file")
+    body = operation_body(name)
+    body["op"] = {"type": "hide", "path": visible_file}
+    hidden = offline_client.post("/api/op", json=body)
+    assert hidden.status_code == 200, hidden.text
+    assert visible_file not in {row["path"] for row in hidden.json()["rows"]}
+
+    body["state"] = hidden.json()["state"]
+    body["op"] = {"type": "unhide", "path": visible_file}
+    restored = offline_client.post("/api/op", json=body)
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["region"] == example["region"]
+    assert restored.json()["state"]["curation"] == example["state"]["curation"]
+
+
 @pytest.mark.parametrize(
     "repo",
     [
         Repository(
             "someone-else",
-            "reponomics-dashboard",
-            TREES["reponomics-dashboard"]["commit"],
+            "treestamp",
+            TREES["treestamp"]["commit"],
         ),
-        Repository("reponomics", "other-repo", TREES["reponomics-dashboard"]["commit"]),
-        Repository("reponomics", "reponomics-dashboard", "0" * 40),
-        Repository("reponomics", "reponomics-dashboard", "HEAD"),
+        Repository("reponomics", "other-repo", TREES["treestamp"]["commit"]),
+        Repository("reponomics", "treestamp", "0" * 40),
+        Repository("reponomics", "treestamp", "HEAD"),
     ],
 )
 def test_other_repositories_and_refs_are_not_bundled(repo: Repository) -> None:
@@ -119,12 +139,12 @@ def test_other_repositories_and_refs_are_not_bundled(repo: Repository) -> None:
 
 
 def test_fixture_does_not_authorize_fetching_missing_document(offline_client):
-    example = EXAMPLES["reponomics-dashboard"]
+    example = EXAMPLES["treestamp"]
     response = offline_client.get(
         "/api/preview",
         params={
             "owner": "reponomics",
-            "repo": "reponomics-dashboard",
+            "repo": "treestamp",
             "ref": example["ref"]["commit"],
             "document": "README.md",
         },

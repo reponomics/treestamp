@@ -129,9 +129,7 @@ def test_desktop_sidebar_fits_with_a_repository_summary(
     )
     expect(page.locator("#reveal")).to_be_in_viewport(ratio=1)
     expect(page.locator("#url")).to_be_hidden()
-    expect(page.locator("#active-repository")).to_have_text(
-        "reponomics/reponomics-dashboard"
-    )
+    expect(page.locator("#active-repository")).to_have_text("reponomics/treestamp")
     expect(page.locator("#submit")).to_be_in_viewport(ratio=1)
 
 
@@ -265,7 +263,7 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     expect(dialog.locator(".dialog-hint")).to_be_in_viewport(ratio=1)
     page.keyboard.press("Escape")
 
-    page.locator("#submit").click()
+    page.locator("#browse-source").click()
     dialog = page.locator("#reload-settings")
     expect(page.locator("#reload")).to_be_enabled()
     assert dialog.evaluate("element => element.scrollWidth <= element.clientWidth")
@@ -291,17 +289,38 @@ def test_phone_and_tablet_example_give_most_of_the_viewport_to_the_tree(
     assert tree["y"] + tree["height"] <= height
     assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
     assert_no_page_overflow(page)
-    for name in ["Open another tree", "Visit repo"]:
-        expect(
-            page.get_by_role(
-                "button" if name == "Open another tree" else "link",
-                name=name,
-                exact=True,
-            )
-        ).to_be_in_viewport(ratio=1)
-    page.locator('.row[data-path=".github/workflows"] .fold').click()
-    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
+    for selector in ["#submit", "#browse-source", "#visit-repo"]:
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
+    page.locator('.row[data-path="src/treestamp"] .fold').click()
+    expect(page.locator('.row[data-path^="src/treestamp/"]').first).to_be_visible()
     page.locator("#rows .row").last.scroll_into_view_if_needed()
     expect(page.locator("#row-note")).to_be_in_viewport(ratio=1)
     expect(page.locator("#row-visibility")).to_be_in_viewport(ratio=1)
     assert page.evaluate("window.scrollY") == 0
+
+
+@pytest.mark.parametrize("width", [390, 768, 1280])
+def test_settings_keep_discard_below_the_editing_options(
+    page: Page, service: str, width: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": 844})
+    page.goto(f"{service}/fixture/repo?root=.")
+    expect(page.locator("#rows .row")).to_have_count(9)
+    if width < 1024:
+        page.locator(".settings-open").click()
+    settings = page.locator("#settings")
+    expect(settings).to_be_visible()
+    options = settings.locator(".settings-group").bounding_box()
+    discard = page.locator("#reset-tree").bounding_box()
+    assert options is not None and discard is not None
+    assert discard["y"] >= options["y"] + options["height"]
+    for selector in [
+        "#show_counts",
+        "#attribution",
+        "#reveal",
+        "#show-all",
+        "#reset-tree",
+    ]:
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
+    assert settings.evaluate("node => node.scrollWidth <= node.clientWidth")
+    assert_no_page_overflow(page)

@@ -45,7 +45,7 @@ treestamp tui --load /path/to/another/checkout/README.md
 
 Without `--load`, startup shows one visual source tree. Selecting a folder offers **Create treestamp here**; selecting a regular file offers **Load treestamp from document**. Arrow keys navigate and expand folders, and Enter accepts the selected source. The chooser reads the working filesystem, including untracked documents, but the editable tree still comes from the staged Git index. Failed loads keep the document selected and report the error; they never silently create a new tree.
 
-`--load DOCUMENT` opens the document directly, bypassing the chooser. An invalid explicit load reports an error without launching the editor. New trees start with the selected root's immediate children and collapsed directories. Loading reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
+`--load DOCUMENT` opens the document directly, bypassing the chooser. An invalid explicit load reports an error without launching the editor. New treestamps start with the selected root's immediate children and collapsed directories. Loading reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
 
 | Keys | Action |
 | --- | --- |
@@ -67,7 +67,7 @@ Placing a directory also carries its pending annotated descendants recursively w
 
 Run `make reconcile-demo` from a development checkout for a disposable example with moved files, a directory with nested annotations, and a deliberately removed entry. Its writes stay in a temporary repository.
 
-New trees are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. When a session starts by loading a document, Write to document saves directly back to that document and preserves content outside its boundary markers. There is no write action for a new-tree session and no destination picker. Folder creation and document loading are available only in the opening chooser. Unwritten changes require confirmation before quitting.
+New treestamps are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. When a session starts by loading a document, Write to document saves directly back to that document and preserves content outside its boundary markers. There is no write action for a new-tree session and no destination picker. Treestamp creation and document loading are available only in the opening chooser. Unwritten changes require confirmation before quitting.
 
 ## Print without opening the editor
 
@@ -76,7 +76,7 @@ treestamp --print
 treestamp --load docs/structure.md --print
 ```
 
-`--print` writes the complete treestamp to stdout without changing a document. With explicit `--load`, the file must contain a valid treestamp; its updated draft is printed. Without `--load`, a valid treestamp in the repository-root README is loaded, while an absent README or one without markers starts a new tree. Malformed or empty marked regions are errors, not requests to initialize a tree.
+`--print` writes the complete treestamp to stdout without changing a document. With explicit `--load`, the file must contain a valid treestamp; its updated draft is printed. Without `--load`, a valid treestamp in the repository-root README is loaded, while an absent README or one without markers starts a new treestamp. Malformed or empty marked regions are errors, not requests to initialize a treestamp.
 
 Printing does not accept `--target` or `--compare`. Shell redirection writes independently of treestamp; do not redirect output over a document the command must read.
 

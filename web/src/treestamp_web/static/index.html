@@ -45,25 +45,27 @@
 
   <main id="entry" class="entry">
     <section id="entry-welcome" class="entry-welcome" aria-labelledby="entry-title">
-      <h2 id="entry-title">Open a repository</h2>
-      <p class="entry-description">Choose a folder for a new treestamp, or load one from a document.</p>
+      <h2 id="entry-title">Open a tree</h2>
+      <p class="entry-purpose">Create a treestamp for your project documentation.</p>
       <form id="entry-form" autocomplete="off">
         <label for="entry-url">Public GitHub repository</label>
         <div class="entry-repo-row">
           <input id="entry-url" type="text" placeholder="owner/repo or a GitHub link" required spellcheck="false">
-          <button id="entry-browse" type="submit" disabled>Browse repository</button>
+          <button id="entry-browse" type="submit" disabled>Browse</button>
         </div>
       </form>
       <p id="entry-error" class="entry-error" role="alert" hidden></p>
-      <div class="entry-offramp"><button id="explore-example" type="button">Explore an example</button></div>
-      <button id="entry-return-welcome" class="entry-return" type="button" hidden>Resume progress</button>
+      <div class="entry-offramp">
+        <button id="entry-return-welcome" type="button" hidden>Resume session</button>
+        <button id="explore-example" type="button">Try example</button>
+      </div>
     </section>
 
     <section id="reload-settings" class="entry-browser" aria-label="Choose a folder or file" hidden>
       <div class="entry-browser-head">
         <div class="entry-instructions">
-          <p><strong>New tree</strong><span>Select folder (root)</span></p>
-          <p><strong>Load tree</strong><span>Select file</span></p>
+          <p><strong>New treestamp</strong><span>Select folder</span></p>
+          <p><strong>Load treestamp</strong><span>Select file</span></p>
         </div>
         <button id="entry-change-repo" type="button">Back</button>
       </div>
@@ -73,8 +75,8 @@
       </div>
       <p id="reload-error" class="entry-error" role="alert" hidden></p>
       <div class="entry-browser-foot">
-        <button id="entry-return" class="entry-return" type="button" hidden>Resume progress</button>
-        <button id="reload" type="button" disabled>New tree</button>
+        <button id="entry-return" class="entry-return" type="button" hidden>Resume session</button>
+        <button id="reload" type="button" disabled>Create</button>
       </div>
     </section>
   </main>
@@ -101,7 +103,8 @@
           <input id="url" name="url" type="hidden">
           <p class="canvas-caption" hidden><span class="caption-label">Document: </span><span id="tree-document"></span></p>
           <div class="repo-actions">
-            <button id="submit" type="submit" title="Open another tree"><svg class="control-icon repo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v2M3 7h16l-3 12H1L3 7Z"/></svg><span class="repo-action-label">Open another tree</span></button>
+            <button id="submit" type="submit" title="Open a tree"><svg class="control-icon repo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="repo-action-label">Open a tree</span></button>
+            <button id="browse-source" class="icon-button" type="button" aria-label="New or load treestamp" title="New or load treestamp"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v2M3 7h16l-3 12H1L3 7Z"/></svg></button>
             <a id="visit-repo" class="github-link button-link" href="#" target="_blank" rel="noopener" title="Visit repo (opens in a new tab)" hidden><span class="repo-action-label">Visit repo</span>
             <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7m0-7L10 14m0-10H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></svg>
             </a>
@@ -126,10 +129,10 @@
         <div class="settings-body">
           <fieldset class="settings-group" aria-labelledby="settings-title">
             <div class="field field-wide">
-              <label class="check"><input id="show_counts" name="show_counts" type="checkbox" checked> Show counts</label>
+              <label class="check"><input id="show_counts" name="show_counts" type="checkbox" checked><span>Show counts</span></label>
             </div>
             <div class="field field-wide">
-              <label class="check"><input id="attribution" name="attribution" type="checkbox"> Add “Maintained with treestamp” footer</label>
+              <label class="check"><input id="attribution" name="attribution" type="checkbox"><span>Add treestamp footer</span></label>
             </div>
             <div class="field field-wide">
               <label class="check" id="reveal-toggle"><input id="reveal" type="checkbox"> <span id="reveal-label">Reveal hidden entries</span></label>
@@ -197,7 +200,7 @@
           <div class="info-content">
             <section class="info-section" aria-labelledby="info-about">
               <h2 id="info-about">About treestamp</h2>
-              <p>Treestamp turns a Git repository into a curated directory tree for your Markdown documentation. Keep the useful structure, fold the detail, and add short notes.</p>
+              <p>treestamp creates annotated directory trees for your Markdown documentation. Keep the useful structure, fold the detail, and add short notes.</p>
             </section>
             <section class="info-section" aria-labelledby="info-usage">
               <h2 id="info-usage">Usage guide</h2>
@@ -207,8 +210,8 @@
                   <p>Enter a public GitHub repository URL to capture its default-branch HEAD, or try a bundled offline example. Choose a subtree or open an existing treestamp document. Paths start at the repository root.</p>
                 </li>
                 <li>
-                  <h3>Curate your tree</h3>
-                  <p>Expand or fold folders, hide entries, and add single-line notes. Your session uses a frozen snapshot. A failed load or edit keeps your previous tree.</p>
+                  <h3>Edit your treestamp</h3>
+                  <p>Expand or fold folders, hide entries, and add single-line notes. Your session uses a frozen snapshot. A failed load or edit keeps your current treestamp.</p>
                 </li>
                 <li>
                   <h3>Copy into your docs</h3>
@@ -246,24 +249,25 @@
         <h2>Place notes</h2>
         <p id="placement-progress" role="status" aria-live="polite"></p>
       </header>
-      <div class="placement-source-slot">
-        <span class="placement-eyebrow">From</span>
-        <code id="placement-source"></code>
+      <div class="placement-main">
+        <div class="placement-source-slot">
+          <span class="placement-eyebrow">From</span>
+          <code id="placement-source"></code>
+        </div>
+        <p id="placement-note"></p>
+        <p id="placement-directory-hint" class="group-note" hidden>Matching notes inside move with this folder.</p>
+        <div class="placement-tree-head">
+          <span>Destination</span>
+          <label class="check"><input id="placement-reveal" type="checkbox"> Show hidden</label>
+        </div>
+        <ul id="placement-rows" role="tree" aria-label="Note destinations" aria-describedby="placement-key-hint"></ul>
+        <div class="placement-target-slot">
+          <code id="placement-target" class="visually-hidden"></code>
+          <button id="placement-folder" type="button" hidden>Open folder</button>
+        </div>
+        <p id="placement-target-hint" class="group-note" aria-live="polite"></p>
+        <p id="placement-error" class="dialog-error" role="alert" hidden></p>
       </div>
-      <p id="placement-note"></p>
-      <p id="placement-directory-hint" class="group-note" hidden>Matching notes inside this folder follow it recursively. Others stay in the queue.</p>
-      <div class="placement-tree-head">
-        <span>Choose a destination</span>
-        <label class="check"><input id="placement-reveal" type="checkbox"> Show hidden</label>
-      </div>
-      <ul id="placement-rows" role="tree" aria-label="Note destinations" aria-describedby="placement-key-hint"></ul>
-      <div class="placement-target-slot">
-        <span class="placement-eyebrow">To</span>
-        <code id="placement-target"></code>
-        <button id="placement-folder" type="button" hidden>Open folder</button>
-      </div>
-      <p id="placement-target-hint" class="group-note" aria-live="polite"></p>
-      <p id="placement-error" class="dialog-error" role="alert" hidden></p>
       <footer class="placement-foot">
         <div class="placement-decisions">
           <button id="placement-undo" type="button" disabled>Undo</button>

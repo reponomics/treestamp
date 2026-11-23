@@ -104,7 +104,7 @@ export class SourceBrowser {
 
   setMode(mode) {
     this.mode = mode;
-    const labels = { new: "Choose a tree root", document: "Choose a document", entry: "Repository entries" };
+    const labels = { new: "Choose a treestamp root", document: "Choose a document", entry: "Repository entries" };
     this.tree.setAttribute("aria-label", labels[mode]);
     this.select(this.selected[mode]);
   }
@@ -179,8 +179,8 @@ export class SourceBrowser {
   activate(entry) {
     if (this.disabled || !this.navigable(entry)) return;
     if (this.selectable(entry)) this.select(entry.path, { notify: true });
-    else this.toggle(entry);
-    this.focusEntry(pathKey(entry.path));
+    if (entry.kind === "dir" && this.children.has(pathKey(entry.path))) this.toggle(entry);
+    else this.focusEntry(pathKey(entry.path));
   }
 
   keydown(event) {
@@ -233,29 +233,10 @@ export class SourceBrowser {
     label.className = "source-name";
     label.textContent = entry.parent === null ? "./" : displayPath(entry.name) + (entry.kind === "dir" ? "/" : "");
     item.appendChild(label);
-    this.appendToggle(item, entry);
+    if (entry.kind === "dir" && this.children.has(key)) {
+      item.setAttribute("aria-expanded", String(this.expanded.has(key)));
+    }
     return item;
-  }
-
-  appendToggle(item, entry) {
-    const key = pathKey(entry.path);
-    if (entry.kind !== "dir" || !this.children.has(key)) return;
-    const expanded = this.expanded.has(key);
-    item.setAttribute("aria-expanded", String(expanded));
-    const toggle = document.createElement("button");
-    toggle.className = "source-toggle";
-    toggle.textContent = expanded ? "▾" : "▸";
-    toggle.type = "button";
-    toggle.tabIndex = -1;
-    toggle.disabled = this.disabled;
-    const action = `${expanded ? "Collapse" : "Expand"} ${displayPath(entry.path)}`;
-    toggle.setAttribute("aria-label", action);
-    toggle.title = action;
-    toggle.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (!this.disabled) this.toggle(entry);
-    });
-    item.appendChild(toggle);
   }
 
   render() {

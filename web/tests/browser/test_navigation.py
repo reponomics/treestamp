@@ -223,7 +223,7 @@ def test_navigation_after_a_failed_edit_keeps_previous_draft_copyable(
     page.keyboard.press("ArrowDown")
     expect(row(page, "docs/api.md")).to_be_focused()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous tree")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
     expect(page.locator("#copy-label")).to_have_text("Copied")
     assert page.evaluate("window.copiedBlocks") == [
         page.locator("#region").text_content()

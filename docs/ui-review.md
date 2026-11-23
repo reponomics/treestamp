@@ -1,45 +1,41 @@
-# Quick local UI review
+# Agent visual review protocol
 
-This is a report-only scan before pushing UI changes, not a release gate. Its purpose is to record rough edges while the work is still fresh, without interrupting feature work or making the maintainer discover everything later. Budget **three minutes total**, including setup and logging. Stop at the deadline and record partial coverage.
+Before committing web UI changes, capture the standard views and **look at the resulting images**. The purpose is to catch obvious drift across screens while the work is local. Passing tests or generating screenshots is not a visual review.
 
-## Run only when useful
+## Capture once, inspect together
 
-Run for changes to rendered UI, interaction, copy, or backend behavior that changes a user-visible state. Skip documentation-only changes and a candidate already scanned without subsequent UI changes. Inspect the changed surfaces, not the whole application. Existing automated checks remain separate; this scan never triggers a full test suite or a redesign.
+With the local preview running:
 
-The implementing agent supplies the running preview URL, a short list of changed states, and any existing direct links or fixture steps. Start with one representative affected view; add another viewport or theme only when relevant and time permits. Share the captures across reviewers. Use real content and include hover/focus/selection or error states affected by the change. Reuse the running fixture server; do not spend the time box building new infrastructure. If a relevant state cannot be reached quickly, log it as not reviewed.
+```bash
+make web-ui-screenshots UI_URL=http://127.0.0.1:8000
+```
 
-Record the candidate commit and whether UI changes were uncommitted, plus the viewed URLs/states, viewport sizes, and themes. Captures and any working diff may live under ignored `output/ui-review/`; keep the concise findings in the tracked [rolling log](ui-review-log.md). Captures are evidence, not permanent repository assets.
+Use the fixture repository (`fixture/repo`) for repeatable source selection and note transfer. Override `UI_REPO` for another local fixture. The command writes a gallery, full-size screenshots, contact sheets, and a capture manifest under ignored `output/ui-review/`; `UI_OUTPUT` changes that directory. It uses isolated browser sessions, leaving the user's browser and draft alone.
 
-## Five narrow lenses
+The sweep visits entry and return screens, folder/file selection, the editor and its secondary views, dialogs, and transfer states at phone, tablet, desktop, and spacious desktop sizes. Consult the manifest for what actually ran. A missing transfer fixture or failed capture is **not reviewed**, never a pass. Screenshots show the viewport rather than expanding the page to conceal overflow.
 
-Use the installed skills by name, reading their `SKILL.md` when first used. Their system-building advice is adapted to a quick audit of the existing design, not permission to replace it. Treestamp's choices take precedence: utility tone, existing fonts and palette, readable controls, and a 16px UI text floor.
+Start with the contact sheets to spot differences between views. Open the full-size images of changed components and anything suspicious. Compare the same component across widths and screens, including neighboring screens that were not edited. Use one reviewer by default; extra agents are optional and should share these images rather than each repeating setup.
 
-| Lens | Skill | Quick questions |
-| --- | --- | --- |
-| Typography | `ui-design:typography-scale` | Are changed text and controls using the existing sizes, weights, and line heights? Any undersized, clipped, or accidentally default-styled text? |
-| Color and states | `ui-design:color-system` | Are text and controls legible in the sampled themes? Are hover, selection, focus, warning, and disabled states distinguishable? Measure relevant contrast pairs when computed styles are available; don't claim compliance from screenshots alone. Use AA text targets of 4.5:1, or 3:1 for qualifying large text; assess applicable control/state indicators at 3:1. |
-| Spacing | `ui-design:spacing-system` | Are related controls grouped, padding/gaps consistent with the existing scale, and the next action visible? Any cramped controls, excessive empty space, or nested scrolling that obstructs the task? |
-| Reading width | `ui-design:readable-measure` | Does body copy wrap comfortably, typically around 45–75 characters on wider screens? Any awkwardly narrow descriptions or stretched paragraphs? Short labels, buttons, filenames, and tree rows are not prose-measure targets; don't force them to 65ch. |
-| Flow and copy | Product brief and affected flow | Is the next action obvious? Are terms consistent and literal? Check relevant normal, empty, error, and return/recovery states. Does an error recommend something actually possible on that screen? Are action controls styled as controls? |
+Keep images only while reviewing. After recording findings in the rolling log, run `make web-ui-clean` before committing or handing back the task (with the same `UI_OUTPUT` if overridden). The command deletes the gallery's recorded screenshots, contact sheets, HTML, and manifest, leaving unrelated files alone. Remove additional task-generated screenshot folders as well; keep artifacts only if the user asks. This cleanup is part of the agent's task, not the contributor's responsibility. There is no background timer: an interrupted task can leave artifacts behind, so the next capture also removes the previous gallery before starting. Use the standard output directory rather than creating archives.
 
-The first four reviewers can inspect the same fresh screenshots and computed styles. The flow reviewer exercises the actual browser where available. State what each reviewer actually inspected; source reading alone is not visual review. If a skill or requested model is unavailable, report that explicitly and use the applicable checklist above; never pretend to have used it.
+## Visual checklist
 
-## Parallelism without interference
+| Check | Look for |
+| --- | --- |
+| Spacing and alignment | Shared edges and baselines; related items grouped; consistent insets; no stray labels, oversized gaps, or off-center dividers. |
+| Typography | Consistent size, weight, line height, and tree density across views; no accidental browser-default styling or oversized utility labels. Keep the existing 16px UI text baseline. |
+| Color and states | Existing palette and semantic roles; readable text; distinct focus, hover, selection, disabled, and error states. Screenshots alone do not establish contrast compliance. |
+| Readability | Clipped input values, awkward wrapping, repeated labels, unnecessary instructions. Prefer an item name to a full path for context. Reserve prose measure rules for prose, not trees or short controls. |
+| Balance | Check both crowding and excessive emptiness. The tree owns the editor, but a small tree should not feel stranded in an enormous panel. Use available space deliberately; avoid oversized gaps, distant actions, and controls that squeeze useful content. Check spacious desktop windows as well as phones. |
+| Hierarchy and actions | One clear next action; secondary actions quieter and sensibly placed; buttons no larger than their job requires; keyboard hints do not crowd mobile layouts. |
+| Consistency and responsive behavior | Shared components look related across entry, picker, editor, and dialogs. Check short-height phones, tablet transitions, long names, and dense trees. Primary actions remain reachable. |
 
-Allocate roughly 45–60 seconds per lens within the overall deadline. Use available reviewers in parallel, then short waves if needed. The model and concurrency depend on the current runtime; do not assume Sonnet or five free slots. A runtime with four total slots including the coordinator can use three reviewers followed by two, if time remains.
+The typography, color, spacing, and measure checks draw on the `ui-design:typography-scale`, `ui-design:color-system`, `ui-design:spacing-system`, and `ui-design:readable-measure` skills. Use these as review lenses for the existing utility, not as a reason to redesign its type or palette.
 
-Reviewers are read-only and share the same frozen candidate. Prefer shared captures for visual passes. If multiple reviewers interact with the app, give them separate browser contexts with separate localStorage and clean fixture state; never drive the same tab concurrently. Do not mutate a shared fixture repository during review. When isolation is unavailable, use one browser operator. Do not change the UI midway through a scan.
+## Keep it fast and honest
 
-## Return a short result
+Budget three minutes for capture, inspection, and a short entry in the [rolling log](ui-review-log.md). Record the candidate, images actually inspected, findings, and gaps. One line per finding is enough: **view → visible problem → consequence**. No numerical design score or visual-coverage percentage.
 
-Give each reviewer this brief:
+Fix obvious regressions introduced by the current change and recheck that view; log unrelated polish work without starting a repair loop. Keep unresolved findings visible. If capture or inspection cannot finish within the budget, report partial review and the reason rather than claiming everything looks good. Skip a repeat sweep when the UI has not changed since the last inspected capture.
 
-> Audit only the supplied changed surfaces through your assigned lens. Do not edit files or propose a redesign. Return up to two concrete findings, or “none observed,” with location/state, evidence, impact, and a small suggested correction. Mark untested states and uncertain observations. Return what you have at the deadline; do not expand scope.
-
-The coordinator deduplicates results into the rolling log. Use one sentence per finding: **state → problem → impact**, with a screenshot or reproduction when useful. Separate a verified breakage from a polish suggestion or an untested risk. Zero findings is valid; do not invent improvements to fill a quota.
-
-No automatic fixes, follow-up agent loops, or new issue per finding. Carry open findings forward; do not re-investigate them on every push or mark them fixed because they were not seen this time. Mark resolved only with a checked fix. A later authorized implementation pass can address them in a batch.
-
-If setup fails or time runs out, log **not reviewed** and the reason. It does not block the push under this protocol. Give the user a short summary of new findings and gaps; do not describe partial review as complete QA. Existing test failures and independently applicable safety requirements retain their normal handling.
-
-This is an agent-run convention, not an installed Git hook. It neither initiates nor authorizes remote writes.
+This is a local review convention, not a Git hook, pixel-diff gate, test-suite replacement, or authorization to push.

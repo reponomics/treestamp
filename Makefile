@@ -30,6 +30,10 @@ SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
+UI_URL ?= http://127.0.0.1:8000
+UI_REPO ?= fixture/repo
+UI_OUTPUT ?= output/ui-review
+UI_BROWSER ?= chrome
 # Extra pytest-cov options for cov and web-cov, e.g. COV_ARGS=--cov-report=xml
 COV_ARGS ?=
 .PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check toolchain-check
@@ -138,6 +142,11 @@ web-js-cov: ## Measure pure JavaScript logic coverage (excludes browser DOM code
 	$(NODE) --experimental-test-coverage --test --test-coverage-include='**/static/logic.js' web/tests/js/*.test.mjs
 web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
+.PHONY: web-ui-screenshots web-ui-clean
+web-ui-screenshots: ## Capture UI states and contact sheets for a quick visual review
+	$(PY) web/scripts/capture_ui.py --url "$(UI_URL)" --repo "$(UI_REPO)" --output "$(UI_OUTPUT)" --browser "$(UI_BROWSER)"
+web-ui-clean: ## Remove the screenshot gallery after review
+	$(PY) web/scripts/capture_ui.py --output "$(UI_OUTPUT)" --clean
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
 	$(PY) web/scripts/fake_github.py --repo . --port $(FAKE_PORT) $(FAKE_FLAGS)
 web-serve: ## Run the web editor locally against GITHUB_API_URL

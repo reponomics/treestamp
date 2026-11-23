@@ -1,5 +1,6 @@
 // A provisional, one-time load step. Intermediate responses never enter the editor
 // or local storage; the shared Python placement model owns all transfer decisions.
+import { treeGuides, appendTreeGuides } from "./tree-view.js";
 import { displayPath, pathKey, preparePreview, rowName, treeNavigation, hintFor } from "./logic.js";
 
 const element = (id) => document.getElementById(id);
@@ -143,7 +144,7 @@ export class NotePlacement {
       : current.kind === "dir" ? "Choose a folder for this directory." : "Choose a file, or open this folder to look inside.";
   }
 
-  rowElement(row) {
+  rowElement(row, guides) {
     const item = document.createElement("li");
     item.className = "placement-row";
     item.dataset.path = row.path;
@@ -152,10 +153,10 @@ export class NotePlacement {
     item.setAttribute("aria-level", String(row.depth + 1));
     item.setAttribute("aria-label", `${displayPath(row.identity) || "Repository root"}${row.hidden ? " (hidden)" : ""}`);
     if (row.kind === "dir") item.setAttribute("aria-expanded", String(!row.collapsed));
-    item.style.setProperty("--placement-depth", row.depth);
     item.addEventListener("click", () => this.select(row.path));
     item.addEventListener("focus", () => { if (!this.busy) this.select(row.path, false); });
     item.addEventListener("dblclick", () => { if (row.kind === "dir") this.fold(); });
+    appendTreeGuides(item, guides);
     const name = document.createElement("span");
     name.className = "placement-name";
     name.textContent = rowName(row);
@@ -180,11 +181,12 @@ export class NotePlacement {
     const info = this.accepted.placement;
     const current = info.current;
     element("placement-progress").textContent = `${info.remaining} left · ${info.placed_count} placed`;
-    element("placement-source").textContent = displayPath(current.path) + (current.kind === "dir" ? "/" : "");
+    element("placement-source").textContent = displayPath(current.path).split("/").pop() + (current.kind === "dir" ? "/" : "");
     element("placement-note").textContent = current.annotation || "Place this folder to carry the notes inside it.";
     element("placement-directory-hint").hidden = current.kind !== "dir";
     const scrollTop = this.tree.scrollTop;
-    this.tree.replaceChildren(...this.rows.map((row) => this.rowElement(row)));
+    const guides = treeGuides(this.rows);
+    this.tree.replaceChildren(...this.rows.map((row, index) => this.rowElement(row, guides[index])));
     if (!this.rows.some((row) => row.path === this.selected)) this.selected = this.rows[0].path;
     this.select(this.selected, false);
     this.tree.scrollTop = scrollTop;

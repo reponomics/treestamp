@@ -68,10 +68,7 @@ export class EntryFlow {
     this.canReturn = canReturn;
     this.url = repo;
     element("entry-url").value = repo;
-    element("entry-title").textContent = canReturn ? "Open another tree" : "Open a repository";
-    document.querySelector(".entry-description").textContent = canReturn
-      ? "Choose a repository, then select a folder or document."
-      : "Choose a folder for a new treestamp, or load one from a document.";
+    element("entry-title").textContent = "Open a tree";
     element("entry-browse").disabled = !repo.trim();
     this.clearError();
     this.showPanel("welcome");
@@ -116,7 +113,7 @@ export class EntryFlow {
   renderSelection() {
     const selected = this.browser.selectedEntry();
     const directory = selected?.kind !== "file";
-    element("reload").textContent = this.busy ? "Opening…" : directory ? "New tree" : "Load tree";
+    element("reload").textContent = this.busy ? "Opening…" : directory ? "Create" : "Load";
     element("reload").disabled = this.busy || this.loading || !selected;
   }
 
@@ -132,7 +129,7 @@ export class EntryFlow {
         : await this.onOpen({ url: this.url, document: selected.path });
       if (accepted) this.hide(true);
     } catch (_) {
-      this.showError("Could not open this selection.", "Try again. Your current tree is unchanged.");
+      this.showError("Could not open this selection.", "Try again. Your current treestamp is unchanged.");
     } finally {
       this.setBusy(false);
       if (!accepted) this.restoreSelectionFocus();

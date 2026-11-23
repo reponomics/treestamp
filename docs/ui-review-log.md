@@ -2,7 +2,11 @@
 
 One rolling record for the [quick local review](ui-review.md). Keep open items until resolved or explicitly accepted; remove resolved history when it stops being useful. Evidence under `output/` is local and may not exist in another checkout, so retain a short reproduction here.
 
-## Latest scan
+## Latest review
+
+2026-11-23 release preparation: compared phone, tablet, desktop, and spacious-desktop contact sheets with the pre-change baseline; inspected full-size changed entry, editor, Settings, picker, placement, and restoration-error views. Additional entry/tab hover and long repository-name checks covered the changed chrome. Shortened picker actions to keep the phone footer on one row. No further visual regression was identified within these views; spacious-picker composition remains open below. Safari, Firefox, and exhaustive zoom combinations were not reviewed. Validation included 232 browser tests and seven final layout reruns. Screenshots were removed after review.
+
+## Initial chrome review
 
 2026-11-22, candidate `4ab4670`, clean UI at capture. User requested a review of the whole chrome after reporting oversized source selection and poorly placed repository identities. Reused localhost:54597 and the fixture repository; fresh captures in `output/ui-review/` cover entry, source picker, editor, Settings, and Info at 1280×900 light/dark and 390×667 light.
 
@@ -12,9 +16,8 @@ Coverage is partial: error/recovery, placement/conflict, long names, and exhaust
 
 ## Open findings
 
-- **Recovery / verified:** Restore a saved draft whose snapshot is unavailable → empty editor says “Copy your current tree” although Copy is hidden → misleading recovery instruction. Reproduce by saving a fixture draft and returning while `/api/op` responds with `410` / `snapshot_unavailable`. Local evidence: `output/ui-critique/expired-draft.png`.
-- **Mobile source selection / remaining discoverability:** With several top-level folders, files initially sit below the internal tree scroll area → document loading still requires discovery by scrolling. The previously offscreen Load action is fixed at 320×568 and 390×667; this remaining point is not a broken action.
-- **Short-height placement / verified:** At 320×568, place notes from a directory → explanatory content and controls consume most of the dialog and Place here extends below the visible area → scrolling is needed to reach the primary action. Rechecked after this polish pass: action spans y556–600. Local evidence: `output/ui-review/after/320-placement.png`.
+- **Spacious picker / verified:** On a large window, a short source tree sits in the corner of an oversized panel and its footer actions are far below the content. This needs a deliberate large-screen composition; filling the viewport is not sufficient. Reported in the user's 2026-11-23 02:06 screenshot; no layout change for this finding in the current pass.
+- **Mobile source selection / remaining discoverability:** With several top-level folders, files initially sit below the internal tree scroll area. Actions remain visible; discovering lower entries still requires scrolling.
 
 ## Resolved in the current candidate
 
@@ -66,3 +69,15 @@ Screenshots in `output/picker-density/` compare both views at 390, 768, and 1280
 Removed the duplicate visible Note label while retaining the input's accessible label. Grouped the heading and path on a shared baseline, with long paths wrapping to their own full-width line. Keyboard shortcuts and Cancel/Apply now share a compact footer, wrapping cleanly on phones. Checked light/dark screenshots and long paths at 320, 390, and 1280px in `output/note-polish/`; input naming, focus, Escape, and action visibility were checked manually. Seven existing focused dialog/mobile checks passed. No editing behavior changed.
 
 The note-dialog context was still too verbose: replaced the full path with only the selected file/folder name. Long names stay on one line with ellipsis. The prior long-path wrapping treatment is superseded; full paths are not displayed in this dialog.
+
+## Repeatable screenshot sweep
+
+Added the agent-operated pre-commit gallery and checklist. The first run against the local fixture preview captured 13 states across three profiles (39 screenshots) in 5.8 seconds with no browser errors. Inspected all three contact sheets, then full-size returning entry, tablet settings, and phone transfer invitation. The visible entry imbalance and transfer clipping are recorded above; the previously recorded short-height transfer-work overflow is also obvious in the phone sheet. Capture success does not resolve these findings. Keyboard/a11y behavior, alternate data sets, every theme/width combination, and unavailable-snapshot recovery are not covered by this quick visual pass. Artifacts: `output/ui-sweep/`; manifest records the candidate and dirty working tree.
+
+## Addressed gallery findings and picker interaction
+
+Simplified entry to a repository input with a compact Browse action and a quiet Resume progress / Example tree footer. Removed redundant introductory text. Settings now has one column with Discard changes beneath the options. The transfer invitation wraps actions rather than clipping them; the transfer workspace keeps its footer outside scrollable content, so decisions remain visible on short phones. Its tree shares the editor/picker branch geometry and 32px rows. Visible transfer context uses the source name without a repeated full path.
+
+Removed source-picker arrow buttons at the user's request: folder rows select and toggle on click, Enter, or Space; files select on activation, and keyboard arrow browsing remains available. Updated the screenshot script to use row activation and added unavailable-draft recovery. The latter now recommends reopening the repository without suggesting copying a nonexistent tree; the opening control retains its visible label on phones in that state.
+
+83 affected browser cases passed, with seven transfer checks rerun after the final sizing change. The later entry/recovery pass passed 19 cases (including overlapping entry checks). Reviewed the phone, tablet, desktop, and newly added spacious-desktop contact sheets, plus full-size changed entry, settings, transfer, and recovery views; final captures are in `output/ui-review/`. Sparse-tree whitespace in a spacious window remains open, and the checklist now explicitly checks emptiness as well as crowding. CONTRIBUTING was not changed in this pass.
