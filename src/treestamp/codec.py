@@ -2,7 +2,7 @@
 
 Names remain literal except for control/byte escapes and list-style Markdown.
 A fixed delimiter separates annotations. Exceptional full path registrations
-resolve names containing that delimiter before interpreting row suffixes.
+resolve names containing reserved row syntax before interpreting row suffixes.
 Before returning output, check
 that parsing preserves the authored paths, kinds, structure, and annotations.
 Counts and targets are regenerated facts, not saved curation.
@@ -130,12 +130,21 @@ def _row_head(node: Node, *, markdown: bool = False) -> str:
     return text
 
 
+def _needs_registration(name: str) -> bool:
+    """Reserve exact identities independently of entry kind or output style."""
+    return (
+        ANNOTATION_DELIMITER in name
+        or f" {SYMLINK_ARROW} " in name
+        or name.endswith(f" {GITLINK_TAG}")
+    )
+
+
 def special_paths(tree: Node, root: str = ".") -> dict[int, str]:
     """Map printed row indices to exact repository-relative special identities."""
     return {
         row: repo_path(node.path, root)
         for row, node in enumerate(tree.walk(), 1)
-        if ANNOTATION_DELIMITER in node.name
+        if _needs_registration(node.name)
     }
 
 
@@ -166,7 +175,7 @@ def render_tree_with_paths(
 
     def visit(node: Node, prefix: str, depth: int) -> None:
         for index, child in enumerate(node.children):
-            if ANNOTATION_DELIMITER in child.name:
+            if _needs_registration(child.name):
                 registered[len(rows)] = repo_path(child.path, settings.root)
             last = index == len(node.children) - 1
             if settings.style == "list":
@@ -345,9 +354,9 @@ def _registrations(
         if type(row) is not int or not 0 < row < row_count:
             raise MarkerError("special-path row must identify an existing non-root row")
         relative = tree_path(path, root)
-        if ANNOTATION_DELIMITER not in relative.rsplit("/", 1)[-1]:
+        if not _needs_registration(relative.rsplit("/", 1)[-1]):
             raise MarkerError(
-                "special_paths must register a name containing the annotation delimiter"
+                "special_paths must register a name containing reserved row syntax"
             )
         if relative in seen:
             raise MarkerError("special_paths contains duplicate paths")

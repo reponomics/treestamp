@@ -454,19 +454,15 @@ def test_unknown_escapes_do_not_delete_filename_characters(text: str) -> None:
     assert parse_tree(text).children[0].name == r"literal\q.txt"
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii"])
-@pytest.mark.parametrize("name", ["odd -> name", "vendor [gitlink]"])
-def test_ambiguous_rows_are_refused_instead_of_silently_changing_identity(
+@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("name", ["odd -> name", "vendor [gitlink]", " [gitlink]"])
+def test_reserved_filename_syntax_preserves_file_identity(
     style: str, name: str
 ) -> None:
-    with pytest.raises(MarkerError, match="cannot represent"):
-        render_tree(build_tree([Entry(name)]), Settings(style=style))
-
-
-def test_list_escaping_can_disambiguate_names_without_a_blacklist() -> None:
-    tree = build_tree([Entry("odd -> name"), Entry("vendor [gitlink]")])
-    printed = render_tree(tree, Settings(style="list"))
-    assert parse_tree(printed, "list") == tree
+    tree = build_tree([Entry(name)])
+    printed = render_tree(tree, Settings(style=style))
+    assert special_paths(tree) == {1: name}
+    assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii"])
@@ -730,9 +726,3 @@ def test_nontext_git_bytes_are_rejected() -> None:
 def test_directory_cannot_print_zero_counts() -> None:
     with pytest.raises(MarkerError, match="zero counts are not printed"):
         parse_tree("./\n- empty/ (0 files)\n")
-
-
-def test_render_rejects_names_that_parse_as_invalid_facts() -> None:
-    tree = build_tree([Entry(" [gitlink]")])
-    with pytest.raises(MarkerError, match="cannot represent tree"):
-        render_tree(tree, Settings())

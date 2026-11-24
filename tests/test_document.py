@@ -580,7 +580,7 @@ def test_unrepresentable_output_preserves_the_entire_existing_document(
         [b"\xef\xbb\xbf# Intro  ", START, b"./", END, b"unrelated\xff bytes", b""]
     )
     path.write_bytes(before)
-    document = Document(build_tree([Entry("odd -> name")]))
+    document = Document(build_tree([Entry("link", "symlink", "null")]))
     with pytest.raises(MarkerError, match="cannot represent"):
         write_document(document, path)
     assert path.read_bytes() == before

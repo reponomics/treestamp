@@ -1,5 +1,6 @@
 import pytest
 
+from treestamp.document import parse_document
 from treestamp_web.github import GitHubClient, NotFoundError
 from treestamp_web.preview import PreviewError
 
@@ -200,15 +201,22 @@ def test_reused_name_does_not_reuse_other_repository_identity(fake, repo):
     assert op(service, second, "restore").commit == second.commit
 
 
-def test_unsupported_hidden_descendant_is_rejected_on_load(fake, repo):
+@pytest.mark.parametrize("name", ["odd -> name", "vendor [gitlink]"])
+def test_syntax_like_hidden_descendant_can_be_loaded_and_revealed(fake, repo, name):
     stamp(repo, hidden=("sub",))
-    repo.write("sub/odd -> name")
-    repo.commit("unsupported descendant")
+    path = f"sub/{name}"
+    repo.write(path)
+    repo.commit("syntax-like descendant")
     service, _ = service_for(fake)
-    with pytest.raises(PreviewError, match="cannot load safely"):
-        preview(service)
-    assert service.stats()["trees"] == 0
-    assert preview(service, root="sub/deep", document="").root == "sub/deep"
+    loaded = preview(service)
+    assert path not in {
+        row.path for row in parse_document(loaded.region.encode()).tree.walk()
+    }
+    shown = op(service, loaded, "unhide_all")
+    expanded = op(service, shown, "expand", "sub")
+    recovered = parse_document(expanded.region.encode())
+    entry = next(row for row in recovered.tree.walk() if row.path == path)
+    assert entry.name == name and entry.kind == "file"
 
 
 def test_failed_candidate_edit_preserves_previously_accepted_document(fake, repo):
