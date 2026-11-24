@@ -79,8 +79,16 @@ typecheck: ## Check strict Python types
 	$(VENV)/bin/mypy
 test: ## Run the regression suite, including headless TUI journeys
 	$(PY) -m pytest
-cov: ## Run tests with branch coverage
+cov: ## Measure core Python statement and branch coverage (95% minimum)
 	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
+.PHONY: cov-python cov-all
+cov-python: ## Run both Python coverage suites and report their combined total
+	rm -f .coverage.python
+	$(MAKE) cov COVERAGE_FILE="$(CURDIR)/.coverage"
+	$(MAKE) web-cov COVERAGE_FILE="$(CURDIR)/web/.coverage"
+	$(PY) -m coverage combine --data-file=.coverage.python --keep .coverage web/.coverage
+	$(PY) -m coverage report --data-file=.coverage.python --fail-under=95
+cov-all: cov-python web-js-cov ## Measure all current coverage scopes: combined Python and separate JavaScript
 ci: format-check lint typecheck cov ## Run core quality gates (see docs/testing.md for combined checks)
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
@@ -123,7 +131,7 @@ reconcile-video: ## Record and verify a TUI note-placement demo (requires VHS)
 tui: ## Open the editor
 	$(CLI)
 clean: ## Remove generated build and coverage artifacts
-	rm -rf dist/ build/ .coverage htmlcov/ coverage.xml web/.coverage web/coverage.xml
+	rm -rf dist/ build/ .coverage .coverage.python htmlcov/ coverage.xml web/.coverage web/coverage.xml
 web-install: install ## Sync the locked workspace, including hosted development dependencies
 web-browser-install: install ## Sync the locked browser test dependencies (install Chromium separately)
 web-lint: ## Lint the web editor project
@@ -132,7 +140,7 @@ web-typecheck: ## Check strict types for the web editor project
 	cd web && $(WEB_VENV)/bin/mypy
 web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
-web-cov: ## Run the web editor tests with branch coverage
+web-cov: ## Measure hosted Python statement and branch coverage (95% minimum)
 	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
 web-ci: web-lint web-typecheck web-cov web-js-cov ## Run hosted Python and JS quality gates (browser tests are separate)
 web-js-test: ## Run the page's pure-logic tests with Node's test runner

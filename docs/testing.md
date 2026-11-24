@@ -99,7 +99,21 @@ Install local development hooks with `venv/bin/pre-commit install`. They run lin
 
 ## Coverage reporting
 
-Python totals combine executable statements and branch destinations; they are not line-only percentages. Reports show two decimal places so small remaining gaps stay visible. Run `make cov web-cov web-js-cov` to obtain all three reports, or use individual targets:
+Python totals combine executable statements and branch destinations; they are not line-only percentages. Reports show two decimal places so small remaining gaps stay visible. Each independently measured scope has a Make target:
+
+| Target | Measurement |
+| --- | --- |
+| `make cov` | Core Python statements and branches |
+| `make web-cov` | Hosted Python statements and branches |
+| `make web-js-cov` | JavaScript logic lines, branches, and functions |
+| `make cov-python` | Fresh core and hosted reports, followed by their combined Python total |
+| `make cov-all` | Everything above: combined Python coverage and a separate JavaScript report |
+
+`cov-python` runs the two Python suites sequentially, retaining their independent 95% gates. It then combines their coverage.py execution data into `.coverage.python`, preserving `.coverage` and `web/.coverage`. The combined percentage is calculated from the total covered statements and branch destinations, not an average of the two percentages. The suites retain their existing measurement scopes: core execution from hosted tests is not added to the core report. A failed suite stops aggregation; any previous aggregate is removed before the run. `make clean` removes all three data files.
+
+`cov-all` provides one command for every currently collected coverage report. It does not turn these into a single whole-application percentage: Python and JavaScript use different counting units, and browser DOM code is not currently instrumented. Browser journeys remain available through `make web-browser-test`, without a coverage percentage.
+
+To export the individual Python reports or run JavaScript coverage alone:
 
 ```bash
 make cov COV_ARGS=--cov-report=json:/tmp/treestamp-core.json
