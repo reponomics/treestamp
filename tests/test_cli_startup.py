@@ -18,8 +18,6 @@ from treestamp.model import Settings
     [
         ("check",),
         ("update",),
-        ("check", "--target", "HEAD"),
-        ("update", "--target", "HEAD"),
     ],
 )
 def test_document_root_cannot_enter_submodule(
@@ -210,14 +208,13 @@ def test_bare_startup_loads_cwd_readme_and_respects_its_saved_root(
 
 
 @pytest.mark.parametrize("absolute", [False, True])
-@pytest.mark.parametrize("file_input", [False, True])
-def test_new_accepts_directory_or_file_parent_without_attaching_document(
-    repo: Repo, monkeypatch: pytest.MonkeyPatch, absolute: bool, file_input: bool
+def test_new_accepts_directory_without_attaching_document(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, absolute: bool
 ) -> None:
     file = repo.write("docs/README.md", "<!-- treestamp:start -->broken")
     repo.write("docs/leaf.txt")
     repo.add(".")
-    selected = file if file_input else file.parent
+    selected = file.parent
     value = str(selected if absolute else selected.relative_to(repo.path))
     opened = capture_editor(monkeypatch)
 
@@ -227,6 +224,21 @@ def test_new_accepts_directory_or_file_parent_without_attaching_document(
     assert opened[0].state.document_path is None
     assert not opened[0].state.session.annotations
     assert file.read_text() == "<!-- treestamp:start -->broken"
+
+
+@pytest.mark.parametrize("absolute", [False, True])
+@pytest.mark.parametrize("printing", [False, True])
+def test_new_rejects_file_without_opening_editor_or_writing(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, absolute: bool, printing: bool
+) -> None:
+    path = stamp(repo)
+    before = path.read_bytes()
+    opened = capture_editor(monkeypatch)
+    value = str(path if absolute else path.relative_to(repo.path))
+    code, output, error = run_cli("new", value, *(("--print",) if printing else ()))
+    assert code == 2 and error and not output
+    assert not opened
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("value", ["missing", "missing.md", "docs/missing.md"])

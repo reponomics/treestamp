@@ -135,83 +135,52 @@ def test_attribution_survives_check_update_and_print(repo: Repo) -> None:
     assert parse_document(output.encode()).settings.attribution
 
 
-@pytest.mark.parametrize("replace_source", [False, True])
-def test_comparison_preserves_annotation_and_admits_unrelated_new_paths(
-    repo: Repo, replace_source: bool
+@pytest.mark.parametrize("command", ["update", "check"])
+@pytest.mark.parametrize("flag", ["--target", "--compare"])
+def test_removed_snapshot_flags_never_write(
+    repo: Repo, command: str, flag: str
 ) -> None:
     path = stamp(repo)
-    document, _ = load_document(path)
-    assert document is not None
-    children = tuple(
-        replace(
-            node,
-            children=tuple(
-                replace(child, annotation="entry point") for child in node.children
-            ),
-        )
-        if node.path == "src"
-        else node
-        for node in document.tree.children
-    )
-    write_document(
-        replace(document, tree=replace(document.tree, children=children)), path
-    )
-    repo.git("mv", "src/main.py", "src/app.py")
-    repo.write("src/new.py")
-    repo.add("src/new.py")
-    if replace_source:
-        repo.write("src/main.py/other")
-        repo.add("src/main.py")
-    assert run_cli("check", "--compare", "HEAD")[0] == 1
-    assert run_cli("update", "--compare", "HEAD")[0] == 0
-    document, _ = load_document(path)
-    assert document is not None
-    nodes = {node.path: node for node in document.tree.walk()}
-    assert nodes["src/app.py"].annotation == "entry point"
-    assert "src/new.py" in nodes
-    assert run_cli("check", "--compare", "HEAD")[0] == 0
-
-
-@pytest.mark.parametrize("command", ["update", "check"])
-def test_bad_comparison_never_writes(repo: Repo, command: str) -> None:
-    path = stamp(repo)
     before = path.read_bytes()
-    assert run_cli(command, "--compare", "")[0] == 2
-    assert run_cli(command, "--compare", "does-not-exist")[0] == 3
+    with pytest.raises(SystemExit) as error:
+        run_cli(command, flag, "HEAD")
+    assert error.value.code == 2
     assert path.read_bytes() == before
 
 
-def test_explicit_ref_ignores_staged_addition(repo: Repo) -> None:
-    stamp(repo)
-    repo.write("new.txt")
-    repo.add("new.txt")
-    assert run_cli("check", "--target", "HEAD")[0] == 0
+def test_maintenance_uses_index_and_excludes_unstaged_additions(repo: Repo) -> None:
+    path = stamp(repo)
+    staged = "staged.txt"
+    untracked = "untracked.txt"
+    repo.write(staged)
+    repo.write(untracked)
+    repo.add(staged)
     assert run_cli("check")[0] == 1
+    assert run_cli("update")[0] == 0
+    document, _ = load_document(path)
+    assert document is not None
+    paths = {node.path for node in document.tree.walk()}
+    assert staged in paths and untracked not in paths
+    assert run_cli("check")[0] == 0
 
 
 @pytest.mark.parametrize("absolute", [False, True])
-def test_target_and_compare_resolve_in_document_repository(
+def test_maintenance_uses_document_repository_index(
     repo: Repo,
     tmp_path_factory: pytest.TempPathFactory,
     monkeypatch: pytest.MonkeyPatch,
     absolute: bool,
 ) -> None:
     path = stamp(repo)
-    path.write_text(
-        path.read_text(encoding="utf-8").replace("main.py", "main.py  # Entry point"),
-        encoding="utf-8",
-    )
     repo.git("mv", "src/main.py", "src/renamed.py")
     other = Repo(tmp_path_factory.mktemp("unrelated"))
-    other.git("init", "-q")  # Deliberately has no HEAD to resolve.
+    other.git("init", "-q")
     monkeypatch.chdir(other.path)
     value = str(path) if absolute else os.path.relpath(path)
-    assert run_cli("check", value, "--target", "HEAD", "--compare", "HEAD")[0] == 0
-    assert run_cli("check", value, "--compare", "HEAD")[0] == 1
-    assert run_cli("update", value, "--compare", "HEAD")[0] == 0
+    assert run_cli("check", value)[0] == 1
+    assert run_cli("update", value)[0] == 0
     document, _ = load_document(path)
     assert document is not None
-    nodes = {node.path: node for node in document.tree.walk()}
-    assert nodes["src/renamed.py"].annotation == "Entry point"
-    assert "src/main.py" not in nodes
-    assert run_cli("check", value, "--compare", "HEAD")[0] == 0
+    nodes = {node.path for node in document.tree.walk()}
+    assert "src/renamed.py" in nodes and "src/main.py" not in nodes
+    assert run_cli("check", value)[0] == 0

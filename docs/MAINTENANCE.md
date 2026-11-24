@@ -77,7 +77,7 @@ Deployments are serialized without cancelling an active rollout. A queued automa
 
 Production runs two Machines with Fly's high-availability provisioning. Rolling deployment replaces one Machine at a time and checks `/healthz`; a build failure stops before rollout, and a failed health check can halt it. With `FLY_SESSION_ROUTING=true`, a session cookie routes each editing session to the Machine holding its snapshot. A Machine failure, restart, or deployment can require a fresh load; the browser draft stays copyable and is replaced only after a successful load. Snapshots and quotas are per Machine, so changing the Machine count changes aggregate capacity and limits.
 
-After a deployment, check that `/healthz` reports the deployed `build_commit`, exercise loading, editing, copying, and draft preservation after a failed load in a browser, and run the smoke test against a public repository with a local checkout of the commit the hosted session loads:
+After a deployment, check that `/healthz` reports the deployed `build_commit`, exercise loading, editing, copying, and draft preservation after a failed load in a browser, and run the smoke test against a public repository with a local checkout whose staged index matches the commit the hosted session loads:
 
 ```bash
 make fly-smoke SMOKE_URL=https://treestamp.reponomics.org \

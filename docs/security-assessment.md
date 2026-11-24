@@ -22,7 +22,7 @@ These are the points where untrusted or externally controlled input enters the s
 | [Hosted HTTP API](design.md#hosted-http-api) | Repository links, query parameters, JSON bodies, state envelopes, operation paths, and annotation text | `app.py` (body size and rate limits), `links.py`, `preview.py` |
 | GitHub API responses | Metadata, tree listings, symlink targets, and documents from public repositories | `github.py` (response size and time limits), `sources.py`, `document.py`, `codec.py` |
 | Proxy and routing headers | `CF-Connecting-IP`, Fly.io replay headers, and the session-affinity cookie | `proxy.py`, `routing.py` |
-| [Command line](design.md#command-line) | Arguments, document paths, and Git refs | `cli.py`, `gitio.py` |
+| [Command line](design.md#command-line) | Arguments and filesystem paths | `cli.py`, `gitio.py` |
 | Local repositories | File names, symlink targets, and documents in the checkout; the repository's Git configuration and the `git` on `PATH` | `gitio.py`, `document.py`, `codec.py` |
 | Contributions | Pull requests, PR titles, and issues processed by CI | Pull-request workflows, which run with read-only tokens |
 | Manually triggered workflows | `workflow_dispatch` inputs: the deployment revision and the README update's base branch | `deploy.yml`, `treestamp-update.yml` |

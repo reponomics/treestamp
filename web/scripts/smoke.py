@@ -3,8 +3,8 @@
     python web/scripts/smoke.py https://host [--repo owner/name]
         [--checkout PATH]
 
-Previews the repository's default branch, then renders the same commit from
-the checkout, which must contain it. Exit 0 only on byte identity.
+Previews the repository's default branch, then renders the checkout's index,
+which must match that commit. Exit 0 only on byte identity.
 """
 
 from __future__ import annotations
@@ -37,6 +37,40 @@ def fetch(url: str) -> tuple[int, dict[str, object]]:
             return status, json.loads(body)
         except ValueError:
             return status, {"error": str(exc)}
+
+
+def verify_index(checkout: Path, commit: str) -> None:
+    """Require the local index to match the hosted tree without changing it."""
+    tree = subprocess.run(  # noqa: S603
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            f"{commit}^{{tree}}",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    subprocess.run(  # noqa: S603
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "diff",
+            "--cached",
+            "--quiet",
+            "--no-ext-diff",
+            "--no-textconv",
+            tree,
+            "--",
+        ],
+        capture_output=True,
+        check=True,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -87,12 +121,11 @@ def main(argv: list[str] | None = None) -> int:
 
     root = str(preview.get("root") or ".")
     try:
-        snapshot = capture_snapshot(
-            checkout if root == "." else checkout / root, commit
-        )
+        verify_index(checkout, commit)
+        snapshot = capture_snapshot(checkout if root == "." else checkout / root)
     except Exception as exc:  # noqa: BLE001
         print(f"cannot render {commit[:12]} from the checkout: {exc}")
-        print("fetch the commit or check out the deployed revision, then retry")
+        print("use a checkout whose index matches the deployed revision, then retry")
         return 1
     session = TreeSession(snapshot.tree, settings)
     document = Document(

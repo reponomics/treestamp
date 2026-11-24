@@ -12,7 +12,7 @@ This document describes system boundaries, data flow, and interface contracts. T
 | Actor | Description |
 | --- | --- |
 | Local user | Runs the CLI or terminal editor against a checkout they control |
-| Git | The local `git` executable, invoked as a subprocess to read the index, trees, and history |
+| Git | The local `git` executable, invoked as a subprocess to read the index and Git objects |
 | Local filesystem | Holds the document Treestamp reads and, for `update` and **Write**, replaces |
 | Clipboard | A native clipboard command (such as `pbcopy`) or the terminal, through OSC 52, receives copied output |
 | Pre-commit and CI | Run `treestamp check` or `treestamp update` without user interaction |
@@ -36,17 +36,17 @@ The core modules are organized as follows:
 | `cli.py` | Parses arguments and dispatches to extraction, generation, maintenance, or the editor |
 | `cli_inputs.py` | Resolves cwd-based source paths and prepares loaded or new sessions |
 | `cli_maintenance.py` | Prepares automatic writes and detects notes omitted from their final output |
-| `gitio.py` | Runs `git` and captures an immutable snapshot of the index or a ref |
+| `gitio.py` | Runs `git` and captures an immutable snapshot of the index |
 | `sources.py` | Builds the same tree from GitHub Trees API records, without a checkout |
 | `model.py`, `session.py` | Immutable tree data and the curation state (expanded, hidden, annotated) |
 | `codec.py` | Renders and parses tree rows, and checks that parsing the output reproduces the authored tree |
-| `maintenance.py` | Updates a printed tree against a newer snapshot, preserving curation and applying detected moves |
+| `maintenance.py` | Updates a printed tree against a newer snapshot, preserving curation at matching paths and entry kinds |
 | `document.py` | Finds the marked region, reads its settings, and writes the document atomically |
 | `editor.py`, `tui.py`, `tui_dialogs.py` | The Textual terminal editor |
 
 ### Local actions
 
-Source acquisition captures an immutable Git index or commit snapshot. The editor derives curation state from that snapshot and an optional loaded document; subsequent edits do not reread the filesystem tree. Stored paths are repository-relative, while displayed paths are relative to the selected subtree. Document operations stay within the selected repository and reject symlink traversal and submodule-boundary crossings.
+Local source acquisition captures an immutable Git index snapshot. The editor derives curation state from that snapshot and an optional loaded document; subsequent edits do not reread the filesystem tree. Stored paths are repository-relative, while displayed paths are relative to the selected subtree. Document operations stay within the selected repository and reject symlink traversal and submodule-boundary crossings.
 
 Document reads locate one marked region and validate its tree and metadata. Loading into an editor applies automatic maintenance against the snapshot and retains unmatched notes for explicit transfer decisions. Extraction reads the stored region without acquiring a source snapshot. The [CLI reference](cli-reference.md) defines how commands choose these operations and handle unmatched notes.
 

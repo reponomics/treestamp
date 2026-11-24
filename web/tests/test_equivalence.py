@@ -42,7 +42,7 @@ def test_equivalent_session_operations(
     assert response.status_code == 200, response.text
     body = response.json()
     settings = Settings(root=root, style=style, show_counts=counts)
-    snapshot = capture_snapshot(repo.path / root, "HEAD")
+    snapshot = capture_snapshot(repo.path / root)
     local = TreeSession(snapshot.tree, settings)
     body["state"]["curation"]["settings"].update(style=style, show_counts=counts)
     body = post_op(client, body, "restore")

@@ -11,20 +11,15 @@ from treestamp.document import (
     prepare_write,
     validate_source_tree,
 )
-from treestamp.errors import MarkerError
-from treestamp.gitio import capture_snapshot, changes
+from treestamp.gitio import capture_snapshot
 from treestamp.maintenance import update
 from treestamp.model import Node, normalize_annotation, tree_path
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from treestamp.cli_inputs import LoadedSource
 
 
-def unmatched_notes(
-    previous: Node, updated: Node, moves: Mapping[str, str]
-) -> tuple[str, ...]:
+def unmatched_notes(previous: Node, updated: Node) -> tuple[str, ...]:
     """Count only notes actually retained in the resulting printed tree."""
     current = {node.path: node for node in (updated, *updated.walk())}
     unmatched = []
@@ -32,9 +27,6 @@ def unmatched_notes(
         if not node.annotation:
             continue
         destination = current.get(node.path)
-        if destination is None or destination.kind != node.kind:
-            moved = moves.get(node.path)
-            destination = current.get(moved) if moved is not None else None
         if not _retains_note(node, destination):
             unmatched.append(node.path)
     return tuple(unmatched)
@@ -64,28 +56,20 @@ class Maintenance:
         )
 
 
-def prepare_maintenance(
-    source: LoadedSource, target_ref: str | None, comparison_ref: str | None
-) -> Maintenance:
+def prepare_maintenance(source: LoadedSource) -> Maintenance:
     document, previous = source.document, source.saved
     assert document is not None and previous is not None
-    if comparison_ref == "":
-        raise MarkerError("--compare requires a nonempty ref")
     target = capture_snapshot(
         source.repository / document.settings.root,
-        target_ref,
         repository=source.repository,
     )
     validate_source_tree(target.tree, document.settings)
-    moves = changes(target, comparison_ref).moves if comparison_ref is not None else {}
     hidden = frozenset(
         tree_path(path, document.settings.root) for path in document.hidden
     )
-    tree = update(
-        document.tree, target.tree, document.settings, hidden=hidden, moves=moves
-    )
+    tree = update(document.tree, target.tree, document.settings, hidden=hidden)
     maintained = Document(tree, document.settings, document.hidden)
     prepared = prepare_write(
         maintained, previous.path, expected=previous, repository=source.repository
     )
-    return Maintenance(prepared, unmatched_notes(document.tree, tree, moves))
+    return Maintenance(prepared, unmatched_notes(document.tree, tree))

@@ -85,10 +85,8 @@ def new_editor(value: str | None) -> EditorController:
     from treestamp.editor import EditorController
 
     selected = native_path("." if value is None else value)
-    if selected.is_file():
-        selected = selected.parent
     if not selected.is_dir():
-        raise MarkerError("new requires an existing directory or regular file")
+        raise MarkerError("new requires an existing directory")
     repository = repo_root(selected)
     settings = Settings(root=selected.relative_to(repository).as_posix())
     snapshot = capture_snapshot(selected, repository=repository)

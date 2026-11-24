@@ -116,6 +116,7 @@ def layout(repo: Repo) -> None:
         "commit-tree", repo.tree(entries), "-p", head, "-m", "with gitlink"
     ).strip()
     repo.git("update-ref", "HEAD", head)
+    repo.git("read-tree", head)
 
 
 def git_bytes(repo: Repo, *args: str) -> bytes:
@@ -151,10 +152,10 @@ def test_records_match_local_snapshot_including_scoped_roots(repo: Repo) -> None
     records, targets = listing(repo)
     assert {r.mode for r in records} >= {"040000", "100755", "120000", "160000"}
     assert tree_from_records(records, symlink_targets=targets) == (
-        capture_snapshot(repo.path, "HEAD").tree
+        capture_snapshot(repo.path).tree
     )
     assert tree_from_records(records, prefix="sub/", symlink_targets=targets) == (
-        capture_snapshot(repo.path / "sub", "HEAD").tree
+        capture_snapshot(repo.path / "sub").tree
     )
 
 
@@ -166,7 +167,7 @@ def test_region_from_records_is_byte_identical_to_local_write(
     records, targets = listing(repo)
     settings = Settings(style=style)
     hosted = TreeSession(tree_from_records(records, symlink_targets=targets), settings)
-    local = TreeSession(capture_snapshot(repo.path, "HEAD").tree, settings)
+    local = TreeSession(capture_snapshot(repo.path).tree, settings)
     for session in (hosted, local):
         session.hide("top.txt")
         session.collapse("sub/deep")

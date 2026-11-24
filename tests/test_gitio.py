@@ -1,4 +1,4 @@
-"""Real Git snapshots and endpoint comparisons, independent of the TUI."""
+"""Real Git index snapshots, independent of the TUI."""
 
 from pathlib import Path
 
@@ -6,7 +6,7 @@ import pytest
 
 from treestamp import gitio, sources
 from treestamp.errors import GitEnvironmentError, MarkerError
-from treestamp.gitio import capture_snapshot, changes, checked_path
+from treestamp.gitio import capture_snapshot, checked_path
 from treestamp.model import KIND_FILE, KIND_GITLINK, KIND_SYMLINK
 
 from .conftest import Repo
@@ -37,20 +37,17 @@ def test_index_is_truth_even_for_missing_and_ignored_tracked_files(repo: Repo) -
     }
 
 
-def test_ref_snapshot_ignores_index_and_worktree_changes(repo: Repo) -> None:
+def test_index_snapshot_includes_staged_changes_only(repo: Repo) -> None:
     baseline(repo)
     repo.write("staged")
     repo.add("staged")
     repo.write("unstaged")
-    assert "staged" not in paths(capture_snapshot(repo.path, "HEAD"))
     assert "staged" in paths(capture_snapshot(repo.path))
     assert "unstaged" not in paths(capture_snapshot(repo.path))
 
 
 def test_index_snapshot_does_not_need_commit(repo: Repo) -> None:
     assert capture_snapshot(repo.path).tree.children == ()
-    with pytest.raises(GitEnvironmentError):
-        capture_snapshot(repo.path, "HEAD")
 
 
 def test_snapshot_remains_fixed_after_index_changes(repo: Repo) -> None:
@@ -61,42 +58,6 @@ def test_snapshot_remains_fixed_after_index_changes(repo: Repo) -> None:
     repo.write("second")
     repo.add("second")
     assert "first" in paths(snapshot) and "second" not in paths(snapshot)
-
-
-def test_empty_comparison_is_exhaustive(repo: Repo) -> None:
-    baseline(repo)
-    result = changes(capture_snapshot(repo.path), "HEAD")
-    assert result.moves == {}
-
-
-def test_staged_rename_transfers_only_leaf_and_adds_destination(repo: Repo) -> None:
-    before = baseline(repo)
-    repo.git("mv", "old", "renamed")
-    result = changes(capture_snapshot(repo.path), before)
-    assert result.moves == {"old/file.txt": "renamed/file.txt"}
-
-
-def test_copy_is_addition_not_move(repo: Repo) -> None:
-    before = baseline(repo)
-    repo.write("copy", (repo.path / "old/file.txt").read_text(encoding="utf-8"))
-    repo.add("copy")
-    result = changes(capture_snapshot(repo.path), before)
-    assert result.moves == {}
-
-
-def test_file_directory_and_symlink_replacements_are_additions(repo: Repo) -> None:
-    repo.write("becomes_dir", "old directory-path file\n")
-    repo.write("becomes_file/child", "old child file\n")
-    repo.write("becomes_link", "old regular file\n")
-    repo.add(".")
-    repo.commit()
-    repo.git("rm", "-r", "becomes_dir", "becomes_file", "becomes_link")
-    repo.write("becomes_dir/child", "unrelated child content\n")
-    repo.write("becomes_file", "unrelated replacement content\n")
-    (repo.path / "becomes_link").symlink_to("becomes_file")
-    repo.add(".")
-    result = changes(capture_snapshot(repo.path), "HEAD")
-    assert result.moves == {}
 
 
 def test_symlink_target_read_from_blob_not_filesystem(repo: Repo) -> None:
@@ -119,14 +80,12 @@ def test_gitlinks_are_leaves(repo: Repo) -> None:
 
 
 def test_unusual_paths_survive_nul_protocol(repo: Repo) -> None:
-    original = "old/line\nwith\ttab and ünicode\\name"
-    destination = "new/line\nwith\ttab and ünicode\\name"
+    path = "dir/line\nwith\ttab and ünicode\\name"
     blob = repo.blob(b"distinct content\n")
-    subtree = repo.tree([("100644", "blob", blob, original.split("/", 1)[1])])
-    before = repo.tree([("040000", "tree", subtree, "old")])
-    after = repo.tree([("040000", "tree", subtree, "new")])
-    result = changes(capture_snapshot(repo.path, after), before)
-    assert result.moves == {original: destination}
+    subtree = repo.tree([("100644", "blob", blob, path.split("/", 1)[1])])
+    tree = repo.tree([("040000", "tree", subtree, "dir")])
+    repo.git("read-tree", tree)
+    assert paths(capture_snapshot(repo.path)) == {"dir": "dir", path: KIND_FILE}
 
 
 def test_scope_root_may_be_missing_from_worktree(repo: Repo) -> None:
@@ -136,37 +95,6 @@ def test_scope_root_may_be_missing_from_worktree(repo: Repo) -> None:
     snapshot = capture_snapshot(repo.path / "old")
     assert snapshot.root == repo.path / "old"
     assert paths(snapshot) == {"file.txt": KIND_FILE}
-
-
-def test_scope_comparison_can_precede_root_creation(repo: Repo) -> None:
-    before = baseline(repo)
-    repo.write("new/sub/file")
-    repo.add(".")
-    snapshot = capture_snapshot(repo.path / "new")
-    assert changes(snapshot, before).moves == {}
-
-
-def test_scope_excludes_cross_boundary_rename_transfer(repo: Repo) -> None:
-    baseline(repo)
-    repo.write("inside/keep")
-    repo.add(".")
-    repo.commit()
-    repo.git("mv", "old/file.txt", "inside/file.txt")
-    result = changes(capture_snapshot(repo.path / "inside"), "HEAD")
-    assert result.moves == {}
-
-
-@pytest.mark.parametrize("ref", ["missing-ref", "--help", "HEAD:old/file.txt"])
-def test_invalid_target_refs_fail(repo: Repo, ref: str) -> None:
-    baseline(repo)
-    with pytest.raises(GitEnvironmentError):
-        capture_snapshot(repo.path, ref)
-
-
-def test_missing_comparison_ref_fails(repo: Repo) -> None:
-    baseline(repo)
-    with pytest.raises(GitEnvironmentError):
-        changes(capture_snapshot(repo.path), "missing-ref")
 
 
 def test_unmerged_index_fails(repo: Repo) -> None:
@@ -186,7 +114,6 @@ def test_unmerged_index_fails(repo: Repo) -> None:
     )
     with pytest.raises(GitEnvironmentError, match="write-tree"):
         capture_snapshot(repo.path)
-    assert paths(capture_snapshot(repo.path, "HEAD"))
 
 
 def test_invalid_scope_fails(repo: Repo) -> None:
@@ -223,18 +150,6 @@ def test_missing_git_and_nonrepo_fail(
     monkeypatch.setenv("PATH", "")
     with pytest.raises(GitEnvironmentError, match="not on PATH"):
         capture_snapshot(tmp_path)
-
-
-def test_move_chains_are_not_supported() -> None:
-    assert (
-        gitio._supported_moves(
-            [("a", "b"), ("b", "c")],
-            {"a": KIND_FILE, "b": KIND_FILE},
-            {"b": KIND_FILE, "c": KIND_FILE},
-            "",
-        )
-        == {}
-    )
 
 
 def test_disappeared_selected_root_has_empty_facts(repo: Repo) -> None:
@@ -294,34 +209,6 @@ def test_symlink_batch_uses_lengths_for_empty_and_multiline_targets(
         path: target.decode("utf-8", "surrogateescape")
         for path, target in targets.items()
     }
-
-
-@pytest.mark.parametrize("raw", [b"R100", b"R100\0source", b"M"])
-def test_truncated_change_records_fail_explicitly(raw: bytes) -> None:
-    with pytest.raises(GitEnvironmentError, match="incomplete Git change record"):
-        gitio._rename_pairs(raw)
-
-
-def test_change_records_distinguish_copies_renames_and_other_changes() -> None:
-    raw = b"C100\0source\0copy\0M\0changed\0R90\0old\0new\0D\0removed\0"
-    assert gitio._rename_pairs(raw) == [("old", "new")]
-
-
-@pytest.mark.parametrize(
-    "pairs",
-    [
-        [("a", "b"), ("a", "c")],
-        [("a", "c"), ("b", "c")],
-        [("a", "b"), ("b", "a")],
-        [("a", "b"), ("b", "c")],
-    ],
-)
-def test_ambiguous_moves_do_not_hide_an_independent_valid_move(
-    pairs: list[tuple[str, str]],
-) -> None:
-    assert gitio._unique_move_pairs([*pairs, ("independent", "renamed")]) == [
-        ("independent", "renamed")
-    ]
 
 
 def test_explicit_repository_rejects_outside_snapshot_root(repo: Repo) -> None:

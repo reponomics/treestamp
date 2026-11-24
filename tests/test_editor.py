@@ -95,7 +95,8 @@ def test_open_captures_new_index_then_edits_use_fixed_snapshot(repo: Repo) -> No
     repo.write("src/new")
     repo.add("src/new")
     candidate = editor.prepare_load(str(destination.relative_to(repo.path)))
-    assert candidate.snapshot.tree_id != editor.state.snapshot.tree_id
+    assert "src/new" not in {node.path for node in editor.state.snapshot.tree.walk()}
+    assert "src/new" in {node.path for node in candidate.snapshot.tree.walk()}
     editor.adopt(candidate)
     assert "src/new" in {node.path for node in candidate.session.printed_tree().walk()}
     before = editor.region_text()
@@ -364,7 +365,7 @@ def test_counts_and_symlink_changes_are_noticed(repo: Repo, changed: str) -> Non
     tree = build_tree(
         [Entry("src/a"), Entry("src/b"), Entry("shortcut", "symlink", "new")]
     )
-    snapshot = Snapshot(repo.path, repo.path, tree, "fixed")
+    snapshot = Snapshot(repo.path, repo.path, tree)
     original = EditorController(snapshot, Settings()).document()
     src, shortcut = original.tree.children
     if changed == "count":

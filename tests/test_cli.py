@@ -39,11 +39,9 @@ def test_removed_flags_rejected(command: str | None, flag: str) -> None:
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("prefix", [(), ("new",)])
+@pytest.mark.parametrize("prefix", [(), ("new",), ("load",), ("check",), ("update",)])
 @pytest.mark.parametrize("flag", ["--target", "--compare"])
-def test_snapshot_flags_are_maintenance_only(
-    prefix: tuple[str, ...], flag: str
-) -> None:
+def test_snapshot_flags_are_rejected(prefix: tuple[str, ...], flag: str) -> None:
     with pytest.raises(SystemExit) as error:
         run_cli(*prefix, flag, "HEAD")
     assert error.value.code == 2

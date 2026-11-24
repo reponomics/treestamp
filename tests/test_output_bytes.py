@@ -55,7 +55,7 @@ def stamped(repo: Repo) -> Repo:
 
 def expected_region(repo: Repo) -> bytes:
     settings = Settings()
-    target = capture_snapshot(repo.path, None)
+    target = capture_snapshot(repo.path)
     tree = initial_tree(target.tree, settings)
     document = Document(tree, settings)
     return render_region(document, ".").encode("utf-8")

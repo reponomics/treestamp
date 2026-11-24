@@ -87,7 +87,7 @@ def test_conflicting_loaded_write_preserves_dirty_draft(
 def test_terminal_control_characters_are_escaped(editor: EditorController) -> None:
     tree = build_tree([Entry("strange\n\x1bname")])
     editor = EditorController(
-        Snapshot(editor.state.root, editor.state.root, tree, "fixed"), Settings()
+        Snapshot(editor.state.root, editor.state.root, tree), Settings()
     )
 
     async def journey() -> None:
@@ -129,7 +129,7 @@ def test_copy_uses_a_native_tool_or_the_terminal(
 
     tree = build_tree([Entry(name), Entry("readme")])
     editor = EditorController(
-        Snapshot(tmp_path, tmp_path, tree, "fixed"),
+        Snapshot(tmp_path, tmp_path, tree),
         Settings(style=style),
     )
     if dirty:

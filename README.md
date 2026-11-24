@@ -151,7 +151,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ## Check your README automatically
 
-treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index), or the revision selected with `--target REF`, and exits 1 when an update would change the document. With no document argument, it checks `README.md` in your current directory; an explicit document path is also relative to that directory, or absolute. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
+treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index) and exits 1 when an update would change the document. With no document argument, it checks `README.md` in your current directory; an explicit document path is also relative to that directory, or absolute. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
 
 **GitHub Actions:** after checking out your repository and setting up Python 3.11+, add this step:
 
@@ -190,7 +190,7 @@ The editor has to define a reserved sequence to be the delimiter between a filen
 
 Trailing whitespace in filenames and symlink targets is emitted as visible escape sequences so a formatter does not trim it away. Preserve those sequences when editing a document. Some filenames still cannot be represented in every style: for example, Unicode and ASCII output reject a regular filename containing ` -> ` or ending in ` [gitlink]` when it would be read as a symlink or submodule. Rendering fails if parsing the result would change the tree's identity or facts.
 
-When a loaded treestamp has notes whose rows disappeared, the terminal and web editors offer to transfer them before ordinary editing. One source stays at the top while you navigate the updated tree: Enter places it, <kbd>s</kbd> skips it, and <kbd>u</kbd> undoes the last decision. Placing a directory also carries annotations at matching relative paths inside it, recursively; unmatched or conflicting descendants remain in the queue. Declining placement or skipping annotations leaves them out of the written tree. Placement is a one-time preparation step; restoring a saved web draft opens the editor directly. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations. `update` refuses to write if notes would still be omitted; use `--skip-notes-transfer` only when you explicitly want to leave those notes out. `check` reports the proposed changes and unmatched notes without writing. `treestamp load DOCUMENT --print` extracts the saved treestamp without updating it or checking for note transfer.
+When a loaded treestamp has notes whose rows disappeared, the terminal and web editors offer to transfer them before ordinary editing. One source stays at the top while you navigate the updated tree: Enter places it, <kbd>s</kbd> skips it, and <kbd>u</kbd> undoes the last decision. Placing a directory also carries annotations at matching relative paths inside it, recursively; unmatched or conflicting descendants remain in the queue. Declining placement or skipping annotations leaves them out of the written tree. Placement is a one-time preparation step; restoring a saved web draft opens the editor directly. The CLI's `check` and `update` commands retain annotations at matching paths with the same entry kind; renamed paths require manual transfer. `update` refuses to write if notes would still be omitted; use `--skip-notes-transfer` only when you explicitly want to leave those notes out. `check` reports the proposed changes and unmatched notes without writing. `treestamp load DOCUMENT --print` extracts the saved treestamp without updating it or checking for note transfer.
 
 treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on preserving the generated tree and configuration between its boundary markers. Manual edits to annotations are supported. Other changes to the tree or configuration should be made through the editor so treestamp can reliably reload the document.
 
@@ -235,7 +235,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (17 files, 2 folders)
+│   ├── tests/ (18 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -283,7 +283,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (17 files, 2 folders)
+|   |-- tests/ (18 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
@@ -329,7 +329,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (4 files)
   - src/ (1 folder)
-  - tests/ (17 files, 2 folders)
+  - tests/ (18 files, 2 folders)
   - Dockerfile
   - README.md
   - fly.preview.toml

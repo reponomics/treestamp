@@ -77,60 +77,13 @@ def test_disappeared_subtree_and_empty_repository() -> None:
         update(target(), target(), S, hidden=frozenset({"../x"}))
 
 
-def test_annotation_transfer_and_repeat_update() -> None:
-    printed = parse_tree(".\n- old  # entry point\n")
-    current = target("new")
-    kwargs = dict(moves={"old": "new"})
-    actual = update(printed, current, S, **kwargs)
-    assert actual.children[0].annotation == "entry point"
-    assert update(actual, current, S, **kwargs) == actual
-
-
-@pytest.mark.parametrize(
-    "replacement",
-    [Entry("old/other"), Entry("old", "symlink", "new"), Entry("old", "gitlink")],
-)
-def test_move_replay_preserves_replacement_at_source(replacement: Entry) -> None:
-    current = build_tree([Entry("new"), replacement])
-    kwargs = dict(moves={"old": "new"})
-    actual = update(parse_tree(".\n- old  # moved note\n"), current, S, **kwargs)
-    rows = {node.path: node for node in actual.walk()}
-    assert rows["new"].annotation == "moved note"
-    assert rows["old"].annotation == ""
-    curated = replace(
-        actual,
-        children=tuple(
-            replace(node, annotation="replacement note") if node.path == "old" else node
-            for node in actual.children
-        ),
-    )
-    assert update(curated, current, S, **kwargs) == curated
-
-
-@pytest.mark.parametrize(
-    "printed", [".\n- old  # note\n- dest/\n", ".\n- old  # note\n"]
-)
-def test_move_does_not_expand_or_introduce_destination_parent(printed: str) -> None:
-    actual = update(
-        parse_tree(printed),
-        target("dest/new"),
-        S,
-        moves={"old": "dest/new"},
-    )
-    assert "dest/new" not in paths(actual)
-
-
-def test_existing_destination_annotation_wins() -> None:
-    printed = parse_tree(".\n- old  # source\n- new  # destination\n")
-    actual = update(printed, target("new"), S, moves={"old": "new"})
-    assert actual.children[0].annotation == "destination"
-
-
-def test_move_cannot_override_hiding() -> None:
-    printed = parse_tree(".\n- old  # source\n")
-    assert not update(
-        printed, target("new"), S, hidden=frozenset({"new"}), moves={"old": "new"}
-    ).children
+def test_notes_stay_at_existing_paths_and_do_not_follow_renamed_files() -> None:
+    printed = parse_tree(".\n- old  # source\n- existing  # retained\n")
+    current = target("new", "existing")
+    actual = update(printed, current, S)
+    notes = {node.path: node.annotation for node in actual.walk()}
+    assert notes == {"existing": "retained", "new": ""}
+    assert update(actual, current, S) == actual
 
 
 def test_kind_replacement_drops_annotation_and_never_expands() -> None:
@@ -147,37 +100,6 @@ def test_symlink_facts_refresh_without_structural_change() -> None:
     actual = update(printed, current, S)
     assert actual.children[0].target == "new"
     assert actual.children[0].annotation == "note"
-
-
-@pytest.mark.parametrize(
-    "moves",
-    [
-        {"a": "new", "b": "new"},
-        {"a": "b", "b": "new"},
-        {"../old": "new"},
-        {"a": "absent"},
-        {"a": "dir"},
-        {"new": "a"},
-    ],
-)
-def test_invalid_move_facts_fail(moves: dict[str, str]) -> None:
-    with pytest.raises(MarkerError):
-        update(
-            parse_tree(".\n- a  # note\n"),
-            target("new", "a", "dir/file"),
-            S,
-            moves=moves,
-        )
-
-
-def test_kind_mismatched_move_fails() -> None:
-    with pytest.raises(MarkerError, match="kinds"):
-        update(
-            parse_tree(".\n- old  # note\n"),
-            build_tree([Entry("new", "symlink", "a")]),
-            S,
-            moves={"old": "new"},
-        )
 
 
 def test_updates_are_idempotent_across_generated_layouts() -> None:

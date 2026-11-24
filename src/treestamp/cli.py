@@ -52,8 +52,9 @@ def _editor_commands(
         child.add_argument(
             "path",
             nargs="?",
+            metavar="DIRECTORY" if creating else "DOCUMENT",
             help=(
-                "existing folder or file whose parent becomes the tree root "
+                "existing directory to use as the tree root "
                 "(default: current directory)"
                 if creating
                 else "document path (default: README.md in the current directory)"
@@ -84,14 +85,6 @@ def _maintenance_commands(
             "document",
             nargs="?",
             help="document path (default: README.md in the current directory)",
-        )
-        child.add_argument(
-            "--target", metavar="REF", help="target Git ref (default: staged Git index)"
-        )
-        child.add_argument(
-            "--compare",
-            metavar="REF",
-            help="baseline Git ref for automatic rename matching",
         )
         if not checking:
             child.add_argument(
@@ -127,7 +120,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _maintain(args: argparse.Namespace) -> int:
     source = read_source(args.document)
-    result = prepare_maintenance(source, args.target, args.compare)
+    result = prepare_maintenance(source)
     assert source.saved is not None
     if result.unmatched:
         if args.command == "update" and not args.skip_notes_transfer:

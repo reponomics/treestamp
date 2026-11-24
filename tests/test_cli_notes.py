@@ -79,7 +79,7 @@ def test_multiple_missing_notes_are_counted_individually(repo: Repo) -> None:
     assert path.read_bytes() == before
 
 
-def test_compare_preserves_a_renamed_note_before_deciding_transfer_is_needed(
+def test_renamed_note_requires_manual_transfer_or_explicit_omission(
     repo: Repo,
 ) -> None:
     note = "entry point"
@@ -88,17 +88,17 @@ def test_compare_preserves_a_renamed_note_before_deciding_transfer_is_needed(
     before = path.read_bytes()
     assert run_cli("update")[0] == 2
     assert path.read_bytes() == before
-    code, _, diagnostic = run_cli("update", "--compare", "HEAD")
-    assert code == 0 and not diagnostic
+    code, _, diagnostic = run_cli("update", "--skip-notes-transfer")
+    assert code == 0 and "1 unmatched" in diagnostic
     document, _ = load_document(path)
     assert document is not None
-    assert {
-        node.path: node.annotation for node in document.tree.walk() if node.annotation
-    } == {"src/renamed.py": note}
+    nodes = {node.path: node for node in document.tree.walk()}
+    assert "src/main.py" not in nodes
+    assert nodes["src/renamed.py"].annotation == ""
 
 
 @pytest.mark.parametrize("hidden", [False, True])
-def test_detected_move_does_not_justify_a_note_missing_from_final_output(
+def test_renamed_note_requires_transfer_even_when_destination_is_not_visible(
     repo: Repo, hidden: bool
 ) -> None:
     repo.write("destination/keep")
@@ -111,29 +111,28 @@ def test_detected_move_does_not_justify_a_note_missing_from_final_output(
     )
     repo.git("mv", "src/main.py", destination)
     before = path.read_bytes()
-    code, output, diagnostic = run_cli("update", "--compare", "HEAD")
+    code, output, diagnostic = run_cli("update")
     assert code == 2 and not output and "1 unmatched" in diagnostic
     assert path.read_bytes() == before
 
 
-def test_conflicting_note_at_detected_move_destination_is_not_silently_replaced(
+def test_existing_destination_note_is_preserved_when_renamed_note_is_omitted(
     repo: Repo,
 ) -> None:
     path = annotated(repo, {"src/main.py": "source note"})
     document, _ = load_document(path)
     assert document is not None
     destination = "renamed.py"
-    # The loaded document can describe a different historical tree from --compare.
     ghost = Node(destination, destination, "file", annotation="destination note")
     tree = replace(document.tree, children=sort_nodes((*document.tree.children, ghost)))
     write_document(replace(document, tree=tree), path)
     repo.git("mv", "src/main.py", destination)
     before = path.read_bytes()
 
-    code, output, diagnostic = run_cli("update", "--compare", "HEAD")
+    code, output, diagnostic = run_cli("update")
     assert code == 2 and not output and "1 unmatched" in diagnostic
     assert path.read_bytes() == before
-    assert run_cli("update", "--compare", "HEAD", "--skip-notes-transfer")[0] == 0
+    assert run_cli("update", "--skip-notes-transfer")[0] == 0
     saved, _ = load_document(path)
     assert saved is not None
     assert (

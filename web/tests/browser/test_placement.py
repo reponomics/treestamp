@@ -43,7 +43,7 @@ def build_placement_fixture(path: Path) -> Fixture:
     _git(path, "commit", "-q", "-m", "Create project")
     old = _git(path, "rev-parse", "HEAD")
     settings = Settings()
-    snapshot = capture_snapshot(path, "HEAD")
+    snapshot = capture_snapshot(path)
     session = TreeSession(snapshot.tree, settings)
     for node in snapshot.tree.walk():
         if node.is_dir:
