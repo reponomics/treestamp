@@ -9,6 +9,7 @@ import json
 import posixpath
 import time
 import uuid
+from collections import Counter
 from dataclasses import asdict, dataclass, replace
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
@@ -835,7 +836,7 @@ class PreviewService:
     async def _symlink_targets(
         self, repo: Repository, snapshot: Snapshot, prefix: str, acquired: bool
     ) -> dict[str, bytes]:
-        wanted = dict.fromkeys(
+        wanted = Counter(
             row.object_id
             for row in snapshot.records
             if row.mode == "120000" and row.path.startswith(prefix)
@@ -848,9 +849,38 @@ class PreviewService:
                 f"this subtree needs {len(wanted)} symlink targets; "
                 f"the service limit is {limit}",
             )
-        bodies = await asyncio.gather(
-            *(self._blob(repo, snapshot, oid, acquired) for oid in wanted)
+        try:
+            bodies = await asyncio.gather(
+                *(
+                    self._blob(
+                        repo,
+                        snapshot,
+                        oid,
+                        acquired,
+                        cap=self._config.symlink_target_max_bytes,
+                    )
+                    for oid in wanted
+                )
+            )
+        except TooLargeError:
+            raise PreviewError(
+                422,
+                "source_unavailable",
+                "a symlink target exceeds the service limit of "
+                f"{self._config.symlink_target_max_bytes} bytes",
+            ) from None
+        # Blob fetches are deduplicated, but decoding and rendering repeat each
+        # target per path. Charge every reference before constructing the tree.
+        expanded = sum(
+            wanted[oid] * len(body) for oid, body in zip(wanted, bodies, strict=True)
         )
+        if expanded > self._config.symlink_expanded_max_bytes:
+            raise PreviewError(
+                422,
+                "source_unavailable",
+                f"this subtree needs {expanded} expanded symlink target bytes; "
+                f"the service limit is {self._config.symlink_expanded_max_bytes}",
+            )
         return dict(zip(wanted, bodies, strict=True))
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import sys
+import unicodedata
 from importlib.metadata import version
 from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING
@@ -31,6 +32,7 @@ from treestamp.model import Settings, build_tree, tree_path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import TextIO
 
     from treestamp.editor import EditorController
 
@@ -222,8 +224,22 @@ def _explore(args: argparse.Namespace) -> int:
     return 0
 
 
+def _terminal_text(text: str, stream: TextIO) -> str:
+    """Escape terminal controls, preserving layout and raw redirected output."""
+    if not stream.isatty():
+        return text
+    # CRLF is a line ending; a bare CR could overwrite already displayed text.
+    return "".join(
+        ascii(char)[1:-1]
+        if char not in "\n\t" and unicodedata.category(char) in {"Cc", "Cs"}
+        else char
+        for char in text.replace("\r\n", "\n")
+    )
+
+
 def _emit(text: str) -> None:
-    """Preserve Git bytes and newlines even through a Windows output pipe."""
+    """Display safely on a terminal; preserve Git bytes/newlines through pipes."""
+    text = _terminal_text(text, sys.stdout)
     stream = getattr(sys.stdout, "buffer", None)
     if stream is None:
         sys.stdout.write(text)
@@ -248,10 +264,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _explore(args)
         return _maintain(args)
     except TreestampError as exc:
-        print(f"treestamp: {exc}", file=sys.stderr)
+        print(_terminal_text(f"treestamp: {exc}", sys.stderr), file=sys.stderr)
         return exc.exit_code
     except (OSError, UnicodeError) as exc:
-        print(f"treestamp: {exc}", file=sys.stderr)
+        print(_terminal_text(f"treestamp: {exc}", sys.stderr), file=sys.stderr)
         return ExecutionError.exit_code
     except KeyboardInterrupt:
         return 130

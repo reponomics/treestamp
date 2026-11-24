@@ -99,6 +99,8 @@ Annotation transfer is best effort: supported moves must remain within the selec
 
 ## Output and exit status
 
+When writing directly to a terminal, CLI output escapes control characters from document context and diagnostics; tabs and line breaks retain their layout. Output redirected to a file or pipe remains unchanged, including original Git bytes and line endings.
+
 Output uses UTF-8. New regions use LF line endings; printing or copying a loaded region preserves its LF or CRLF convention and supported formatting. Exported snippets omit a file-level UTF-8 BOM. Writing into an existing document preserves its line-ending convention and any original BOM. Diagnostic errors go to stderr.
 
 | Exit status | Meaning |

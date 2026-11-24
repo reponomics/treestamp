@@ -24,6 +24,20 @@ In a second terminal, run `make web-serve` and open `http://127.0.0.1:8000`. The
 
 To use real GitHub, set `GITHUB_TOKEN` or all three GitHub App variables: `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY`. Then run `make web-serve GITHUB_API_URL=https://api.github.com`. To read the token or private key from a separate file instead, set `GITHUB_TOKEN_FILE` or `GITHUB_APP_PRIVATE_KEY_FILE` to its path; each file can be replaced without other configuration changes and takes effect on restart. Keep credentials in a host secret store or a file readable only by the service, never in the repository.
 
+## Symlink resource limits
+
+The hosted service applies three limits to symlinks within the selected subtree. Each can be configured through an environment variable at startup:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SYMLINK_FETCH_LIMIT` | 32 distinct objects | Bounds upstream blob fetches; paths sharing a target blob use one fetch |
+| `SYMLINK_TARGET_MAX_BYTES` | 16 KiB (16384 bytes) | Bounds each raw target blob, including cached blobs |
+| `SYMLINK_EXPANDED_MAX_BYTES` | 256 KiB (262144 bytes) | Bounds raw target bytes counted once for every symlink path, including repeated references to the same blob |
+
+The byte limits are checked before building or rendering the source tree, on opening and on subsequent edits or note transfers. Exceeding a limit rejects the selected subtree without truncating targets. These are hosted-service constraints; the local CLI and TUI retain their existing behavior.
+
+Counting each reference bounds repeated decoding and the targets' contribution to rendered output: the current codec expands a raw target byte to at most five characters, including list-style escaping. This does not impose a global memory ceiling on the service; other source data and concurrent requests remain subject to their separate limits.
+
 ## Test and build
 
 The [shared UI patterns](../docs/ui-patterns.md) define button roles, interaction states, and brand typography. Their CSS is shared across the landing page, picker, editor, and dialogs.

@@ -230,11 +230,11 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── tui_entry.py
 │       ├── tui_reconcile.py
 │       └── tui_rows.py
-├── tests/ (22 files)  # Contract and integration tests
+├── tests/ (23 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (16 files, 2 folders)
+│   ├── tests/ (17 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -277,11 +277,11 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- tui_entry.py
 |       |-- tui_reconcile.py
 |       `-- tui_rows.py
-|-- tests/ (22 files)  # Contract and integration tests
+|-- tests/ (23 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (16 files, 2 folders)
+|   |-- tests/ (17 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
@@ -322,11 +322,11 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - tui_entry.py
     - tui_reconcile.py
     - tui_rows.py
-- tests/ (22 files)  # Contract and integration tests
+- tests/ (23 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
   - scripts/ (4 files)
   - src/ (1 folder)
-  - tests/ (16 files, 2 folders)
+  - tests/ (17 files, 2 folders)
   - Dockerfile
   - README.md
   - fly.preview.toml

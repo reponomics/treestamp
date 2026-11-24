@@ -33,6 +33,8 @@ class Config:
     github_rate_reserve: int = 100
     request_timeout_seconds: float = 20.0
     symlink_fetch_limit: int = 32
+    symlink_target_max_bytes: int = 16 * 1024
+    symlink_expanded_max_bytes: int = 256 * 1024
     cache_max_trees: int = 256
     cache_max_entries: int = 2_000_000
     cache_max_blobs: int = 4096
@@ -110,6 +112,8 @@ class Config:
             "port",
             "github_rate_reserve",
             "symlink_fetch_limit",
+            "symlink_target_max_bytes",
+            "symlink_expanded_max_bytes",
             "cache_max_trees",
             "cache_max_entries",
             "cache_max_blobs",
