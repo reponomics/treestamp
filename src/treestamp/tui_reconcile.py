@@ -29,7 +29,7 @@ class PlacementChoiceScreen(ModalScreen[bool]):
     """Offer placement once, before editing a newly loaded draft."""
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("enter,y,Y", "place", "Place notes", priority=True),
+        Binding("enter,y,Y", "place", "Transfer notes", priority=True),
         Binding("escape,n,N", "skip", "Continue without them", priority=True),
     ]
     DEFAULT_CSS = """
@@ -55,21 +55,22 @@ class PlacementChoiceScreen(ModalScreen[bool]):
         pronoun = "it" if self.count == 1 else "them"
         with Vertical(id="placement-choice"):
             yield Static(
-                "This treestamp no longer matches the repository.",
+                "Transfer notes?",
                 markup=False,
                 id="placement-choice-title",
             )
             yield Static(
-                f"{self.count} {noun} no longer in the tree.",
+                f"{self.count} {noun} no longer in the updated tree.",
                 markup=False,
                 id="placement-choice-summary",
             )
             yield Static(
-                "Choose where each note belongs in the updated tree, or leave it out.",
+                "Transfer these notes to other paths, or continue without them.\n"
+                "Your document remains unchanged until you write it.",
                 markup=False,
             )
             yield Static(
-                f"Enter Place notes\nEsc Continue without {pronoun}",
+                f"Enter Transfer notes\nEsc Continue without {pronoun}",
                 markup=False,
                 id="placement-choice-keys",
             )
@@ -106,7 +107,7 @@ class ReconcileScreen(ModalScreen[str]):
     """One stable source slot, one focus, and a destination browser."""
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("enter", "place", "Place", priority=True),
+        Binding("enter", "place", "Transfer", priority=True),
         Binding("s", "skip", "Skip", priority=True),
         Binding("u", "undo", "Undo", priority=True),
         Binding("left", "fold('left')", "Close / parent"),
@@ -182,7 +183,7 @@ class ReconcileScreen(ModalScreen[str]):
     def _source_text(self) -> str:
         source = self.state.current
         if source is None:
-            return "Placement finished"
+            return "Note transfer finished"
         path = source.path + ("/" if source.is_dir else "")
         return f"[{self.state.remaining} left] From {path}"
 
@@ -228,7 +229,7 @@ class ReconcileScreen(ModalScreen[str]):
 
     def _keys(self) -> str:
         return (
-            "↑↓ Move  ←→ Folders  Enter Place  s Skip\n"
+            "↑↓ Move  ←→ Folders  Enter Transfer  s Skip\n"
             "u Undo  H Hidden  ? Details  Esc Skip remaining"
         )
 
@@ -358,7 +359,7 @@ class ReconcileScreen(ModalScreen[str]):
         lines.extend(
             [
                 "",
-                "Enter places the note and reveals its destination in the draft.",
+                "Enter transfers the note and reveals its destination in the draft.",
                 "s skips this item. Skipped notes are left out when writing.",
                 "Directories carry pending notes at matching relative paths,",
                 "including nested paths. Missing or conflicting entries stay queued.",
@@ -369,7 +370,7 @@ class ReconcileScreen(ModalScreen[str]):
         )
         self.app.push_screen(
             PreviewScreen(
-                "Placement details",
+                "Note transfer details",
                 "\n".join(safe_text(line) for line in lines),
                 soft_wrap=True,
             )
@@ -377,6 +378,6 @@ class ReconcileScreen(ModalScreen[str]):
 
     def action_back(self) -> None:
         self.dismiss(
-            f"Placement finished: {self.state.placed_count} notes placed, "
+            f"Note transfer finished: {self.state.placed_count} notes transferred, "
             f"{self.state.unplaced} left out. w writes the draft."
         )

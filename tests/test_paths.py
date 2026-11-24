@@ -71,7 +71,7 @@ def test_nested_cwd_and_tree_root_do_not_rebase_document_paths(
     assert document_path(repo.path, "./tree.md") == repo.path / "tree.md"
     assert run_cli("check", "tree.md")[0] == 2
     assert run_cli("check", "../tree.md")[0] == 0
-    assert run_cli("--load", "../tree.md", "--print")[1] == repo.read("tree.md")
+    assert run_cli("load", "../tree.md", "--print")[1] == repo.read("tree.md")
     editor.adopt(editor.prepare_load("tree.md"))
     editor.write("tree.md")
     assert not (repo.path / "src" / "tree.md").exists()
@@ -98,7 +98,7 @@ def test_explicit_document_selects_its_own_repository(
         monkeypatch.chdir(tmp_path_factory.mktemp("outside-repository"))
     document = other.path / "README.md"
     value = str(document) if absolute else os.path.relpath(document)
-    code, output, error = run_cli("--load", value, "--print")
+    code, output, error = run_cli("load", value, "--print")
     assert code == 0 and not error and "other.txt" in output and "src/" not in output
     for command in ("check", "update"):
         assert run_cli(command, value)[0] == 0
@@ -215,7 +215,7 @@ def test_cli_document_symlinks_are_refused_before_normalizing_parents(
         pytest.skip("creating symbolic links is not permitted")
     before = repo.read_bytes("tree.md")
     for arguments in (
-        ("--load", value, "--print"),
+        ("load", value, "--print"),
         ("check", value),
         ("update", value),
     ):
@@ -236,7 +236,7 @@ def test_cli_selects_nested_repository_but_editor_does_not_cross_into_it(
     nested_editor = EditorController(capture_snapshot(nested.path), Settings())
     write_document(nested_editor.document(), nested.path / "tree.md", create=True)
     assert run_cli("check", "nested/tree.md")[0] == 0
-    code, output, error = run_cli("--load", "nested/tree.md", "--print")
+    code, output, error = run_cli("load", "nested/tree.md", "--print")
     assert code == 0 and not error and "nested.txt" in output and "src/" not in output
     with pytest.raises(MarkerError, match="another repository"):
         editor.prepare_load("nested/tree.md")
@@ -265,7 +265,7 @@ def test_cli_submodule_document_ownership(repo: Repo, initialized: bool) -> None
         assert run_cli("update", "module/tree.md")[0] == 0
     for arguments in (
         ("check", "module/tree.md"),
-        ("--load", "module/tree.md", "--print"),
+        ("load", "module/tree.md", "--print"),
     ):
         code, output, error = run_cli(*arguments)
         if initialized:
@@ -284,7 +284,7 @@ def test_cli_rejects_invalid_document_path_without_writing(
     for arguments in (
         ("check", value),
         ("update", value),
-        ("--load", value, "--print"),
+        ("load", value, "--print"),
     ):
         code, output, error = run_cli(*arguments)
         assert code == 2 and error and not output

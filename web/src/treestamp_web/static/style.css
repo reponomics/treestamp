@@ -1,4 +1,4 @@
-/* treestamp: an ink-and-paper workspace for a small piece of documentation. */
+/* Shared typography, palette, and application layout. */
 
 @font-face {
   font-family: "Reponomics Inter";
@@ -599,11 +599,7 @@ pre {
   .info-sheet { flex: 1; min-height: 0; overflow-y: auto; }
 }
 
-/* ---------- the tree
-
-   The whole tree is on the page; the page scrolls, not a box inside it. The list is as
-   wide as its widest row so every row's actions line up at the right; long rows scroll
-   sideways. */
+/* Tree rows share a width so their actions align; long rows scroll horizontally. */
 .tree-scroll {
   overflow-x: auto;
   container-type: inline-size;
@@ -697,10 +693,8 @@ pre {
 .name { cursor: default; }
 .row.dir .name { cursor: inherit; font-weight: var(--weight-strong); }
 .row.dir .name:hover { color: var(--ink); }
-/* One ink for the document; weight and geometry carry its hierarchy. */
 .rows .counts, .rows .note { color: var(--ink); }
 .note { margin-left: var(--s1); }
-/* A focused row is offering its actions, not asking to be read as a text selection. */
 .row:focus { outline: none; }
 .row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
 

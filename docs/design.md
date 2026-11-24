@@ -33,7 +33,9 @@ The modules in `src/treestamp/` have narrow responsibilities:
 
 | Module | Responsibility |
 | --- | --- |
-| `cli.py` | Parses arguments and dispatches to headless maintenance or the editor |
+| `cli.py` | Parses arguments and dispatches to extraction, generation, maintenance, or the editor |
+| `cli_inputs.py` | Resolves cwd-based source paths and prepares loaded or new sessions |
+| `cli_maintenance.py` | Prepares automatic writes and detects notes omitted from their final output |
 | `gitio.py` | Runs `git` and captures an immutable snapshot of the index or a ref |
 | `sources.py` | Builds the same tree from GitHub Trees API records, without a checkout |
 | `model.py`, `session.py` | Immutable tree data and the curation state (expanded, hidden, annotated) |
@@ -46,7 +48,7 @@ The modules in `src/treestamp/` have narrow responsibilities:
 
 - **Snapshot.** Treestamp captures the Git index (or a ref given with `--target`) once. Every later action in that run or editing session uses the same snapshot, so files changing on disk do not alter the tree being edited.
 - **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
-- **Start or load.** In the terminal editor, the opening filesystem tree lets the user select a folder for **Create treestamp here** or a file for **Load treestamp from document**. Creation captures the chosen subtree; loading reads the document and restores its tree, hidden entries, and settings against the captured index.
+- **Start or load.** The CLI resolves the source before opening the terminal editor. Creation captures the selected subtree; interactive loading reads the document and prepares an updated draft against the captured index, retaining supported curation and offering transfer for unmatched notes. See the [CLI reference](cli-reference.md) for command defaults and explicit paths.
 - **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
 - **Write.** `update` and the editor's **Write to document** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. The editor offers writing only for a loaded document, and always writes back to that document. New treestamps are copied or printed for insertion into a document.
 - **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
@@ -72,7 +74,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 
 ### Hosted actions
 
-1. The visitor enters a repository link. The service confirms through the GitHub API that the repository is public, resolves its default branch to a commit and tree, and fetches the complete recursive tree listing. Private repositories, branches, and tags are refused; only the default-branch HEAD or a pinned commit already in the cache can be opened.
+1. The visitor enters a repository link. The service confirms through the GitHub API that the repository is public, resolves its default branch to a commit and tree, and fetches the complete recursive tree listing. Private repositories, branches, and tags are refused; the service opens the current default-branch HEAD or an available cached commit. An uncached pinned commit can be acquired only if it still matches that HEAD.
 2. The service fetches the blobs it needs: symlink targets in the selected subtree, up to a configured limit, and the selected document, up to 1 MiB.
 3. The service returns the rendered tree, display rows, and a session state envelope to the browser. The browser holds the curation state; the server keeps only the cached snapshot.
 4. Each edit sends the state envelope and one operation to the service, which validates both, applies the operation, and returns the new state. Requests for a snapshot that is no longer cached fail with `410` rather than reading a newer commit.
@@ -90,15 +92,15 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
-[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) documents command usage, path rules, and defaults.
+The [CLI reference](cli-reference.md) documents command usage, path rules, and defaults. [ADR 0001](adr/0001-cli-path-coherence.md) records the rationale for those choices.
 
-`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents a visual folder/document chooser. `treestamp` with no command is equivalent to `treestamp tui`.
+Bare `treestamp` loads a valid treestamp from cwd's `README.md`, or starts a fresh tree rooted at cwd when that README is absent or unmarked. Malformed or unreadable documents fail. `treestamp new [PATH]` explicitly starts fresh at cwd or the selected directory; a regular file selects its parent without becoming a write destination. `treestamp load [DOCUMENT]` strictly loads cwd's README or an explicit document. These commands enter the editor directly, without a terminal source picker. Explicit paths are cwd-relative or absolute and select their containing repository. Loaded tree scope comes from repository-relative document metadata.
 
-With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new treestamp if the README is absent or unmarked; malformed or empty marked regions remain errors.
+`load --print` validates and extracts the stored region without acquiring a new snapshot, updating the tree, or checking unmatched notes. `new --print` generates a fresh tree from the selected root's staged index. Bare `--print` uses the same automatic source choice as bare interactive startup. Printing writes stdout, never the document; it accepts no maintenance flags.
 
-`treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` to match the snapshot. An explicit document path resolves from cwd (or is absolute) and selects its containing repository. An omitted document selects the repository-root README in cwd's repository. `--target` selects a Git ref in the document's repository instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
+`treestamp update [DOCUMENT] [--target REF] [--compare REF] [--skip-notes-transfer]` prepares an automatic replacement for cwd's README or the specified document. `--target` chooses a local Git ref instead of the index; `--compare` enables supported leaf-rename matching. After automatic matching, notes omitted from the resulting draft block writing unless the explicit override is supplied. Matched notes remain preserved. No transfer prompt is shown in headless commands.
 
-`treestamp check [DOCUMENT] [--target REF] [--compare REF]` uses the same document and repository selection as `update` and reports whether it would change the document, printing a unified diff if so.
+`treestamp check [DOCUMENT] [--target REF] [--compare REF]` uses the same document, repository, and automatic maintenance rules, reports a proposed diff and any unmatched notes, and never writes. It reports drift without requiring transfer decisions.
 
 CLI document discovery rejects symlinks, including traversed components before `..` normalization. An explicitly selected document in an initialized nested repository or submodule uses that repository; an uninitialized submodule remains a boundary. Within an editing session, tree roots and document paths remain repository-relative, and document operations cannot cross into another repository.
 
@@ -118,7 +120,7 @@ Errors are written to standard error, prefixed with `treestamp:`.
 
 ### Terminal editor
 
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to document (loaded sessions only), `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Folder creation and document loading are available only in the opening visual chooser. Browsing includes untracked files, is lazy, and does not follow symlinks. Source preparation validates the selection before the chooser closes; document loads then offer note placement when necessary.
+The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to document (loaded sessions only), `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. The CLI resolves and validates a source before opening the editor, which identifies its selected root and explains an empty staged tree. Interactive loads offer a Transfer notes modal only when notes lose their original paths. The existing transfer queue retains Transfer, Skip, and Undo; a navigable list is deferred for both interfaces. New sessions export through Copy or Print; loaded sessions can write back to their original document. Starting another session requires a new CLI invocation.
 
 ### Document format
 
@@ -126,9 +128,9 @@ The [README](../README.md#3-add-it-to-your-readme) shows a complete region and d
 
 The optional config comment holds TOML with three keys, each generated only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Equivalent authored configuration may include explicit defaults. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
-[ADR 0002: Formatter-compatible documents](adr/0002-formatter-compatible-documents.md) records the formatting contract. New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
+New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
 
-`prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports, while writes to a different existing document preserve that destination's formatting. No formatting preference is added to persisted session state.
+`prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference. [ADR 0002](adr/0002-formatter-compatible-documents.md) records the formatting rationale and alternatives.
 
 Both editors offer an attribution toggle, off by default. When enabled, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 
@@ -153,7 +155,7 @@ The browser application uses these endpoints. They exist to serve that applicati
 | `POST /api/placement` | Captured source and opening `state`, bounded `decisions`, browsing `expanded` paths, and `reveal` | Provisional placement state and destination rows |
 | `GET /healthz` | None | Liveness, versions, build commit, credential type, last observed GitHub budget, and cache statistics |
 
-The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the loaded document's original bytes, an optional `initial_curation` baseline, and a revision counter; the browser returns it unchanged with each operation. Operation types:
+The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the original marked treestamp-region bytes, an optional `initial_curation` baseline, and a revision counter. The browser sends the latest envelope with current presentation settings and the requested operation. Operation types:
 
 | Type | Effect |
 | --- | --- |

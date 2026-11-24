@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
 
 import pytest
 from textual.containers import VerticalScroll
@@ -15,7 +14,6 @@ from treestamp.gitio import capture_snapshot
 from treestamp.model import Settings
 from treestamp.tui import TreestampApp
 from treestamp.tui_dialogs import PreviewScreen
-from treestamp.tui_entry import SourceChoiceScreen
 from treestamp.tui_reconcile import (
     PlacementChoiceScreen,
     PlacementConfirmScreen,
@@ -23,62 +21,29 @@ from treestamp.tui_reconcile import (
 )
 
 from .conftest import Repo, run_cli
-
-if TYPE_CHECKING:
-    from textual.pilot import Pilot
-
-NOTES = {"old/a.py": "First annotation", "old/b.py": "Second annotation"}
+from .tui_reconcile_support import NOTES, current, opened, press, selected, text_of
+from .tui_reconcile_support import stale_fixture as stale_fixture
 
 
-def load_stale(repo: Repo) -> EditorController:
-    """Move two annotated rows into a previously collapsed existing directory."""
-    for path in ("old/a.py", "old/b.py", "pkg/existing.py"):
-        repo.write(path)
-    repo.add(".")
-    editor = EditorController(capture_snapshot(repo.path), Settings())
-    session = editor.state.session
-    session.expand("old")
-    for path, note in NOTES.items():
-        session.set_annotation(path, note)
-    write_document(editor.document(), repo.path / "tree.md", create=True)
-    repo.git("mv", "old/a.py", "pkg/first.py")
-    repo.git("mv", "old/b.py", "pkg/second.py")
-    editor.adopt(editor.prepare_load("tree.md"))
-    return editor
+@pytest.mark.parametrize("size", [(80, 24), (60, 20)])
+def test_transfer_prompt_fits_above_the_populated_editor(
+    stale: EditorController, repo: Repo, size: tuple[int, int]
+) -> None:
+    saved = repo.read_bytes("tree.md")
 
+    async def journey() -> None:
+        app = TreestampApp(stale)
+        async with app.run_test(size=size):
+            screen = app.screen
+            assert isinstance(screen, PlacementChoiceScreen)
+            assert len(app.tree_view.children) == len(app.session.visible_rows())
+            panel = screen.query_one("#placement-choice")
+            assert screen.region.contains_region(panel.region)
+            for item in panel.query(Static):
+                assert panel.region.contains_region(item.region)
+            assert repo.read_bytes("tree.md") == saved
 
-@pytest.fixture
-def stale(repo: Repo) -> EditorController:
-    return load_stale(repo)
-
-
-def text_of(widget: Static) -> str:
-    rendered = widget.render()
-    return getattr(rendered, "plain", str(rendered))
-
-
-async def press(pilot: Pilot[bool], *keys: str) -> None:
-    await pilot.press(*keys)
-    await pilot.pause()
-
-
-async def opened(pilot: Pilot[bool], *, skip_group: bool = True) -> ReconcileScreen:
-    assert isinstance(pilot.app.screen, PlacementChoiceScreen)
-    await press(pilot, "enter")
-    screen = pilot.app.screen
-    assert isinstance(screen, ReconcileScreen)
-    if (
-        skip_group
-        and screen.state.current.is_dir
-        and not screen.state.current.annotation
-    ):
-        await press(pilot, "s")
-    return screen
-
-
-def selected(screen: ReconcileScreen) -> str:
-    assert screen.tree_view.index is not None
-    return screen.rows[screen.tree_view.index][0].path
+    asyncio.run(journey())
 
 
 def test_browse_one_tree_place_each_annotation_and_write(
@@ -93,18 +58,18 @@ def test_browse_one_tree_place_each_annotation_and_write(
             screen = await opened(pilot)
             assert len(screen.query(ListView)) == 1
             assert screen.tree_view.has_focus
-            assert screen.state.current.path == "old/a.py"
+            assert current(screen).path == "old/a.py"
             assert selected(screen) == ""
             await press(pilot, "down", "right", "right", "down")
             assert selected(screen) == "pkg/first.py"
-            assert screen.state.current.path == "old/a.py"
+            assert current(screen).path == "old/a.py"
             assert stale.state.session.collapsed == collapsed
             assert stale.region_text() == before
             await press(pilot, "enter")
             assert stale.state.session.annotations["pkg/first.py"] == NOTES["old/a.py"]
             assert "pkg" not in stale.state.session.collapsed
             assert NOTES["old/a.py"] in stale.region_text()
-            assert screen.state.current.path == "old/b.py"
+            assert current(screen).path == "old/b.py"
             assert selected(screen) == "pkg/first.py"
             await press(pilot, "down", "enter")
             assert screen.state.current is None
@@ -129,10 +94,10 @@ def test_skip_and_undo_are_available_only_before_entering_editor(
         async with app.run_test() as pilot:
             screen = await opened(pilot)
             await press(pilot, "s")
-            assert screen.state.current.path == "old/b.py"
+            assert current(screen).path == "old/b.py"
             assert screen.state.skipped == ["old/a.py"]
             await press(pilot, "u")
-            assert screen.state.current.path == "old/a.py"
+            assert current(screen).path == "old/a.py"
             assert not screen.state.skipped
             await press(pilot, "s", "s")
             assert app.screen is not screen
@@ -179,17 +144,17 @@ def test_replacement_confirmation_cancel_accept_and_undo(
             assert (
                 stale.state.session.annotations["pkg/existing.py"] == "Keep this note"
             )
-            assert screen.state.current.path == "old/a.py"
+            assert current(screen).path == "old/a.py"
             await press(pilot, "enter", "y")
             assert (
                 stale.state.session.annotations["pkg/existing.py"] == NOTES["old/a.py"]
             )
-            assert screen.state.current.path == "old/b.py"
+            assert current(screen).path == "old/b.py"
             await press(pilot, "u")
             assert (
                 stale.state.session.annotations["pkg/existing.py"] == "Keep this note"
             )
-            assert screen.state.current.path == "old/a.py"
+            assert current(screen).path == "old/a.py"
 
     asyncio.run(journey())
 
@@ -203,7 +168,7 @@ def test_file_annotation_rejects_folder_with_a_browsing_hint(
             screen = await opened(pilot)
             await press(pilot, "down", "enter")
             assert selected(screen) == "pkg"
-            assert screen.state.current.path == "old/a.py"
+            assert current(screen).path == "old/a.py"
             assert not screen.state.placed
             assert "browse" in text_of(screen.message_widget)
             await press(pilot, "right", "right")
@@ -251,7 +216,7 @@ def test_details_exposes_full_source_annotation_and_destination(
             assert NOTES["old/a.py"] in details.text
             assert "pkg/existing.py" in details.text
             await press(pilot, "escape")
-            assert app.screen is screen
+            assert app.screen_stack[-1] is screen
             assert selected(screen) == "pkg/existing.py"
 
     asyncio.run(journey())
@@ -321,7 +286,7 @@ def test_long_replacement_confirmation_keeps_response_keys_on_screen(
             scroll = dialog.query_one(VerticalScroll)
             assert scroll.max_scroll_y > 0
             await press(pilot, "escape")
-            assert app.screen is screen
+            assert app.screen_stack[-1] is screen
 
     asyncio.run(journey())
 
@@ -334,7 +299,7 @@ def test_new_document_has_no_relink_queue(repo: Repo) -> None:
     async def journey() -> None:
         app = TreestampApp(editor)
         async with app.run_test() as pilot:
-            assert not isinstance(app.screen, (PlacementChoiceScreen, ReconcileScreen))
+            assert not isinstance(app.screen, PlacementChoiceScreen | ReconcileScreen)
             main_screen = app.screen
             await press(pilot, "r")
             assert app.screen is main_screen
@@ -354,7 +319,7 @@ def test_declining_placement_enters_updated_editor_without_writing(
             assert isinstance(app.screen, PlacementChoiceScreen)
             assert len(app.screen.query(ListView)) == 0
             await press(pilot, key)
-            assert not isinstance(app.screen, (PlacementChoiceScreen, ReconcileScreen))
+            assert not isinstance(app.screen, PlacementChoiceScreen | ReconcileScreen)
             assert stale.state.reconciliation is None
             assert stale.region_text() == draft
             assert repo.read_bytes("tree.md") == saved
@@ -365,9 +330,16 @@ def test_declining_placement_enters_updated_editor_without_writing(
     asyncio.run(journey())
 
 
-def test_explicit_cli_load_offers_placement_before_editing(
-    stale: EditorController, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("arguments", [("load", "tree.md"), ()])
+def test_cli_document_load_offers_transfer_over_the_editor(
+    stale: EditorController,
+    repo: Repo,
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: tuple[str, ...],
 ) -> None:
+    if not arguments:
+        (repo.path / "tree.md").rename(repo.path / "README.md")
+
     async def journey(app: TreestampApp) -> bool | None:
         async with app.run_test() as pilot:
             assert isinstance(app.screen, PlacementChoiceScreen)
@@ -377,29 +349,11 @@ def test_explicit_cli_load_offers_placement_before_editing(
             assert app.editor.state.reconciliation is None
         return app.return_value
 
-    monkeypatch.setattr(TreestampApp, "run", lambda app: asyncio.run(journey(app)))
-    assert run_cli("--load", "tree.md") == (0, "", "")
+    def run(app: TreestampApp) -> bool | None:
+        return asyncio.run(journey(app))
 
-
-def test_startup_load_offers_placement_after_adopting_document(
-    stale: EditorController, repo: Repo
-) -> None:
-    seed = EditorController(capture_snapshot(repo.path), Settings())
-
-    async def journey() -> None:
-        app = TreestampApp(seed, choose_source=True)
-        async with app.run_test() as pilot:
-            assert isinstance(app.screen, SourceChoiceScreen)
-            app.screen.source_tree.index = next(
-                i for i, row in enumerate(app.screen.rows) if row.path.name == "tree.md"
-            )
-            await press(pilot, "enter")
-            assert isinstance(app.screen, PlacementChoiceScreen)
-            await press(pilot, "enter")
-            assert isinstance(app.screen, ReconcileScreen)
-            assert app.screen.state.total == 2
-
-    asyncio.run(journey())
+    monkeypatch.setattr(TreestampApp, "run", run)
+    assert run_cli(*arguments) == (0, "", "")
 
 
 def test_up_to_date_loaded_document_enters_editor_without_prompt(repo: Repo) -> None:
@@ -413,7 +367,7 @@ def test_up_to_date_loaded_document_enters_editor_without_prompt(repo: Repo) -> 
     async def journey() -> None:
         app = TreestampApp(editor)
         async with app.run_test() as pilot:
-            assert not isinstance(app.screen, (PlacementChoiceScreen, ReconcileScreen))
+            assert not isinstance(app.screen, PlacementChoiceScreen | ReconcileScreen)
             assert editor.state.session.annotations["only.py"] == "Kept in place"
             assert not editor.dirty
             await press(pilot, "r")
@@ -453,8 +407,8 @@ def test_unannotated_grandparent_places_recursive_annotations_and_enters_editor(
         saved = repo.read_bytes("tree.md")
         async with app.run_test() as pilot:
             screen = await opened(pilot, skip_group=False)
-            assert screen.state.current.path == "old"
-            assert not screen.state.current.annotation
+            assert current(screen).path == "old"
+            assert not current(screen).annotation
             assert screen.state.total == 3
             await press(pilot, "down", "enter")
             assert app.screen is not screen
@@ -483,8 +437,8 @@ def test_directory_batch_leaves_unmatched_child_and_undo_restores_whole_batch(
         async with app.run_test() as pilot:
             screen = await opened(pilot, skip_group=False)
             await press(pilot, "down", "enter")
-            assert app.screen is screen
-            assert screen.state.current.path == "old/branch/a.py"
+            assert app.screen_stack[-1] is screen
+            assert current(screen).path == "old/branch/a.py"
             assert screen.state.remaining == 1
             assert screen.state.placed_count == 2
             assert "destination/a.py" not in editor.state.session.annotations
@@ -493,8 +447,8 @@ def test_directory_batch_leaves_unmatched_child_and_undo_restores_whole_batch(
                 == "Nested child"
             )
             await press(pilot, "u")
-            assert app.screen is screen
-            assert screen.state.current.path == "old"
+            assert app.screen_stack[-1] is screen
+            assert current(screen).path == "old"
             assert screen.state.remaining == 3
             assert not screen.state.placed
             assert editor.region_text() == before

@@ -13,11 +13,11 @@ Set CursorBlink false
 Hide
 Type@0ms "export PS1='demo $ '; unset PROMPT_COMMAND; clear; ./run-demo"
 Enter
-Wait+Screen /4 annotations lost their place/
+Wait+Screen /4 notes refer to paths/
 Show
 Sleep 3500ms
 
-# Place the directory. Matching nested annotations follow in one decision.
+# Transfer the directory. Matching nested annotations follow in one decision.
 Enter
 Wait+Screen /From old-tools/
 Sleep 3500ms
@@ -29,7 +29,7 @@ Sleep 3500ms
 
 # Skip the intentionally deleted file, then save the updated document.
 Type "s"
-Wait+Screen /Placement finished/
+Wait+Screen /Note transfer finished/
 Sleep 3500ms
 Type "w"
 Wait+Screen /Wrote treestamped document/

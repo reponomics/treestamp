@@ -1,4 +1,4 @@
-"""Startup choices remain clear and usable with keyboard or mouse focus."""
+"""Preview dialogs preserve content and keyboard navigation."""
 
 from __future__ import annotations
 

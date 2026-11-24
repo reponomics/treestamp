@@ -31,6 +31,7 @@ def test_output_controls_and_layout(
     if binary:
         output = buffer.getvalue().decode("utf-8", "surrogateescape")
     else:
+        assert isinstance(stream, io.StringIO)
         output = stream.getvalue()
     if terminal:
         assert output.startswith("└── café\tfile\n")

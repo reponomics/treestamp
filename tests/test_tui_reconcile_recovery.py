@@ -12,8 +12,9 @@ from treestamp.tui import TreestampApp
 from treestamp.tui_dialogs import PreviewScreen
 
 from .conftest import Repo
-from .test_tui_reconcile import (
+from .tui_reconcile_support import (
     NOTES,
+    current,
     load_stale,
     opened,
     press,
@@ -40,13 +41,17 @@ def test_navigation_and_empty_undo_leave_draft_and_queue_unchanged(repo: Repo) -
             await press(pilot, "down", "space", "end")
             assert selected(screen) == screen.rows[-1][0].path
             # A directory source cannot be placed on a file.
-            assert not screen.rows[screen.tree_view.index][0].is_dir
+            index = screen.tree_view.index
+            assert index is not None
+            assert not screen.rows[index][0].is_dir
             await press(pilot, "enter")
             assert screen.state.snapshot() == decisions
             await press(pilot, "home")
             assert selected(screen) == screen.rows[0][0].path
             await press(pilot, "pagedown")
-            assert 0 < screen.tree_view.index < len(screen.rows) - 1
+            index = screen.tree_view.index
+            assert index is not None
+            assert 0 < index < len(screen.rows) - 1
             await press(pilot, "pageup")
             assert selected(screen) == screen.rows[0][0].path
             await press(pilot, "down")
@@ -77,9 +82,9 @@ def test_details_preserves_existing_destination_note_and_selection(repo: Repo) -
             await press(pilot, "question_mark")
             assert isinstance(app.screen, PreviewScreen)
             assert destination_note in app.screen.text
-            assert NOTES[screen.state.current.path] in app.screen.text
+            assert NOTES[current(screen).path] in app.screen.text
             await press(pilot, "escape")
-            assert app.screen is screen
+            assert app.screen_stack[-1] is screen
             assert selected(screen) == destination
             assert editor.state.session.state() == draft
             assert screen.state.snapshot() == decisions
@@ -118,7 +123,7 @@ def test_failed_edit_restores_draft_and_decisions_and_can_be_retried(
             with monkeypatch.context() as patch:
                 patch.setattr(editor, "document", reject_export)
                 await press(pilot, operation)
-            assert app.screen is screen
+            assert app.screen_stack[-1] is screen
             assert screen.tree_view.has_focus
             assert failure in text_of(screen.message_widget)
             assert editor.state.session.state() == draft
@@ -132,11 +137,11 @@ def test_failed_edit_restores_draft_and_decisions_and_can_be_retried(
                     == NOTES["old/a.py"]
                 )
                 assert not editor.state.session.is_hidden("pkg/first.py")
-                assert screen.state.current.path == "old/b.py"
+                assert current(screen).path == "old/b.py"
             else:
                 assert "pkg/first.py" not in editor.state.session.annotations
                 assert editor.state.session.is_hidden("pkg/first.py")
-                assert screen.state.current.path == "old/a.py"
+                assert current(screen).path == "old/a.py"
             assert repo.read_bytes("tree.md") == saved
 
     asyncio.run(journey())

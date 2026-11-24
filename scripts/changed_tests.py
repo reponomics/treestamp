@@ -1,10 +1,9 @@
 """Run the tests that correspond to changed files; the full suite when unsure.
 
-Used by the pre-commit hooks. Tests are laid out one to one with modules, so
-``src/treestamp/codec.py`` maps to ``tests/test_codec.py`` and
-``web/src/treestamp_web/links.py`` to ``web/tests/test_links.py``; a changed
-test file runs itself. Any file without such a counterpart, including shared
-modules and configuration, runs its project's full suite.
+Used by the pre-commit hooks. Source modules select their matching test file
+and any suffixed test files. Core CLI and TUI modules select their whole test
+family; a changed test file runs itself. Shared helpers, configuration, and
+sources without matching tests select the project's full suite.
 
     python scripts/changed_tests.py {package|web} FILE...
 """
@@ -23,6 +22,19 @@ PROJECTS = {
 }
 
 
+def counterparts(project: str, module: str, tests: Path) -> set[Path]:
+    """Include split suites, grouping the core CLI and TUI by interface."""
+    family = module.split("_", 1)[0]
+    if project != "package" or family not in {"cli", "tui"}:
+        family = module
+    matches = set(tests.glob(f"test_{family}_*.py"))
+    names = [f"test_{family}.py"]
+    if project == "package" and family == "cli":
+        names.extend(("test_paths.py", "test_output_bytes.py"))
+    matches.update(tests / name for name in names if (tests / name).is_file())
+    return matches
+
+
 def select(project: str, changed: list[str]) -> list[Path] | None:
     """Test files to run, or None for the full suite."""
     source, tests, _ = PROJECTS[project]
@@ -38,10 +50,10 @@ def select(project: str, changed: list[str]) -> list[Path] | None:
         elif path.parent == source and path.suffix == ".py":
             if path.stem in SHARED:
                 return None
-            counterpart = tests / f"test_{path.stem}.py"
-            if not counterpart.exists():
+            matches = counterparts(project, path.stem, tests)
+            if not matches:
                 return None
-            selected.add(counterpart)
+            selected.update(matches)
         elif path.is_relative_to(source) or path.is_relative_to(tests):
             continue  # static assets and non-Python files beneath the source tree
         else:

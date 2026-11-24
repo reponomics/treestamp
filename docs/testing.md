@@ -150,13 +150,13 @@ The installer was subsequently reduced to a short shell script, with version enf
 
 ### Test dependencies and known warnings
 
-Starlette's `TestClient` now uses the web development dependency `httpx2>=2,<3`, locked at 2.16.0. The production GitHub client still uses `httpx` 0.28.1, and the tests exercise that same implementation. The former Starlette fallback deprecation warning is resolved: hosted and browser suites passed with `-W error::starlette.exceptions.StarletteDeprecationWarning`. No warning suppression was added.
+Starlette's `TestClient` uses the web development dependency `httpx2>=2,<3`. The production GitHub client uses `httpx`, and the tests exercise that same implementation. Exact installed versions are recorded in [uv.lock](../uv.lock). The former Starlette fallback deprecation warning is resolved: hosted and browser suites passed with `-W error::starlette.exceptions.StarletteDeprecationWarning`. No warning suppression was added.
 
 One browser warning remains: pytest 9.2 reports `PytestRemovedIn10Warning` for the session-scoped `base_url` fixture in pytest-playwright 0.10.0's `_BaseUrlFallback`. This upstream fixture does not use instance state, so the warning does not identify a behavioral failure in these tests. Leave it visible and revisit it when upgrading pytest-playwright; do not add a plugin or local fixture override solely to silence it. The installed plugin constrains pytest to `<10`, preventing a compatible dependency update from crossing the announced removal boundary. Recheck the fixture before accepting a plugin version that permits pytest 10.
 
 ## Remaining gaps and cost
 
-Core gaps include the non-entry import branch in `__main__.py`, containment/name consistency guards in `gitio.py` and `model.py`, and empty-count/rejected-browse branches in `tui.py`. Hosted gaps include missing package metadata, defensive exception handlers in `app.py`, and normalization/rendering guards in `preview.py`. Some are inexpensive but low-value checks; others sit behind earlier validation. Not every remaining gap requires a complex harness.
+Use the current coverage reports to identify uncovered statements and branches; the dated snapshot above describes an earlier revision. Evaluate gaps by behavior and reachability: some guards sit behind earlier validation, while others exercise recoverable failures. The table below lists broader verification limits that a coverage percentage does not resolve.
 
 | Area | Useful next assurance | Complexity or limitation |
 | --- | --- | --- |

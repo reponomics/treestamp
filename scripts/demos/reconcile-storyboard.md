@@ -1,4 +1,4 @@
-# Placing notes after a directory move
+# Transferring notes after a directory move
 
 Viewer question: “Can I keep the notes in my project tree when a folder moves?”
 
@@ -6,8 +6,8 @@ The clip opens on the real terminal editor's load prompt. A disposable Git repos
 
 | Beat | Visible action | Evidence |
 | --- | --- | --- |
-| Orient | Read the prompt reporting four displaced annotations | The application offers placement before editing |
-| Place | Enter; select `tools/`; Enter | One directory decision carries its own note and both nested notes |
+| Orient | Read the prompt reporting four unmatched notes | The application offers transfer before editing |
+| Transfer | Enter; select `tools/`; Enter | One directory decision carries its own note and both nested notes |
 | Skip | Read the remaining `retired.py` item; press `s` | The intentionally deleted note is left out, and ordinary editing begins |
 | Save | Press `w` to update the loaded `tree.md` | The populated tree and the application's write confirmation remain visible |
 

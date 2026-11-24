@@ -71,7 +71,7 @@ def prepare(repository: Path, output: Path) -> None:
     launcher = repository / "run-demo"
     launcher.write_text(
         "#!/bin/sh\n"
-        f"{shlex.quote(sys.executable)} -m treestamp --load tree.md\n"
+        f"{shlex.quote(sys.executable)} -m treestamp load tree.md\n"
         "capture_status=$?\n"
         "printf '%s\\n' \"$capture_status\" > "
         f"{shlex.quote(str(output / 'app-exit.txt'))}\n"

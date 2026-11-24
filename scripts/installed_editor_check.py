@@ -17,7 +17,7 @@ from treestamp.tui import TreestampApp
 
 async def curate(app: TreestampApp) -> bool | None:
     async with app.run_test() as pilot:
-        assert not app.choose_source
+        assert len(app.screen_stack) == 1
         assert app.editor.state.document_path == Path.cwd() / "README.md"
         await pilot.pause()
         await pilot.press("down", "right", "right")
@@ -44,7 +44,7 @@ def verify() -> None:
     assert Path(treestamp.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
     # Keep CLI dispatch and the real editor intact; replace only the terminal runner.
     with patch.object(TreestampApp, "run", run_editor):
-        assert main(["--load", "README.md"]) == 0
+        assert main(["load", "README.md"]) == 0
     document, _ = load_document(Path("README.md"))
     assert document is not None
     rows = {node.path: node for node in document.tree.walk()}

@@ -49,7 +49,7 @@ The release App is installed only on `reponomics/treestamp`, with write access t
 
 ## Secrets and credentials
 
-Secrets are stored only in the services that use them, as listed in the table above. They are never committed to the repository, built into images, or written to logs. The maintainer keeps the GitHub App private keys outside the repository. Prefer credentials that need no stored secret, such as PyPI Trusted Publishing, and scope each credential to one app or repository.
+Store secrets only in the services that use them, as listed in the table above. Keep them out of the repository, images, and logs. The maintainer keeps the GitHub App private keys outside the repository. Prefer credentials that need no stored secret, such as PyPI Trusted Publishing, and scope each credential to one app or repository.
 
 Only the maintainer can read or change these secrets (see [GOVERNANCE.md](GOVERNANCE.md)). Workflows receive a secret only in the job that needs it, and deployment credentials only through the `production` environment. To install or rotate a hosted app's GitHub App credentials, run `make fly-secrets` with `FLY_CONFIG` set to that app's configuration and the key file in `GITHUB_APP_PRIVATE_KEY_FILE`.
 
@@ -103,4 +103,4 @@ Deploy a clean, committed revision so its build identifier describes the deploye
 
 The README contains one managed treestamp. Its ASCII and list previews are generated from that tree by `scripts/readme_styles.py`, preserving its curation, annotations, counts, and footer setting. The preview region has separate `readme-styles` markers so the normal document parser still sees only one managed treestamp.
 
-After editing the tree or changing tracked paths, run `make readme-update` to refresh the main tree and both previews. Stage new files first because the tree uses the Git index. `make integration-check` verifies both the repository tree and the generated previews without writing. The README freshness workflow, local pre-commit check, and automatic README update workflow use these same commands.
+After editing the tree or changing tracked paths, run `make readme-update` to refresh the main tree and both previews. Stage new files first because the tree uses the Git index. `make integration-check` verifies both the repository tree and the generated previews without writing. The README freshness workflow, local pre-commit check, and automatic README update workflow use these same commands. If an update would omit unmatched notes, it stops before writing; an automated run then fails without opening an update PR. Use `treestamp load README.md` to transfer notes and write the result, then rerun `make readme-update`. To deliberately omit unmatched notes, run `treestamp update README.md --skip-notes-transfer`, then `make readme-update` to refresh the previews. See [automatic maintenance](cli-reference.md#check-and-update) for the command contract.

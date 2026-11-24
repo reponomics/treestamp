@@ -20,7 +20,6 @@ from treestamp.tui_dialogs import (
     PreviewScreen,
     PromptScreen,
 )
-from treestamp.tui_entry import SourceChoiceScreen
 from treestamp.tui_reconcile import PlacementChoiceScreen, ReconcileScreen
 from treestamp.tui_rows import Cursor as Cursor
 from treestamp.tui_rows import row_label as _row_label
@@ -33,13 +32,13 @@ if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
 
-    from treestamp.editor import EditorController, EditorState
+    from treestamp.editor import EditorController
     from treestamp.session import TreeSession
 
 
 _HELP = (
     "Edit your tree, then copy or print the complete treestamp.",
-    "Choose a folder or document to begin. Stage tree changes before opening.",
+    "Stage tree changes before opening with treestamp new or treestamp load.",
     "The captured tree stays fixed for this editing session.",
     "",
     "NAVIGATE",
@@ -73,10 +72,10 @@ _HELP = (
     "ON DOCUMENT LOAD",
     "If saved paths are gone, choose where their notes belong in the new tree.",
     "One source stays at the top; navigate only the destination tree.",
-    "Enter places; s skips; u undoes the last decision during placement.",
+    "Enter transfers; s skips; u undoes the last transfer decision.",
     "Directories carry matching notes recursively by relative path.",
-    "Browsing folders leaves the draft unchanged. Placing reveals the target.",
-    "Placement ends before editing. Skipped notes are left out.",
+    "Browsing folders leaves the draft unchanged. Transfer reveals the target.",
+    "Transfer ends before editing. Skipped notes are left out.",
     "",
     "Collapsing a folder preserves its curation during this session.",
     "Reopening restores only printed rows and recorded hiding.",
@@ -148,9 +147,7 @@ class TreestampApp(App[bool]):
     #summary, .controls { background: $surface; }
     """
 
-    def __init__(
-        self, editor: EditorController, *, choose_source: bool = False
-    ) -> None:
+    def __init__(self, editor: EditorController) -> None:
         super().__init__()
         self.editor = editor
         self.session = editor.state.session
@@ -168,10 +165,13 @@ class TreestampApp(App[bool]):
         )
         self.document_controls.display = self.editor.state.document_path is not None
         self._rebuilding = False
-        self.choose_source = choose_source
 
     def compose(self) -> ComposeResult:
-        yield Static("treestamp", markup=False, id="title")
+        yield Static(
+            _safe_text(f"treestamp · Root: {self.session.settings.root}"),
+            markup=False,
+            id="title",
+        )
         yield self.tree_view
         yield self.attribution_widget
         yield self.status_widget
@@ -188,20 +188,14 @@ class TreestampApp(App[bool]):
         )
 
     async def on_mount(self) -> None:
-        if not self.choose_source:
-            await self.refresh_tree(self.editor.state.status)
-            self._offer_placement()
-        else:
-            self._show_startup()
-
-    def _show_startup(self) -> None:
-        self.push_screen(SourceChoiceScreen(self.editor), self._accept_startup)
-
-    async def _accept_startup(self, candidate: EditorState | None) -> None:
-        if candidate is None:
-            self.exit(False)
-        else:
-            await self._adopt_editor_state(candidate)
+        status = self.editor.state.status
+        if not self.session.root.children:
+            status = (
+                "No staged files beneath this root. "
+                "Stage files with git add and reopen."
+            )
+        await self.refresh_tree(status)
+        self._offer_placement()
 
     def _set_status(self, text: str) -> None:
         self.status_widget.update(_safe_text(text))
@@ -433,13 +427,6 @@ class TreestampApp(App[bool]):
             return
         await self.refresh_tree(message)
 
-    async def _adopt_editor_state(self, candidate: EditorState) -> None:
-        self.editor.adopt(candidate)
-        self.session = candidate.session
-        self.cursor = Cursor(candidate.session)
-        await self.refresh_tree(candidate.status)
-        self._offer_placement()
-
     async def action_quit(self) -> None:
         if self.editor.dirty:
             self.push_screen(
@@ -482,5 +469,5 @@ def _clipboard_command() -> list[str] | None:
     return None
 
 
-def explore(editor: EditorController, *, choose_source: bool = False) -> bool:
-    return bool(TreestampApp(editor, choose_source=choose_source).run())
+def explore(editor: EditorController) -> bool:
+    return bool(TreestampApp(editor).run())

@@ -545,8 +545,8 @@ function rejectResponse(body, responseStatus) {
   return false;
 }
 
-// Previews abort whatever is in flight. Operations never abort: each one waits for the
-// previous response so it carries the newest state, which is what keeps notes from being lost.
+// Previews cancel earlier previews. Edits run sequentially so each request
+// uses the preceding accepted state.
 async function call(url, init, { abortable }) {
   restoreIncoming();
   placement.cancel();

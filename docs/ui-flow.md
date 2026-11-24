@@ -32,7 +32,7 @@ Browsing does not inspect every file for treestamp markers. If a selected docume
 
 The browser caches one accepted draft after successful opening or editing. **Resume session** is a best-effort convenience for short return visits, not a save or backup feature. Storage failures do not prevent editing, and returning later is not guaranteed to recover the draft. Users obtain their treestamp through Copy treestamp and keep it in their own document.
 
-Repository draft restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the cached draft and offers repository browsing to start fresh; it does not silently substitute another commit. Bundled examples can be restored from their included data without the server snapshot. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor).
+Repository draft restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the cached draft and offers repository browsing to start fresh; it does not silently substitute another commit. Unmodified bundled examples can be restored from their included data without the server snapshot; edited examples require the captured server snapshot. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor).
 
 The address can also encode editing state, and explicit address state takes precedence over the local cache. This is implementation behavior, not a durable session-sharing workflow; users are not expected to save URLs to preserve their work.
 
@@ -58,4 +58,8 @@ The session envelope retains both initial and current curation, so a successfull
 
 ## Terminal behavior
 
-The terminal editor uses a visual source chooser within its starting repository. It includes untracked documents for loading, while the editable treestamp comes from a captured Git index. Explicit `--load` bypasses the chooser. Terminal drafts live in the running process; persistence comes from writing a loaded document or copying a new treestamp into documentation. See the [CLI reference](cli-reference.md#interactive-editor) for commands, keyboard controls, and placement behavior.
+The terminal editor opens directly after the CLI resolves a source. Bare `treestamp` loads a valid treestamp from cwd's README, or creates a fresh tree at cwd when that README is missing or unmarked. `new [PATH]` and `load [DOCUMENT]` make that choice explicit. Invalid documents fail instead of starting over. There is no terminal source picker or New/Load screen.
+
+Interactive loads prepare an updated draft and offer **Transfer notes?** only for notes whose paths disappeared. Enter starts the existing queue; Escape continues without these notes. Transfer, Skip, Undo, and the queue's completion behavior remain supported. The navigable-list follow-up above applies to both interfaces. New sessions have no write destination; loaded sessions preserve their original document until Write is chosen.
+
+Terminal drafts live in the running process. Persistence comes from writing a loaded document or copying a new treestamp into documentation. Headless `load --print` extracts saved content and never enters this flow. See the [CLI reference](cli-reference.md) for source semantics, maintenance safeguards, and keyboard controls.

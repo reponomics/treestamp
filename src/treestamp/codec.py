@@ -43,14 +43,9 @@ _NAMED_ESCAPES = {"\\": "\\\\", "\n": "\\n", "\t": "\\t", "\r": "\\r"}
 _NAMED_CHARACTERS = {sequence: char for char, sequence in _NAMED_ESCAPES.items()}
 _ESCAPE = re.compile(r"\\(?:[\\ntr]|x[0-9a-f]{2}|u[0-9a-f]{4})")
 
-# What can begin a Markdown construct where a list row's name sits. A backslash
-# before any of these renders the character itself, so an escaped name shows the
-# name. Only list rows are escaped; fenced rows are already inert. Underscore is
-# absent on purpose: CommonMark does not emphasise intraword underscores, and
-# escaping every test_thing.py would cost more legibility than it buys; an
-# underscore that is not intraword, as in a file named _draft_, still is. The
-# backslash is in the set so that escaping is reversible. A few characters start
-# a block only at the beginning of the item: a heading, a list, a blockquote.
+# Escape Markdown syntax in list-row names, including backslashes for reversibility.
+# CommonMark leaves intraword underscores literal; block prefixes need escaping
+# only at the start of an item. Fenced styles do not use Markdown escapes.
 _MARKDOWN = re.compile(r"[`*\[\]<>&~\\]|(?<![0-9A-Za-z])_|_(?![0-9A-Za-z])")
 _MARKDOWN_BLOCK = re.compile(r"\A(?:[#+-]|\d{1,9}[.)])(?= |\Z)|\A>")
 _MARKDOWN_ESCAPED = re.compile(r"\\([!-/:-@\[-`{-~])")
