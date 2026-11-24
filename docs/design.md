@@ -94,6 +94,8 @@ The CLI exposes source creation, document loading and extraction, read-only comp
 
 ### Document format
 
+[ADR 0004: Structured SVG artifacts](adr/0004-structured-svg-artifacts.md) proposes a separate graphical container with authoritative structured metadata. It is a proposed extension, not a supported output format.
+
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
 The optional config comment holds TOML with three keys, each generated only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Equivalent authored configuration may include explicit defaults. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
