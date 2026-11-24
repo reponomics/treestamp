@@ -17,7 +17,7 @@ The CLI is designed such that when it is invoked with implicit arguments or comm
 
 Explicit source and document paths can select another checkout even when cwd is outside Git. A new-tree path must be an existing directory; files are rejected. To create a tree for a file’s parent, pass that directory explicitly. To load a treestamp from a file, use `load`. Paths may include `..`, but symlinks are refused, including traversed components before parent normalization. An initialized nested repository or submodule owns sources selected within it; uninitialized submodules remain boundaries. Stored root, hidden-path, and special-path identities remain repository-relative regardless of the caller's cwd.
 
-New trees and interactive or automatic updates use a captured staged Git index. Stage additions, deletions, and renames before these operations. Untracked files are absent, and unstaged changes are not incorporated. Subsequent interactive edits use the captured snapshot. Documents themselves are read from disk. Treestamp does not stage or commit files or fetch remote history. Extraction with `load --print` reads the saved document without acquiring a current Git snapshot.
+New trees and interactive or automatic updates use a captured staged Git index. Stage additions, deletions, and renames before these operations. Untracked files are absent, and unstaged changes are not incorporated. Subsequent interactive edits use the captured snapshot. Documents themselves are read from disk. Treestamp does not stage or commit files or fetch remote history.
 
 ## Interactive editor
 
@@ -48,7 +48,7 @@ Transferring a directory also carries its pending annotated descendants recursiv
 
 `u` undoes the last decision, including every note carried by a directory transfer. Resolving the queue opens the editor automatically. Escape skips remaining items and starts editing. Transfer is a one-time step for each document load; skipped notes are omitted when writing.
 
-New treestamps are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. Loaded sessions can Write directly back to the original document while preserving surrounding bytes. New-tree sessions have no write destination. To start another session, exit and invoke the desired command. Unwritten changes require confirmation before quitting.
+Copy and Print export the current draft, including your edits, markers, and configuration. For a new treestamp, paste this complete block into your document. Loaded sessions can Write directly back to the original document while preserving surrounding bytes. New-tree sessions have no write destination. To start another session, exit and invoke the desired command. Unwritten changes require confirmation before quitting.
 
 ## Print without opening the editor
 
@@ -58,11 +58,13 @@ treestamp new docs --print
 treestamp load docs/structure.md --print
 ```
 
-`load --print` validates and extracts the complete treestamp region as it exists in the document. It preserves its markers, metadata, notes, formatting, and line endings. It does not capture or refresh the source tree, or check whether notes need transfer. Repository/path validation still applies, including Git metadata checks that enforce submodule boundaries. A stale document prints its saved tree. A missing, unmarked, or malformed document fails.
+`--print` writes a complete treestamp block to stdout without opening the editor or changing a document:
 
-`new --print` generates a new treestamp for the selected root from the staged Git index. Bare `--print` extracts from cwd's README if it contains a valid treestamp, or generates a fresh tree at cwd if the README is absent or unmarked. A malformed or empty marked region remains an error.
+- `load --print` extracts the saved block unchanged, even if its tree is stale. A missing, unmarked, or malformed document fails. To refresh the saved tree first, run `update`.
+- `new --print` generates a tree for the selected directory from the staged Git index.
+- Bare `treestamp --print` loads from cwd's `README.md` if it contains a treestamp, or generates a new tree at cwd if the README is absent or unmarked. A malformed treestamp remains an error.
 
-Printing writes to stdout without changing a document. It does not accept `--skip-notes-transfer`. Run an explicit `update` first to change the saved document, then `load --print` to extract that result. Printing from inside the interactive editor exports its current draft, including edits made during that session. Shell redirection writes independently of treestamp; do not redirect output over a document the command must read.
+Do not redirect output over the document being loaded: the shell can truncate it before treestamp reads it.
 
 ## Check and update
 
@@ -73,11 +75,9 @@ treestamp update docs/structure.md
 treestamp update docs/structure.md --skip-notes-transfer
 ```
 
-Both commands read an existing, valid treestamp from disk and compare it with the captured index of its repository. With no document argument, they use `README.md` in cwd. `check` computes the proposed automatic replacement without writing it. It prints `Current: …` and exits `0` when unchanged, or a unified diff and exits `1` when an update would change the document, including generated formatting. If the replacement would omit notes, it reports that separately on stderr. It does not require transfer decisions or accept the override flag.
+Both commands read an existing, valid treestamp from disk and compare it with the captured index of its repository. With no document argument, they use `README.md` in cwd. `check` computes the proposed automatic replacement without writing it. It prints `Current: …` and exits `0` when unchanged, or a unified diff and exits `1` when an update would change the document, including generated formatting. If the replacement would omit notes, it reports that separately on stderr.
 
-`update` prepares automatic changes, then checks whether any original notes would be omitted. If so, it exits nonzero without writing. Open the document with `treestamp load DOCUMENT` to transfer those notes interactively, or explicitly use `--skip-notes-transfer` to accept their omission. The override retains notes whose paths and entry kinds still match. A successful update replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
-
-Automatic updates retain notes at matching paths with the same entry kind; they do not infer renames. Notes on removed or renamed paths, kind-changed entries, or rows absent from the resulting draft require transfer or explicit omission. Interactive loading offers manual transfer; extraction performs no matching.
+`update` retains notes at matching paths with the same entry kind; it does not infer renames. If any notes would be omitted, it exits nonzero without writing. Use `treestamp load DOCUMENT` to transfer those notes interactively, or `--skip-notes-transfer` to omit them while retaining matched notes. A successful update replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
 
 Supported formatting differences are preserved before comparison: zero or one blank line after the start marker, between configuration and tree, and before the end marker, plus equivalent TOML formatting when validated configuration values are unchanged. These differences alone do not fail `check`. Changed configuration is regenerated with compact array wrapping at an 80-character target and loses its comments; oversized individual entries stay intact. See the [document format](design.md#document-format).
 
