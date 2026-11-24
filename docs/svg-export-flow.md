@@ -1,6 +1,6 @@
 # SVG export experience
 
-Status: proposed next-release behavior; not implemented. [ADR 0004](adr/0004-structured-svg-artifacts.md) owns the artifact, codec, safety, and publication contracts. This document owns the web/TUI experience and the release sequence. The existing [UI flow](ui-flow.md) describes shipped/current behavior.
+Status: next-release implementation; validation and release gates are recorded in the ADR. [ADR 0004](adr/0004-structured-svg-artifacts.md) owns the artifact, codec, safety, and publication contracts. This document owns the web/TUI experience and the release sequence. The existing [UI flow](ui-flow.md) describes shipped/current behavior.
 
 ## Decisions
 
@@ -72,4 +72,4 @@ Investigate optional image previews in terminals such as Kitty and Ghostty after
 
 ## Review
 
-Independently reviewed by two agents on 2026-11-23 against the current web controls, controller, document codec, TUI write flow, and clipboard implementation. Findings incorporated: separate export from source-adopting write; bind replacement to captured destination state; fix filenames before list removal; define regenerated-SVG dirty behavior; omit a TUI appearance editor to avoid mixed draft/source semantics; and preserve honest OSC 52 delivery status. Final review found no remaining blocking issue after those clarifications. No UI, TUI, codec, or publication behavior has changed in this documentation pass.
+Independently reviewed by two agents on 2026-11-23 against the current web controls, controller, document codec, TUI write flow, and clipboard implementation. Findings incorporated: separate export from source-adopting write; bind replacement to captured destination state; fix filenames before list removal; define regenerated-SVG dirty behavior; omit a TUI appearance editor to avoid mixed draft/source semantics; and preserve honest OSC 52 delivery status. Final review found no remaining blocking issue after those clarifications. The implementation now follows these decisions; the filename repair and list removal remain separate checkpoint commits.

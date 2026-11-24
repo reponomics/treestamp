@@ -15,11 +15,11 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
+from treestamp.artifacts import Artifact, parse_artifact, prepare_artifact_content
 from treestamp.codec import format_counts, render_tree
 from treestamp.document import (
     Document,
     extract_region,
-    parse_document,
     prepare_content,
     render_region,
     validate_source_tree,
@@ -38,8 +38,10 @@ from treestamp.model import (
 from treestamp.reconcile import Reconciliation
 from treestamp.session import SessionState, TreeSession
 from treestamp.sources import tree_from_records
+from treestamp.svg import SvgAppearance, render_svg_metadata
 from treestamp_web.cache import Snapshot, SnapshotCache
 from treestamp_web.examples import bundled_default_branch, bundled_tree
+from treestamp_web.export import parse_appearance
 from treestamp_web.github import BODY_CAP, TooLargeError
 from treestamp_web.links import LinkError, Repository, parse_link, repository
 
@@ -54,6 +56,10 @@ if TYPE_CHECKING:
 DEFAULT_DOCUMENT = "README.md"
 DOCUMENT_CAP = 1024 * 1024
 OPEN_NOTICE = "Treestamp updated"
+SVG_NOTICE = (
+    "Preview regenerated from embedded treestamp data. "
+    "The exported SVG replaces the original drawing."
+)
 OPERATIONS = (
     "restore",
     "reset",
@@ -225,8 +231,12 @@ def _baseline(value: object) -> bytes | None:
         if not isinstance(value, str):
             raise ValueError
         decoded = base64.b64decode(value, validate=True)
-        parse_document(decoded)
-        return decoded
+        artifact = parse_artifact(decoded)
+        return (
+            render_svg_metadata(artifact.document, artifact.appearance).encode("utf-8")
+            if artifact.format == "svg"
+            else decoded
+        )
     except (ValueError, binascii.Error, MarkerError):
         raise PreviewError(400, "invalid_state", "invalid document baseline") from None
 
@@ -253,6 +263,7 @@ class Envelope:
     generation: str
     revision: int = 0
     initial_curation: SessionState | None = None
+    svg_appearance: SvgAppearance | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -269,13 +280,18 @@ class Envelope:
                 if self.initial_curation is not None
                 else {}
             ),
+            **(
+                {"svg_appearance": asdict(self.svg_appearance)}
+                if self.svg_appearance is not None
+                else {}
+            ),
         }
 
     @classmethod
     def from_dict(cls, data: object) -> Envelope:
         if (
             not isinstance(data, dict)
-            or set(data) - {"initial_curation"}
+            or set(data) - {"initial_curation", "svg_appearance"}
             != {"version", "curation", "source", "baseline", "generation", "revision"}
             or data["version"] != 1
         ):
@@ -286,6 +302,18 @@ class Envelope:
         if not isinstance(source, dict):
             raise PreviewError(400, "invalid_state", "invalid session source")
         try:
+            appearance = (
+                parse_appearance(data["svg_appearance"])
+                if "svg_appearance" in data
+                else None
+            )
+            baseline_artifact = parse_artifact(decoded) if decoded is not None else None
+            if appearance is not None and (
+                baseline_artifact is None or baseline_artifact.format != "svg"
+            ):
+                raise MarkerError("SVG source appearance requires an SVG baseline")
+            if baseline_artifact is not None and baseline_artifact.format == "svg":
+                appearance = appearance or baseline_artifact.appearance
             state = SessionState.from_dict(data["curation"])
             initial = (
                 SessionState.from_dict(data["initial_curation"])
@@ -294,7 +322,7 @@ class Envelope:
             )
         except MarkerError as exc:
             raise PreviewError(400, "invalid_state", str(exc)) from None
-        return cls(state, source, decoded, generation, revision, initial)
+        return cls(state, source, decoded, generation, revision, initial, appearance)
 
 
 @dataclass(frozen=True)
@@ -419,6 +447,8 @@ class Preview:
     notice: str | None = None
     default_branch: str | None = None
     placement: dict[str, object] | None = None
+    source_format: str = "markdown"
+    svg_appearance: SvgAppearance = SvgAppearance()
 
     def permalink(self, public_base_url: str | None) -> str:
         root, document = path_value(self.root), path_value(self.document)
@@ -464,6 +494,8 @@ class Preview:
             "permalink": self.permalink(public_base_url),
             "state": self.state,
             "rows": self.rows,
+            "source_format": self.source_format,
+            "svg_appearance": asdict(self.svg_appearance),
         }
         if self.placement is not None:
             result["placement"] = self.placement
@@ -524,11 +556,16 @@ def _check_plain_document(content: bytes, document: str) -> None:
 
 def _loaded_document(
     content: bytes, request: PreviewRequest
-) -> tuple[Document, bytes] | None:
+) -> tuple[Artifact, bytes] | None:
     try:
-        parsed = parse_document(content, location=request.document, allow_absent=True)
+        parsed = parse_artifact(content, location=request.document, allow_absent=True)
         if parsed is not None:
-            return parsed, extract_region(content, location=request.document)
+            baseline = (
+                render_svg_metadata(parsed.document, parsed.appearance).encode("utf-8")
+                if parsed.format == "svg"
+                else extract_region(content, location=request.document)
+            )
+            return parsed, baseline
     except MarkerError as exc:
         raise PreviewError(422, "curation", str(exc)) from None
     if request.explicit_document:
@@ -571,17 +608,20 @@ class PreviewService:
         repo = request.repository
         snapshot, acquired = await self._preview_snapshot(repo)
         loaded = await self._load_document(snapshot, request, acquired)
-        root = request.root if loaded is None else loaded[0].settings.root
+        root = request.root if loaded is None else loaded[0].document.settings.root
         if loaded is None:
             _require_new_root(snapshot, root)
         target = await self._target(repo, snapshot, root, acquired)
-        settings = Settings(root=root) if loaded is None else loaded[0].settings
+        settings = (
+            Settings(root=root) if loaded is None else loaded[0].document.settings
+        )
         self._preflight(target.node, settings)
         if loaded is None:
             session = TreeSession(target.node, Settings(root=root))
             baseline = None
         else:
-            document, baseline = loaded
+            artifact, baseline = loaded
+            document = artifact.document
             hidden = frozenset(tree_path(path, root) for path in document.hidden)
             curated = update(
                 document.tree, target.node, document.settings, hidden=hidden
@@ -593,6 +633,11 @@ class PreviewService:
             baseline,
             str(uuid.uuid4()),
             initial_curation=session.state(),
+            svg_appearance=(
+                loaded[0].appearance
+                if loaded is not None and loaded[0].format == "svg"
+                else None
+            ),
         )
         result = self._compose(
             repo,
@@ -600,13 +645,15 @@ class PreviewService:
             session,
             request.document,
             envelope,
+            snapshot,
             opening=True,
-            warnings=[request.notice] if request.notice else [],
+            warnings=([request.notice] if request.notice else [])
+            + (list(loaded[0].warnings) if loaded is not None else []),
         )
         if loaded is not None:
             from treestamp_web.placement import summary
 
-            review = Reconciliation(loaded[0].tree, session)
+            review = Reconciliation(loaded[0].document.tree, session)
             if review.total:
                 result = replace(result, placement=summary(review, session))
         if acquired:
@@ -628,12 +675,17 @@ class PreviewService:
             raise PreviewError(400, "invalid_state", str(exc)) from None
         if request.op.type == "reset":
             session = initial_session
+        appearance = request.envelope.svg_appearance
+        if request.op.type == "reset" and appearance is not None:
+            assert request.envelope.baseline is not None
+            appearance = parse_artifact(request.envelope.baseline).appearance
         request.op.apply(session)
         envelope = replace(
             request.envelope,
             curation=session.state(),
             revision=request.envelope.revision + int(request.op.type != "restore"),
             initial_curation=initial,
+            svg_appearance=appearance,
         )
         result = self._compose(
             request.repository,
@@ -641,6 +693,7 @@ class PreviewService:
             session,
             request.document,
             envelope,
+            snapshot,
             reveal=request.reveal,
         )
         if request.op.type != "restore":
@@ -664,7 +717,7 @@ class PreviewService:
             initial_curation=session.state(),
         )
         result = self._compose(
-            opening.repository, target, session, opening.document, envelope
+            opening.repository, target, session, opening.document, envelope, snapshot
         )
         placement = summary(
             review, session, expanded=request.expanded, reveal=opening.reveal
@@ -675,7 +728,7 @@ class PreviewService:
 
     async def _load_document(
         self, snapshot: Snapshot, request: PreviewRequest, acquired: bool
-    ) -> tuple[Document, bytes] | None:
+    ) -> tuple[Artifact, bytes] | None:
         if not request.document:
             return None
         record = next(
@@ -790,6 +843,7 @@ class PreviewService:
         session: TreeSession,
         document: str,
         envelope: Envelope,
+        snapshot: Snapshot,
         *,
         reveal: bool = False,
         opening: bool = False,
@@ -801,7 +855,14 @@ class PreviewService:
         )
         printed = Document(tree, session.settings, hidden)
         try:
-            if envelope.baseline is None:
+            if envelope.svg_appearance is not None:
+                region = render_region(printed)
+                original = _original_svg(snapshot, document)
+                candidate = prepare_artifact_content(
+                    Artifact(printed, "svg", envelope.svg_appearance), original
+                )
+                dirty = candidate != original
+            elif envelope.baseline is None:
                 region = render_region(printed)
                 dirty = True
             else:
@@ -827,10 +888,14 @@ class PreviewService:
             document,
             envelope.baseline is not None,
             dirty,
-            OPEN_NOTICE
+            SVG_NOTICE
+            if opening and envelope.svg_appearance is not None
+            else OPEN_NOTICE
             if opening and dirty and envelope.baseline is not None
             else None,
             target.default_branch,
+            source_format="svg" if envelope.svg_appearance is not None else "markdown",
+            svg_appearance=envelope.svg_appearance or SvgAppearance(),
         )
 
     async def _symlink_targets(
@@ -882,6 +947,15 @@ class PreviewService:
                 f"the service limit is {self._config.symlink_expanded_max_bytes}",
             )
         return dict(zip(wanted, bodies, strict=True))
+
+
+def _original_svg(snapshot: Snapshot, document: str) -> bytes:
+    """The captured source stays in the existing cache, never in session transport."""
+    record = next((row for row in snapshot.records if row.path == document), None)
+    content = snapshot.blobs.get(record.object_id) if record is not None else None
+    if content is None:
+        raise _snapshot_unavailable()
+    return content
 
 
 def _snapshot_unavailable() -> PreviewError:

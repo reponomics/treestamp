@@ -232,7 +232,7 @@ def test_maintenance_emits_utf8_with_a_legacy_stdout_encoding(
 @pytest.mark.parametrize(
     "command",
     [
-        ("--load", "README.md", "--print"),
+        ("load", "README.md", "--print"),
         ("check", "README.md"),
         ("update", "README.md"),
     ],

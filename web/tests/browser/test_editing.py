@@ -392,7 +392,7 @@ def test_failed_copy_does_not_report_success(page: Page, service: str) -> None:
     open_editor(page, service)
     page.locator("#copy").click()
     expect(page.locator("#copy-status")).to_have_text("Copy failed")
-    expect(page.locator("#copy-label")).to_have_text("Copy treestamp")
+    expect(page.locator("#copy-label")).to_have_text("Copy Markdown")
     expect(page.locator("#copy")).to_be_enabled()
 
 

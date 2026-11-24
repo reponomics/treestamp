@@ -18,7 +18,7 @@ def test_legacy_list_document_is_explicitly_rejected(fake, repo, rows):
     with pytest.raises(PreviewError, match="list") as error:
         preview(service, document="legacy.md")
     assert error.value.code == "curation"
-    assert (repo.path / "legacy.md").read_text() == content
+    assert (repo.path / "legacy.md").read_text(encoding="utf-8") == content
 
 
 def test_retired_list_state_cannot_replace_an_accepted_document(fake):

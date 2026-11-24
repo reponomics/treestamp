@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/static/buttons.css">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/landing.css">
+  <link rel="stylesheet" href="/static/export.css">
   <script type="module" src="/static/app.js"></script>
   <script type="module" src="/static/landing.js"></script>
 </head>
@@ -172,16 +173,16 @@
       <div class="stage-head">
         <div class="tabs" role="tablist" aria-label="View">
           <button id="tab-editor" type="button" role="tab" aria-selected="true" aria-controls="editor-panel">Tree</button>
-          <button id="tab-stamp" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="stamp-panel">Markdown</button>
+          <button id="tab-stamp" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="stamp-panel">Export</button>
           <button id="tab-info" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="info-panel">Info</button>
         </div>
         <button type="button" class="settings-open" popovertarget="settings" title="Settings">
           <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-.5 2-2 .9-1.9-.6-2 3.4 1.5 1.4v2.3l-1.5 1.4 2 3.4 1.9-.6 2 .9L9 20h4l.5-2.1 2-.9 1.9.6 2-3.4-1.5-1.4v-2.3l1.5-1.4-2-3.4-1.9.6-2-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
           <span class="control-label">Settings</span>
         </button>
-        <button id="copy" type="button" title="Copy treestamp">
+        <button id="copy" type="button" title="Copy Markdown">
           <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
-          <span id="copy-label">Copy treestamp</span>
+          <span id="copy-label">Copy Markdown</span>
         </button>
         <span id="copy-status" role="status" aria-live="polite"></span>
       </div>
@@ -207,13 +208,44 @@
 
       <div id="stamp-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-stamp" hidden>
         <div class="output-toolbar">
-          <label for="style">Format</label>
+          <label for="output-format">Output</label>
+          <select id="output-format">
+            <option value="markdown">Markdown</option>
+            <option value="svg">SVG</option>
+          </select>
+        </div>
+        <div id="markdown-controls" class="output-toolbar">
+          <label for="style">Branches</label>
           <select id="style" name="style">
             <option value="unicode" selected>Unicode ├─</option>
             <option value="ascii">ASCII +--</option>
           </select>
         </div>
         <pre id="region" class="region"></pre>
+        <section id="svg-output" aria-label="SVG export" hidden>
+          <div class="svg-controls">
+            <div class="output-toolbar">
+              <label for="svg-theme">Appearance</label>
+              <select id="svg-theme">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+            <div class="svg-actions" role="group" aria-label="SVG actions">
+              <button id="svg-download" class="primary" type="button" disabled>Download SVG</button>
+              <button id="svg-copy" type="button" disabled>Copy SVG</button>
+            </div>
+          </div>
+          <p class="export-guidance">Save the SVG in your repository, then reference it from your README.</p>
+          <p id="svg-source-notice" class="export-guidance" hidden></p>
+          <div class="svg-preview-heading">
+            <p id="svg-status" role="status" aria-live="polite"></p>
+            <button id="svg-size" type="button" aria-pressed="false">Actual size</button>
+          </div>
+          <div id="svg-preview" class="svg-preview" tabindex="0" role="region" aria-label="SVG image preview" aria-busy="false">
+            <img id="svg-image" alt="Exported directory tree and annotations" hidden>
+          </div>
+        </section>
       </div>
 
       <div id="info-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-info" hidden>
@@ -236,7 +268,7 @@
                 </li>
                 <li>
                   <h3>Copy into your docs</h3>
-                  <p>Copy the treestamp block into Markdown. Install the treestamp command locally to refresh it as your repository changes, including with local or unpublished commits.</p>
+                  <p>Open Export to copy a Markdown block or download an SVG image. Save SVG files in your repository and add the README image reference yourself. Install the treestamp command locally to refresh either format as your repository changes.</p>
                 </li>
               </ol>
             </section>

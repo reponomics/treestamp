@@ -2,6 +2,7 @@
 // Decisions that need no DOM live in logic.js and are tested with node --test.
 
 import { treeGuides, appendTreeGuides } from "./tree-view.js";
+import { ExportView } from "./export-view.js";
 import { EXAMPLES } from "./example.js";
 import { EntryFlow, renderRepository } from "./entry-flow.js";
 import { NotePlacement } from "./placement.js";
@@ -74,6 +75,11 @@ const noteSave = document.getElementById("note-save");
 const noteCancel = document.getElementById("note-cancel");
 
 const placement = new NotePlacement();
+const exportView = new ExportView({
+  getEditor: () => editor,
+  waitForEdits,
+  setAppearance: (appearance) => enqueueEdit(() => sendOperation("present", undefined, undefined, appearance)),
+});
 
 let controller = null;
 let countdown = null;
@@ -382,11 +388,16 @@ function render(data, opening = false) {
     dirty: data.dirty,
     loaded: data.loaded,
     region: data.region,
+    sourceFormat: data.source_format || "markdown",
+    svgAppearance: data.svg_appearance || { style: "continuous", theme: "light" },
+    sourceNotice: data.source_format === "svg"
+      ? ((!opening && previous?.sourceNotice) || [data.notice || "Preview regenerated from embedded treestamp data. The exported SVG replaces the original drawing.", ...(data.warnings || [])].join(" ")) : "",
   };
   if (opening) {
     editingSession += 1;
     queue = Promise.resolve(true);
   }
+  exportView.accept(editor, opening);
   history.replaceState(null, "", prepared.address);
   saveDraft(prepared.address);
 }
@@ -413,7 +424,7 @@ function presentPreview(data, prepared) {
 
   renderRegion(data.region);
   copy.disabled = false;
-  copyLabel.textContent = "Copy treestamp";
+  copyLabel.textContent = "Copy Markdown";
   setCopyStatus("");
   copy.classList.remove("copied");
   const hiddenCount = data.state.curation.hidden.length;
@@ -515,7 +526,13 @@ async function acceptResponse(body, opening, ticket) {
       // Validate the transfer tree before exposing either part of the preview.
       preparePreview({ ...body, rows: body.placement.rows }, window.location.origin);
       presentIncoming(body, prepared, ticket);
+      const source = body;
       body = await placement.run(body);
+      if (body) body = {
+        ...body,
+        notice: source.notice || body.notice,
+        warnings: [...new Set([...(source.warnings || []), ...(body.warnings || [])])],
+      };
     }
     if (!body || ticket !== generation) return false;
     setBusy(false, opening);
@@ -583,17 +600,20 @@ async function preview(params) {
 let queue = Promise.resolve(true);
 
 function enqueueEdit(action) {
+  exportView.invalidate();
   const session = editingSession;
   queue = queue.then((saved) => {
     if (!editor || session !== editingSession) return false;
     return action(saved);
   });
+  queue.then(() => exportView.showOutput());
   return queue;
 }
 
-async function sendOperation(type, path, text) {
+async function sendOperation(type, path, text, appearance) {
   const accepted = editor;
   const body = opBody(editor, settingsFromForm(editor.state.curation.settings), reveal.checked, type, path, text);
+  if (appearance) body.state.svg_appearance = appearance;
   const saved = await call("/api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { abortable: false });
   if (!saved && editor === accepted) {
     fields.style.value = accepted.state.curation.settings.style;
@@ -935,10 +955,10 @@ copy.addEventListener("click", async () => {
       return;
     }
     const copied = await copyText(region.textContent, region);
-    copyLabel.textContent = copied ? "Copied" : "Copy treestamp";
+    copyLabel.textContent = copied ? "Copied" : "Copy Markdown";
     copy.classList.toggle("copied", copied);
-    const destination = !saved ? "Copied previous treestamp" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
-    setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Markdown and select the block to copy it manually.");
+    const destination = !saved ? "Copied previous treestamp" : editor.document && editor.sourceFormat !== "svg" ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
+    setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Export, choose Markdown, and select the block to copy it manually.");
   } finally {
     copy.disabled = typeof editor?.region !== "string";
   }
@@ -950,6 +970,7 @@ function selectTab(name) {
   settingsPanel.hidden = !editing;
   settingsTrigger.hidden = !editing;
   stage.dataset.view = name;
+  exportView.setVisible(name === "stamp");
   for (const key of tabNames) {
     const active = key === name;
     tabs[key].setAttribute("aria-selected", active ? "true" : "false");

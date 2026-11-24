@@ -1,8 +1,8 @@
 # Web UI flow
 
-The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor exports Markdown for the user to copy into documentation; it does not write files or commit to GitHub.
+The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor copies Markdown or downloads/copies a standalone SVG. It does not write repository files or commit to GitHub.
 
-The proposed next-release [SVG export experience](svg-export-flow.md) covers the future Export tab and terminal SVG save/copy flow; it does not describe current behavior.
+The [SVG export experience](svg-export-flow.md) specifies the Export tab and terminal save/copy flow for this next-release implementation.
 
 ## Arrivals and navigation
 
@@ -22,7 +22,9 @@ Browsing candidates preserves the accepted treestamp, its cached record, and its
 
 ## Editing and export views
 
-**Tree** owns editing controls, including notes, hiding, reveal-hidden, Unhide all, and Settings. Leaving Tree closes an open Settings sheet and hides its desktop sidebar section. **Markdown** previews the exported plaintext, lets the user choose its text format, and provides Copy treestamp. Returning to Tree restores editing controls without resetting curation. **Info** also hides editing Settings.
+**Tree** owns editing controls, including notes, hiding, reveal-hidden, Unhide all, and Settings. Leaving Tree closes an open Settings sheet and hides its desktop sidebar section. **Export** selects Markdown or SVG independently of the loaded source. Markdown previews the exact copied region and offers Unicode/ASCII branches. SVG previews the regenerated image with a light/dark appearance choice, Fit width/Actual size, Download SVG, and Copy SVG. Copy SVG copies complete source, including editable metadata. The first output choice follows the loaded container; new trees use Markdown. Tree retains Copy Markdown. Returning to Tree restores editing controls without resetting curation. **Info** also hides editing Settings.
+
+SVG downloads use the loaded SVG basename or `treestamp.svg`. Users save the file in their repository and add its README image reference manually. The app never inserts uploaded SVG markup into the page; it generates an image from validated embedded treestamp data. Pending or failed generation disables export actions. Changing the output view does not change source identity or dirty state. Changing appearance is part of a loaded SVG’s accepted content; Discard restores its initial appearance. Browser downloads do not claim to overwrite the source repository.
 
 ## Source selection
 

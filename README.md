@@ -90,7 +90,7 @@ Use the editor to expand the important parts of the directory tree, hide the dot
 
 ### 3. Add it to your README
 
-When first writing a treestamp to a document, choose **Copy** in the terminal editor or **Copy treestamp** on the web, then paste the block into your project's Markdown document. treestamp renders directory trees inside a pair of HTML comment boundary markers:
+When first writing a treestamp to a document, choose **Copy** in the terminal editor or **Copy Markdown** on the web, then paste the block into your project's Markdown document. treestamp renders directory trees inside a pair of HTML comment boundary markers:
 
 `<!-- treestamp:start -->`
 
@@ -117,6 +117,10 @@ Paste the whole block, including the markers, anywhere in your project's documen
 <!-- treestamp:end -->
 ````
 
+#### SVG instead of a text block
+
+The web **Export** tab also offers SVG preview, Download SVG, and Copy SVG. In the terminal, press `e` to save or copy SVG; `w` updates a loaded SVG. The image carries an editable treestamp in its metadata, so it can be loaded again. Save it in your repository and add a README image reference yourself, using Markdown image syntax. See [SVG export](https://github.com/reponomics/treestamp/blob/main/docs/cli-reference.md#svg-export) for the CLI and file-safety rules.
+
 #### The config block
 
 The treestamp may also contain a configuration comment after the top boundary marker. It opens with `<!-- treestamp:config`, contains TOML settings, and closes with `-->` on a separate line. For example:
@@ -133,7 +137,7 @@ The `hidden` array records paths that the user has elected to hide, so that when
 
 ### 4. Update an existing treestamp
 
-To load an existing treestamp for editing, run `treestamp load docs/structure.md`, or `treestamp load` for the README in your current directory. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the tree when loaded into the editor:
+To load an existing treestamp for editing, run `treestamp load docs/structure.md`, or `treestamp load` for the README in your current directory. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will read the Markdown boundary markers or SVG metadata and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the tree when loaded into the editor:
 
 (i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the tree;
 
@@ -218,6 +222,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
+│       ├── artifacts.py
 │       ├── cli.py
 │       ├── cli_inputs.py
 │       ├── cli_maintenance.py
@@ -231,6 +236,9 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── reconcile.py
 │       ├── session.py
 │       ├── sources.py
+│       ├── svg.py
+│       ├── svg_layout.py
+│       ├── svg_metadata.py
 │       ├── tui.py
 │       ├── tui_dialogs.py
 │       ├── tui_reconcile.py
@@ -239,7 +247,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (17 files, 2 folders)
+│   ├── tests/ (18 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -266,6 +274,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
+|       |-- artifacts.py
 |       |-- cli.py
 |       |-- cli_inputs.py
 |       |-- cli_maintenance.py
@@ -279,6 +288,9 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- reconcile.py
 |       |-- session.py
 |       |-- sources.py
+|       |-- svg.py
+|       |-- svg_layout.py
+|       |-- svg_metadata.py
 |       |-- tui.py
 |       |-- tui_dialogs.py
 |       |-- tui_reconcile.py
@@ -287,7 +299,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (17 files, 2 folders)
+|   |-- tests/ (18 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml

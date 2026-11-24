@@ -1,6 +1,6 @@
 # ADR 0004: SVG artifacts with an embedded textual treestamp
 
-Status: proposed; SVG is not yet implemented or a released compatibility promise.
+Status: accepted and implemented on the next-release branch; not yet a released compatibility promise.
 
 Review: the initial structured-node proposal was independently reviewed on 2026-11-23. This revision replaces that payload with the existing textual document format at the maintainer's suggestion, makes visual styles independent, and clarifies GitHub embedding and ephemeral sessions. A fresh independent agent review checked this revision against the model, codec, document, and editor code. It identified count-preference inference and existing text-style representation limits; both are now explicit below. Final review found no remaining architectural blockers. The subsequent decision to repair the codec, retire list style, and define web/TUI export flows is recorded in the linked export experience; that addition received fresh independent review, with findings and resolutions recorded there. Rendering and compatibility gates remain implementation work.
 
@@ -126,4 +126,22 @@ Before implementation, freeze the envelope namespace/schema/version and resource
 
 Round-trip tests must cover the current document semantics, all node kinds, byte/special paths, subtree hiding, annotations, counts, folds, explicit presentation preferences, and known/unknown graphical styles. Compare canonical decoded document semantics across conversions, not incidental SVG serialization or surrounding README prose. Visible drawing edits cannot change recovered facts; absent, duplicate, contradictory, malformed, oversized, or unsupported payloads fail without replacing the accepted editor state. Verify that no extra hidden data is disclosed.
 
-Rendering tests must verify connected branches and last-sibling endpoints, dimension/wrapping bounds, safe escaping, and the shared GitHub-compatible profile. CLI and hosted output must agree for the same document/appearance. Test source-container writes, cross-format exports, unchanged source identities/baselines, external-file changes, and failure preservation separately. Failed export preserves the accepted session. No runtime SVG implementation is included in this ADR change; the connected landing illustration remains an independent UI experiment.
+Rendering tests must verify connected branches and last-sibling endpoints, dimension/wrapping bounds, safe escaping, and the shared GitHub-compatible profile. CLI and hosted output must agree for the same document/appearance. Test source-container writes, cross-format exports, unchanged source identities/baselines, external-file changes, and failure preservation separately. Failed export preserves the accepted session. The paired runtime implementation follows these boundaries; the connected landing illustration remains an independent UI treatment.
+
+
+## Implemented envelope and limits
+
+The version-1 payload is `{urn:treestamp:svg:1}treestamp`, directly beneath a root SVG `metadata` element. Its required attributes are `version="1"`, `codec="treestamp-text-v1"`, `encoding="base64"`, `text_style`, `show_counts`, `style`, and `theme`. Text style and count preferences are validated against the decoded text; they preserve choices that a root-only tree or a tree without counts cannot reveal. The first graphical style is `continuous`; themes are `light` and `dark`. Unknown graphical styles load with an explicit fallback warning; unknown schema/codec versions fail.
+
+Bounds are 1 MiB SVG, 256 KiB decoded textual payload, 10,000 tree rows including root, tree depth 128, XML depth 64, 50,000 XML elements, and namespace URIs of at most 256 characters. Layout caps width at 16,384 pixels and height at 1,000,000 pixels. Notes wrap at 80 conservative display cells. Display escaping is separate from metadata encoding, so XML-restricted characters and raw Git bytes retain their original identities in the payload. Full-buffer XML parsing rejects a DTD at declaration start, before entities or document content are processed. No incoming drawing is inserted into the web DOM.
+
+`artifacts.py` chooses the container and prepares source writes or separate exports; `svg_metadata.py` owns the envelope, `svg_layout.py` owns layout primitives and the style registry, and `svg.py` combines them. A test-only second style demonstrates reuse of metadata and serialization. The hosted stateless exporter accepts a complete textual region, explicit text preferences, and appearance; it returns generated SVG independently of recovery-state envelopes. Original SVG bytes remain in the source snapshot for dirty/check comparisons; hosted recovery state carries only the compact metadata baseline.
+
+Local Chromium rendering and automated conversion/publication checks are implementation evidence. Actual rendering of a committed SVG through a GitHub README remains a release gate until verified; local browser rendering alone does not claim that gate passed.
+
+
+## Implementation review
+
+Independently reviewed on 2026-11-24 across metadata parsing, layout, artifact dispatch, atomic publication, controller state, CLI/TUI actions, and hosted integration. Review found and resolved inconsistent dispatch for SVGs with XML comments/processing instructions before the root. A separate frontend review found that regeneration/fallback notices were being dropped; the UI now retains them and browser tests cover the fallback and appearance reset. Small helper extractions kept the new HTTP route out of the existing application factory and separated editor opening messages from source preparation. No blocking implementation finding remained after these changes.
+
+Final local validation passed 1,182 core tests (two skipped) with 99.11% branch-inclusive coverage and 393 hosted tests with 99.13%. The full Chrome browser run passed 263 cases; after the final notice and mobile-scroll refinements, all eight focused SVG cases passed. The 30 pure JavaScript tests passed with 100% coverage of the measured logic module. The 60-state responsive sweep and its inspected views are recorded in the [UI review log](../ui-review-log.md). Actual GitHub README rendering and other browser engines remain release verification, not claimed by these results.

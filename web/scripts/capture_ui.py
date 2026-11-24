@@ -137,6 +137,11 @@ def show_markdown(page: Page) -> None:
     visible(page, "#stamp-panel")
 
 
+def show_svg(page: Page) -> None:
+    page.locator("#output-format").select_option("svg")
+    visible(page, "#svg-image")
+
+
 def show_info(page: Page) -> None:
     page.locator("#tab-info").click()
     visible(page, "#info-panel")
@@ -240,6 +245,7 @@ def capture_profile(
         ("settings", lambda: show_settings(page)),
         ("discard", lambda: show_reset(page)),
         ("markdown", lambda: show_markdown(page)),
+        ("svg", lambda: show_svg(page)),
         ("info", lambda: show_info(page)),
         ("returning-entry", lambda: show_return(page)),
         ("picker-folder", lambda: show_picker(page, args.repo)),

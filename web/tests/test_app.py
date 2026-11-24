@@ -65,6 +65,8 @@ def test_preview_contract(client: TestClient) -> None:
         "permalink",
         "state",
         "rows",
+        "source_format",
+        "svg_appearance",
     }
     assert body["repository"] == {
         "owner": "o",
@@ -312,7 +314,10 @@ def test_pages_and_static_files(client: TestClient) -> None:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
         assert '<form id="entry-form"' in response.text
-        assert response.headers["Content-Security-Policy"] == "default-src 'self'"
+        assert (
+            response.headers["Content-Security-Policy"]
+            == "default-src 'self'; img-src 'self' blob:"
+        )
     assert client.get("/static/app.js").status_code == 200
     assert client.get("/static/style.css").status_code == 200
     icon = client.get("/favicon.ico")

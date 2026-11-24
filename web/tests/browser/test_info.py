@@ -38,7 +38,7 @@ def test_info_preserves_curated_output_and_the_permalink(
     page.keyboard.press("Tab")
     expect(page.get_by_role("region", name="Project information")).to_be_focused()
 
-    page.get_by_role("tab", name="Markdown", exact=True).click()
+    page.get_by_role("tab", name="Export", exact=True).click()
     expect(page.locator("#region")).to_have_text(original_output)
     expect(page.locator("#copy")).to_be_visible()
     page.get_by_role("tab", name="Tree", exact=True).click()

@@ -6,19 +6,23 @@ import argparse
 import difflib
 import sys
 import unicodedata
+from dataclasses import replace
 from importlib.metadata import version
 from typing import TYPE_CHECKING
 
+from treestamp.artifacts import capture_export_destination, prepare_svg_export
 from treestamp.cli_inputs import new_editor, read_source
 from treestamp.cli_maintenance import prepare_maintenance
 from treestamp.document import publish_write
 from treestamp.errors import ExecutionError, MarkerError, TreestampError
+from treestamp.gitio import document_path
+from treestamp.svg import render_svg
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TextIO
 
-COMMANDS = ("new", "load", "update", "check", "help")
+COMMANDS = ("new", "load", "update", "check", "export", "help")
 
 
 def _print_argument(parser: argparse.ArgumentParser, *, child: bool = False) -> None:
@@ -94,6 +98,33 @@ def _maintenance_commands(
             )
 
 
+def _export_parser(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    child = commands.add_parser("export", help="export a separate treestamp artifact")
+    child.add_argument(
+        "--load", metavar="DOCUMENT", help="source document (default: README.md)"
+    )
+    child.add_argument("--format", required=True, choices=("svg", "markdown"))
+    target = child.add_mutually_exclusive_group(required=True)
+    target.add_argument(
+        "--stdout", action="store_true", help="print the complete artifact"
+    )
+    target.add_argument(
+        "--output", metavar="PATH", help="repository-relative .svg file"
+    )
+    child.add_argument(
+        "--theme",
+        choices=("light", "dark"),
+        help="SVG appearance (default: retained, or light)",
+    )
+    child.add_argument(
+        "--replace",
+        action="store_true",
+        help="allow replacing a different existing .svg file",
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="treestamp",
@@ -111,6 +142,7 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command")
     _editor_commands(commands)
     _maintenance_commands(commands)
+    _export_parser(commands)
     help_command = commands.add_parser("help", help="show general or command help")
     help_command.add_argument(
         "help_command", metavar="COMMAND", nargs="?", choices=COMMANDS
@@ -145,6 +177,50 @@ def _maintain(args: argparse.Namespace) -> int:
         return 1
     publish_write(prepared)
     _emit(f"Updated: {source.path}\n")
+    return 0
+
+
+def _export(args: argparse.Namespace) -> int:
+    if args.format == "markdown" and (args.output or args.theme):
+        raise MarkerError(
+            "Markdown export uses --stdout without --theme; "
+            "insert the region into your document manually"
+        )
+    if args.replace and not args.output:
+        raise MarkerError("--replace requires --output")
+    source = read_source(args.load, allow_absent=args.load is None)
+    editor = source.editor() if source.document is not None else new_editor(None)
+    reconciliation = editor.state.reconciliation
+    if reconciliation is not None and reconciliation.remaining:
+        raise MarkerError(
+            "unmatched notes need transfer before export; open this document with "
+            "'treestamp load DOCUMENT', transfer the notes, and write the draft first",
+            location=str(source.path),
+        )
+    if args.format == "markdown":
+        _emit(editor.region_text())
+        return 0
+    appearance = editor.state.svg_appearance
+    if args.theme:
+        appearance = replace(appearance, theme=args.theme)
+    if args.stdout:
+        _emit(render_svg(editor.document(), appearance))
+        return 0
+    repository = editor.state.snapshot.repo
+    destination = document_path(repository, args.output)
+    previous = capture_export_destination(
+        destination, repository=repository, source=editor.state.document_path
+    )
+    prepared = prepare_svg_export(
+        editor.document(),
+        destination,
+        repository=repository,
+        appearance=appearance,
+        source=editor.state.document_path,
+        expected=previous if args.replace else None,
+    )
+    result = publish_write(prepared)
+    _emit(f"Exported SVG: {result.path}\n")
     return 0
 
 
@@ -203,6 +279,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "help":
             target = [args.help_command] if args.help_command else []
             parser.parse_args([*target, "--help"])
+        if args.command == "export":
+            if args.print_output:
+                parser.error("export uses --stdout instead of --print")
+            return _export(args)
         if args.command in ("check", "update"):
             if args.print_output:
                 parser.error(
