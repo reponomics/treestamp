@@ -12,6 +12,9 @@
 #svg-status { flex: 1; min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
 #svg-status[data-error="true"] { color: var(--error-ink); }
 .svg-preview { flex: 1; overflow: auto; min-height: 6rem; border: 1px solid var(--rule); border-radius: var(--r); background: var(--document-surface); }
+/* Preview context only: exported SVGs remain transparent. */
+.svg-preview[data-theme="light"] { background: #fff; }
+.svg-preview[data-theme="dark"] { background: #0d1117; }
 .svg-preview img { display: block; max-width: 100%; height: auto; }
 .svg-preview[data-actual-size="true"] img { max-width: none; }
 @media (max-width: 47.999rem) {

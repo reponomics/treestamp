@@ -43,6 +43,7 @@ export class ExportView {
       this.appearance = editor.svgAppearance;
     }
     this.theme.value = this.appearance.theme;
+    this.preview.dataset.theme = this.appearance.theme;
     const notice = document.getElementById("svg-source-notice");
     notice.textContent = editor.sourceNotice || "";
     notice.hidden = !editor.sourceNotice;
@@ -99,6 +100,7 @@ export class ExportView {
         this.appearance = appearance;
       }
       this.theme.value = this.appearance.theme;
+      this.preview.dataset.theme = this.appearance.theme;
     } finally {
       this.theme.disabled = false;
     }

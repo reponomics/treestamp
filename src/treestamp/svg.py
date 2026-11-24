@@ -30,10 +30,8 @@ __all__ = [
 
 _DEFAULT_APPEARANCE = SvgAppearance()
 
-_PALETTES = {
-    "light": ("#faf9f6", "#292b28", "#666b62", "#a6ada0"),
-    "dark": ("#191c19", "#e5e8df", "#a2ad9c", "#66755e"),
-}
+# The image has no background. Appearance chooses only its foreground ink.
+_INK = {"light": "#000000", "dark": "#ffffff"}
 
 
 def parse_svg(content: bytes) -> SvgArtifact:
@@ -86,11 +84,10 @@ def render_svg(
 
 
 def _drawing(layout: Layout, appearance: SvgAppearance) -> str:
-    background, foreground, muted, branch = _PALETTES[appearance.theme]
+    foreground = _INK[appearance.theme]
     parts = [
-        f'<rect width="{layout.width}" height="{layout.height}" '
-        f'rx="8" fill="{background}"/>',
-        f'<g fill="none" stroke="{branch}" stroke-width="1.25">',
+        f'<g fill="none" stroke="{foreground}" stroke-opacity="0.4" '
+        'stroke-width="1.25">',
     ]
     for line in layout.branches:
         parts.append(
@@ -100,11 +97,12 @@ def _drawing(layout: Layout, appearance: SvgAppearance) -> str:
         '</g>\n<g font-family="monospace" font-size="14" xml:space="preserve">'
     )
     for run in layout.labels:
-        color = muted if run.role == "note" else foreground
+        opacity = "0.65" if run.role == "note" else "1"
         weight = "600" if run.role == "directory" else "400"
         parts.append(
-            f'<text x="{run.x}" y="{run.y}" fill="{color}" '
-            f'font-weight="{weight}">{escape(display_text(run.text))}</text>'
+            f'<text x="{run.x}" y="{run.y}" fill="{foreground}" '
+            f'fill-opacity="{opacity}" font-weight="{weight}">'
+            f"{escape(display_text(run.text))}</text>"
         )
     parts.append("</g>")
     return "\n".join(parts)

@@ -95,10 +95,15 @@ def test_appearance_is_independent_of_app_theme_for_text_export(
     open_svg_export(page, service)
     expect(page.locator("#svg-download")).to_be_enabled()
     address = page.url
+    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "dark")
     page.locator("#svg-theme").select_option("light")
     expect(page.locator("#svg-download")).to_be_enabled()
     page.locator("#theme-toggle").click()
     expect(page.locator("#svg-theme")).to_have_value("light")
+    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "light")
+    expect(page.locator("#svg-preview")).to_have_css(
+        "background-color", "rgb(255, 255, 255)"
+    )
     assert page.url == address
 
 

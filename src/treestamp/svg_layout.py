@@ -25,7 +25,6 @@ CELL = 9
 LINE_HEIGHT = 24
 INDENT = 30
 PADDING = 24
-NOTE_COLUMNS = 80
 MAX_WIDTH = 16_384
 MAX_HEIGHT = 1_000_000
 
@@ -73,23 +72,6 @@ def cell_width(value: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in "WFA" else 1 for c in value)
 
 
-def _wrap_note(value: str) -> tuple[str, ...]:
-    """Bound annotation lines without stripping spaces or dropping long tokens."""
-    lines: list[str] = []
-    current: list[str] = []
-    columns = 0
-    for char in value:
-        width = cell_width(char)
-        if columns + width > NOTE_COLUMNS:
-            lines.append("".join(current))
-            current, columns = [], 0
-        current.append(char)
-        columns += width
-    if current:
-        lines.append("".join(current))
-    return tuple(lines)
-
-
 def _label(node: Node) -> str:
     text = display_text(node.name)
     if node.is_dir:
@@ -106,15 +88,15 @@ def _label(node: Node) -> str:
 def _row_labels(node: Node, depth: int, baseline: int) -> tuple[list[TextRun], int]:
     x = PADDING + depth * INDENT
     role = "directory" if node.is_dir else "file"
-    labels = [TextRun(x, baseline, _label(node), role)]
-    notes = _wrap_note(display_text(node.annotation.replace("\t", "  ")))
-    # Notes occupy their own indented lines. This keeps the image narrow and
-    # avoids connectors intersecting wrapped text or depending on font shaping.
-    for offset, note in enumerate(notes, 1):
-        labels.append(
-            TextRun(x + CELL * 2, baseline + offset * LINE_HEIGHT, note, "note")
-        )
-    return labels, LINE_HEIGHT * (1 + len(notes))
+    label = _label(node)
+    labels = [TextRun(x, baseline, label, role)]
+    if node.annotation:
+        note = "# " + display_text(node.annotation.replace("\t", "  "))
+        # The conservative label width plus two cells keeps inline notes clear
+        # of filenames/counts, without depending on browser font measurement.
+        note_x = x + (cell_width(label) + 2) * CELL
+        labels.append(TextRun(note_x, baseline, note, "note"))
+    return labels, LINE_HEIGHT
 
 
 def continuous_layout(document: Document) -> Layout:

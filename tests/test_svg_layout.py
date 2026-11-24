@@ -10,7 +10,7 @@ from treestamp.model import Node
 from treestamp.svg_layout import (
     CELL,
     INDENT,
-    NOTE_COLUMNS,
+    LINE_HEIGHT,
     PADDING,
     cell_width,
     continuous_layout,
@@ -52,20 +52,22 @@ def test_parent_trunk_connects_every_child_and_stops_at_last() -> None:
     for arm in arms:
         trunk = next(line for line in trunks if line.x1 == arm.x1)
         assert trunk.y1 <= arm.y1 <= trunk.y2
-    assert labels["file"].y > labels["src/"].y + 24
+    assert labels["file"].y == labels["src/"].y + LINE_HEIGHT
 
 
-def test_long_notes_wrap_without_loss_and_fit_width() -> None:
+def test_notes_stay_inline_with_hash_without_loss_and_fit_width() -> None:
     note = "界 note " * 100
     document = Document(Node(".", "", "dir", annotation=note))
     layout = continuous_layout(document)
-    lines = [label for label in layout.labels if label.role == "note"]
-    assert "".join(label.text for label in lines) == note
-    assert all(cell_width(label.text) <= NOTE_COLUMNS for label in lines)
-    assert all(
-        label.x + cell_width(label.text) * CELL < layout.width for label in lines
-    )
-    assert all(label.y < layout.height for label in lines)
+    label, annotation = layout.labels
+    assert annotation.text == "# " + note
+    assert annotation.y == label.y
+    assert annotation.x >= label.x + cell_width(label.text) * CELL + 2 * CELL
+    assert annotation.x + cell_width(annotation.text) * CELL < layout.width
+    assert layout.height == continuous_layout(Document(Node(".", "", "dir"))).height
+    document = replace(document, tree=replace(document.tree, annotation="x" * 2000))
+    with pytest.raises(MarkerError, match="dimensions"):
+        continuous_layout(document)
 
 
 def test_long_names_expand_width_but_are_bounded() -> None:

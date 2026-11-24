@@ -219,3 +219,25 @@ def test_xml_safe_display_preserves_exact_byte_and_control_names() -> None:
         namespace, local = element.tag[1:].split("}")
         assert namespace == PAYLOAD_NAMESPACE or local in allowed
         assert not any(key.startswith("on") or key == "href" for key in element.attrib)
+
+
+@pytest.mark.parametrize("theme, ink", [("light", "#000000"), ("dark", "#ffffff")])
+def test_transparent_monochrome_image_keeps_notes_on_the_entry_row(theme, ink):
+    document = Document(
+        Node(
+            ".",
+            "",
+            "dir",
+            (Node("file.py", "file.py", "file", annotation="Inline & editable"),),
+        )
+    )
+    source = render_svg(document, SvgAppearance(theme=theme))
+    root = ET.fromstring(source)
+    assert not list(root.iter(f"{{{SVG_NAMESPACE}}}rect"))
+    labels = list(root.iter(f"{{{SVG_NAMESPACE}}}text"))
+    assert {label.attrib["fill"] for label in labels} == {ink}
+    name = next(label for label in labels if label.text == "file.py")
+    note = next(label for label in labels if label.text == "# Inline & editable")
+    assert name.attrib["y"] == note.attrib["y"]
+    assert float(note.attrib["fill-opacity"]) < float(name.attrib["fill-opacity"])
+    assert parse_svg(source.encode()).document == document
