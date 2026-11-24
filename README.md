@@ -186,6 +186,8 @@ Use a terminal and font that display Unicode tree characters, or choose ASCII ou
 
 ## Limitations and edge cases
 
+Textual treestamps use fenced Unicode or ASCII branches. The former unfenced Markdown-list format has been removed, including loading existing list treestamps. Such documents fail with an explicit unsupported-style error and are not rewritten.
+
 The editor has to define a reserved sequence to be the delimiter between a filename and the annotation that follows it. In this case, it's `  # ` (space-space-hash-space). The problem is: this sequence is legal within a filename. This creates the potential for ambiguity for the parser. To avoid this, and maintain support for these uncommon filenames, pathnames whose final segment contains that sequence are stored in the config block in a `special_paths` array (see [special-path-resolution](https://github.com/reponomics/treestamp/blob/main/docs/special-path-resolution.md)).
 
 The same exact-path registrations protect filenames containing ` -> ` or ending in ` [gitlink]`, so an ordinary file cannot be confused with a symlink or Git-link entry. The registration rule applies to every entry kind and output style. Readers predating this extension reject these new registrations and need to be upgraded.
@@ -237,7 +239,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (18 files, 2 folders)
+│   ├── tests/ (17 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -285,7 +287,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (18 files, 2 folders)
+|   |-- tests/ (17 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
@@ -294,51 +296,6 @@ The alternate styles below are generated from the same tree and checked for fres
 |   `-- pyproject.toml
 `-- README.md
 ```
-
-Maintained with [treestamp](https://github.com/reponomics/treestamp)
-
-</details>
-
-<details>
-<summary>View list style</summary>
-
-./
-
-- .github/ (9 files, 2 folders)
-- assets/ (2 files, 1 folder)
-- docs/ (13 files, 1 folder)
-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
-- src/
-  - treestamp/  # Shared model and terminal editor
-    - cli.py
-    - cli_inputs.py
-    - cli_maintenance.py
-    - codec.py
-    - document.py
-    - editor.py
-    - errors.py
-    - gitio.py
-    - maintenance.py
-    - model.py
-    - reconcile.py
-    - session.py
-    - sources.py
-    - tui.py
-    - tui_dialogs.py
-    - tui_reconcile.py
-    - tui_rows.py
-- tests/ (31 files)  # Contract and integration tests
-- web/  # Hosted editor: a FastAPI adapter over the same package
-  - scripts/ (4 files)
-  - src/ (1 folder)
-  - tests/ (18 files, 2 folders)
-  - Dockerfile
-  - README.md
-  - fly.preview.toml
-  - fly.toml
-  - package.json
-  - pyproject.toml
-- README.md
 
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
 

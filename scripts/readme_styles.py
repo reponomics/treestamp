@@ -16,19 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def render_previews(document: Document) -> str:
-    sections = []
-    for style, label in (("ascii", "ASCII"), ("list", "list")):
-        settings = replace(document.settings, style=style)
-        tree, _ = render_tree_with_paths(document.tree, settings, fenced=True)
-        if style == "list":
-            root, separator, children = tree.partition("\n")
-            tree = root + separator + ("\n" + children if children else "")
-        footer = f"\n{ATTRIBUTION}\n" if settings.attribution else ""
-        sections.append(
-            f"<details>\n<summary>View {label} style</summary>\n\n"
-            f"{tree}{footer}\n</details>\n"
-        )
-    return "\n".join(sections)
+    settings = replace(document.settings, style="ascii")
+    tree, _ = render_tree_with_paths(document.tree, settings, fenced=True)
+    footer = f"\n{ATTRIBUTION}\n" if settings.attribution else ""
+    return (
+        "<details>\n<summary>View ASCII style</summary>\n\n"
+        f"{tree}{footer}\n</details>\n"
+    )
 
 
 def refreshed_content(content: bytes) -> bytes:

@@ -135,7 +135,7 @@ function validatePreviewOutput(data) {
 function validatePreviewSettings(data) {
   const paths = data?.state?.curation;
   const settings = paths?.settings;
-  if (!settings || !["unicode", "ascii", "list"].includes(settings.style) || typeof settings.show_counts !== "boolean"
+  if (!settings || !["unicode", "ascii"].includes(settings.style) || typeof settings.show_counts !== "boolean"
       || (settings.attribution !== undefined && typeof settings.attribution !== "boolean")
       || !validPath(settings.root) || !validPath(data.root) || !validPath(data.document)
       || ![paths.expanded, paths.hidden, paths.annotations].every(Array.isArray)) {

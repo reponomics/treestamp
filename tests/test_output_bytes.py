@@ -227,3 +227,23 @@ def test_maintenance_emits_utf8_with_a_legacy_stdout_encoding(
     assert "├──" in drift.stdout.decode("utf-8")
     assert not drift.stderr
     assert destination.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ("--load", "README.md", "--print"),
+        ("check", "README.md"),
+        ("update", "README.md"),
+    ],
+)
+def test_retired_list_document_fails_without_rewriting(
+    repo: Repo, command: tuple[str, ...]
+) -> None:
+    stamped(repo)
+    original = b"# Intro\n<!-- treestamp:start -->\n./\n- src/\n<!-- treestamp:end -->\nUnrelated prose.\n"
+    destination = repo.write_bytes("README.md", original)
+    result = cli(repo, *command, check=False)
+    assert result.returncode == 2
+    assert b"list style is no longer supported" in result.stderr
+    assert destination.read_bytes() == original

@@ -12,7 +12,7 @@ from treestamp.model import Node, Settings
 RESERVED_NAMES = ("odd -> name", "vendor [gitlink]", "raw\udcff\n -> name  # [gitlink]")
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("root", [".", "source -> root"])
 @pytest.mark.parametrize("name", RESERVED_NAMES)
 @pytest.mark.parametrize("kind", ["file", "dir", "symlink", "gitlink"])
@@ -38,7 +38,7 @@ def test_registered_names_preserve_document_facts(
     assert special_paths(document.tree, root) == {1: expected_path}
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("name", RESERVED_NAMES)
 def test_reserved_directory_names_scope_children_and_follow_row_changes(
     style: str, name: str

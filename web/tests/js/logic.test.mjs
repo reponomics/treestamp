@@ -169,7 +169,7 @@ test("new source parameters only select repository-relative root and document", 
 
 test("one count toggle edits presentation and retains the selected root", () => {
   const settings = { root: "docs", style: "unicode", show_counts: true };
-  assert.deepEqual(settingsFromValues(settings, { style: "list", show_counts: false }), { root: "docs", style: "list", show_counts: false, attribution: false });
+  assert.deepEqual(settingsFromValues(settings, { style: "ascii", show_counts: false }), { root: "docs", style: "ascii", show_counts: false, attribution: false });
   assert.deepEqual(valuesFromSettings(settings), { ...settings, attribution: false });
 });
 
@@ -244,6 +244,7 @@ test("incomplete preview responses cannot replace the accepted draft", async () 
     data => { delete data.state; },
     data => { delete data.state.curation; },
     data => { data.state.curation.settings.style = "unknown"; },
+    data => { data.state.curation.settings.style = "list"; },
     data => { data.state.curation.settings.show_counts = "true"; },
     data => { data.state.curation.settings.root = { git_bytes: "f" }; },
     data => { data.root = { git_bytes: "zz" }; },

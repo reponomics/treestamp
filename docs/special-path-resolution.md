@@ -46,7 +46,7 @@ For example, these registrations identify the following tree:
 
 Row 1 is the file `x  # y` with annotation `z`; row 2 is the directory `x  # y  # z`. Matching registered filename prefixes alone cannot reliably distinguish them. The row association supplies the missing information directly.
 
-`row` is the zero-based index of a physical tree row, with the root at 0. Boundary markers, metadata, and code fences are excluded. Unicode, ASCII, and list styles use the same indexing. Paths remain repository-relative and retain the existing string or `git_bytes` representation.
+`row` is the zero-based index of a physical tree row, with the root at 0. Boundary markers, metadata, and code fences are excluded. Unicode and ASCII styles use the same indexing. Paths remain repository-relative and retain the existing string or `git_bytes` representation.
 
 The array layout above is illustrative. Equivalent TOML formatting is accepted and preserved while the registrations remain unchanged; newly generated or changed arrays use compact wrapping at an 80-character target. Wrapping metadata does not change tree row numbers. See [ADR 0002](adr/0002-formatter-compatible-documents.md).
 

@@ -392,7 +392,7 @@ def test_show_counts_and_style_are_session_only(fake: FakeGitHub) -> None:
     assert "show_counts" not in result.region and "style =" not in result.region
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_attribution_is_opt_in_and_survives_loading_and_editing(
     fake: FakeGitHub, repo: Repo, style: str
 ) -> None:

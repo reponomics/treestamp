@@ -31,7 +31,7 @@ def make_editor(repo: Repo) -> EditorController:
     return editor
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_preview_includes_attribution_without_changing_draft(
     repo: Repo, style: str
 ) -> None:
@@ -396,8 +396,6 @@ def test_dirty_uses_output_for_count_and_root_only_style_choices(repo: Repo) -> 
     )
     empty.state.session.settings = replace(empty.state.session.settings, style="ascii")
     assert not empty.dirty, "root-only ASCII and Unicode print the same bytes"
-    empty.state.session.settings = replace(empty.state.session.settings, style="list")
-    assert empty.dirty
     empty.state.session.settings = replace(
         empty.state.session.settings, style="unicode"
     )
@@ -433,11 +431,17 @@ def test_dirty_tracks_restoring_original_bytes_after_a_changed_open(repo: Repo) 
 
 
 @pytest.mark.parametrize("name", ["a [gitlink]", "nested/a [gitlink]"])
-def test_initial_unrepresentable_source_is_rejected(repo: Repo, name: str) -> None:
+def test_initial_syntax_colliding_source_retains_file_identity(
+    repo: Repo, name: str
+) -> None:
     repo.write(name)
     repo.add(".")
-    with pytest.raises(MarkerError, match="cannot load safely"):
-        EditorController(capture_snapshot(repo.path), Settings())
+    editor = EditorController(capture_snapshot(repo.path), Settings())
+    for parent in name.split("/")[:-1]:
+        editor.state.session.expand(parent)
+    loaded = parse_document(editor.region_text().encode())
+    child = next(node for node in loaded.tree.walk() if node.path == name)
+    assert child.kind == "file" and child.name == name.rsplit("/", 1)[-1]
 
 
 def test_failed_source_preflight_preserves_loaded_draft(repo: Repo) -> None:
@@ -446,8 +450,9 @@ def test_failed_source_preflight_preserves_loaded_draft(repo: Repo) -> None:
     editor.adopt(editor.prepare_load("tree.md"))
     before = editor.region_text()
     state = editor.state
-    repo.write("src/pkg/a [gitlink]")
     repo.add(".")
+    target = repo.blob(b"null")
+    repo.git("update-index", "--add", "--cacheinfo", f"120000,{target},src/pkg/link")
     with pytest.raises(MarkerError, match="cannot load safely"):
         editor.prepare_load("tree.md")
     assert editor.state is state and editor.region_text() == before

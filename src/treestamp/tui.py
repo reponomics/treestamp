@@ -15,6 +15,7 @@ from textual.widgets import Label, ListItem, ListView, Static
 
 from treestamp.document import ATTRIBUTION_URL
 from treestamp.errors import TreestampError
+from treestamp.model import TEXT_STYLES
 from treestamp.tui_dialogs import (
     ConfirmScreen,
     PreviewScreen,
@@ -58,7 +59,7 @@ _HELP = (
     "H               Show or conceal hidden entries in the editor",
     "                This does not change which entries are printed.",
     "c               Show or hide counts on collapsed directories",
-    "s               Switch between Unicode, ASCII, and list styles",
+    "s               Switch between Unicode and ASCII styles",
     "t               Include or remove the Maintained with treestamp trailer",
     "",
     "OUTPUT",
@@ -80,8 +81,8 @@ _HELP = (
     "Collapsing a folder preserves its curation during this session.",
     "Reopening restores only printed rows and recorded hiding.",
 )
-STYLES = ("unicode", "ascii", "list")
-STYLE_LABELS = {"unicode": "Unicode", "ascii": "ASCII", "list": "List"}
+STYLES = TEXT_STYLES
+STYLE_LABELS = {"unicode": "Unicode", "ascii": "ASCII"}
 
 
 def _toggle_counts(session: TreeSession) -> str:

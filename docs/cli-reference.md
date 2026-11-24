@@ -35,7 +35,7 @@ New treestamps show the selected directory's immediate children, with subdirecto
 | Arrow keys, Space, Home/End, Page Up/Down | Navigate and expand or collapse directories |
 | `h`, `H`, `S` | Hide/unhide an entry, reveal hidden entries for browsing, unhide all |
 | `a` | Edit the selected entry's annotation |
-| `c`, `s`, `t` | Toggle counts, cycle Unicode/ASCII/list style, toggle attribution footer |
+| `c`, `s`, `t` | Toggle counts, cycle Unicode/ASCII style, toggle attribution footer |
 | `w` | Write back to the loaded document (loaded sessions only) |
 | `v`, `y`, `p` | Preview, copy the draft, print it and exit |
 | `?`, `q` / Escape | Help, quit |
