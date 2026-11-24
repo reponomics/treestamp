@@ -1,104 +1,130 @@
-# ADR 0004: SVG at the document input/output boundary
+# ADR 0004: SVG artifacts with an embedded textual treestamp
 
-Status: proposed; not an implemented format or an accepted compatibility promise.
+Status: proposed; SVG is not yet implemented or a released compatibility promise.
 
-Review: independently reviewed by a second agent on 2026-11-23 against the current model, session, document, and hosted code. Revisions incorporated subtree hidden-path conversion, symlink-only targets, existing text-preflight constraints, appearance preservation, document-level validation, and the requirement to ship both SVG reading and writing. The final review found no blocking architectural issue; exact schema and rendering choices remain open below. Human review is pending.
+Review: the initial structured-node proposal was independently reviewed on 2026-11-23. This revision replaces that payload with the existing textual document format at the maintainer's suggestion, makes visual styles independent, and clarifies GitHub embedding and ephemeral sessions. A fresh independent agent review checked this revision against the model, codec, document, and editor code. It identified count-preference inference and existing text-style representation limits; both are now explicit below. Final review found no remaining architectural blockers. Human review remains pending; rendering and compatibility gates are implementation work.
 
-## Context
+## Context and decision
 
-Treestamp currently exports Unicode, ASCII, and Markdown-list trees inside a managed Markdown region. The web editor draws continuous branches, while textual exports rely on box-drawing characters. We want a portable graphical format with the same continuous branches and enough structure to reopen it as a treestamp. This is a new artifact format, not merely another choice of textual branch characters.
+Treestamp already parses supported textual styles into a common document model and edits that model against a repository snapshot. A graphical format belongs at those input/output boundaries. It must support loading a textual treestamp and exporting SVG, and loading that SVG to edit and export either text or another SVG style. Reading and writing are required together in the first supported SVG release.
 
-Much of the existing text codec solves ambiguity between filenames, type suffixes, counts, and annotations. Generated graphical artifacts have a different contract: users are not expected to edit their visible labels as a way of editing the treestamp. Structured metadata can separate these fields explicitly. The importer still validates input, but need not infer identities or annotations from SVG text positions or delimiters.
+Use the complete existing textual treestamp as the authoritative SVG metadata payload. The payload includes the managed-region markers, configuration and special-path records, tree, and attribution, rather than only the visible rows. The current document codec already handles delimiter-looking filenames, byte identities, kinds, targets, annotations, counts, roots, and saved hiding. Reuse that contract instead of defining a second encoding of those facts. Surrounding README prose is not embedded.
 
-The core model already separates tree facts from presentation. [`Node`](../../src/treestamp/model.py), [`TreeSession.printed_tree()`](../../src/treestamp/session.py), and [`Document`](../../src/treestamp/document.py) provide suitable inputs. The text codec and Markdown document writer have deliberate round-trip and managed-region contracts that should remain intact. [`treeGuides()`](../../web/src/treestamp_web/static/tree-view.js) provides the existing web branch topology; it is a useful reference for a platform-independent layout traversal.
+Store the region's serialized bytes as uncompressed base64 inside a versioned, namespaced element under SVG's standard `metadata` element. Base64 is transport encoding, not a new tree format. A reader extracts and decodes the payload, then calls the existing `parse_document()`. A writer renders the current accepted document through the existing `render_region()` and packages it with a drawing. The drawing is generated from the document model; it is never reverse-engineered on import. SVG's [metadata element](https://www.w3.org/TR/SVG2/struct.html#MetadataElement) is intended to carry application-specific data.
 
-## Proposed decision
+This supersedes the initial proposal to encode ordered node records in JSON. Keeping the text parser is an advantage here: the existing ambiguity handling and validation remain authoritative. It does not couple SVG appearance to textual layout.
 
-Add SVG serialization at the output boundary. Any accepted internal document can be exported as SVG, regardless of its input format. Loading a textual treestamp and copying its SVG representation is the primary required workflow. Loading an SVG treestamp to update it is equally required. Ship the SVG reader, writer, and versioned structured metadata together as one first-class format; the reader and writer are separate adapters around the same internal model, not optional product capabilities. Preserve `Settings.style` as the existing text-style choice. Keep SVG appearance options separate from tree curation and text settings. Do not introduce a general renderer plugin system until a second graphical backend demonstrates a need for one.
-
-### Rendering pipeline
+## Module boundaries and conversion contract
 
 ```text
-Markdown reader --+                         +-- Markdown writer
-                  +-- internal tree/session-+
-SVG reader -------+                         +-- SVG writer
-                            ^
-                     repository snapshot
+Text document reader -------------------+
+                                        |
+SVG container reader -> text decoder ---+-> Document -> reconciliation/editor
+                                                              |
+                                               accepted export Document
+                                                 /                   \
+                                         text writer           SVG artifact writer
+                                                             /                   \
+                                                   text payload encoder     selected visual style
+                                                                                  |
+                                                                         layout -> SVG drawing
 ```
 
-Both readers produce the same document model for reconciliation and editing. Either writer can serialize the resulting accepted document. SVG loading must preserve the existing repository selection and refresh/update flow; it must not require a conversion through Markdown.
+Every supported input format/style feeds the same model, and every supported output can be selected independently of that input. Successful conversion must preserve the existing document semantics. Some existing text styles cannot represent all facts accepted by another: for example, list-style filenames resembling symlink or Git-link suffixes can be rejected by Unicode/ASCII output. Retain the codec's explicit losslessness refusal for such conversions; never silently change names, kinds, or notes. All graphical styles must cover the same accepted document domain and reuse a representable textual payload style rather than forcing every embedded region to Unicode. Expanding the successful text-style conversion domain requires a deliberate text-codec change and tests. “Arbitrary style” means any supported treestamp style; it does not promise recovery from unrelated SVG images without a treestamp payload. Source preservation for writes remains the job of the appropriate container adapter.
 
-The new output boundary is conceptually `render_svg(document, appearance) -> str`. Parsing remains at the input boundary; the renderer consumes the internal model and does not inspect the source format. No editing-engine rewrite or intermediate text reparse is required. The first exporter accepts the sessions supported today: editor initialization still performs text-codec preflight, and hosted responses currently compose Markdown as well. SVG export alone does not remove those existing input restrictions; supporting graphical-only tree facts would be a later, separate change. The layout and SVG serializer should be pure Python modules alongside the text codec, independent of browser DOM, terminal widgets, network access, and Git access. The same implementation should serve CLI and hosted exports. Use actual line/path geometry with text elements; do not screenshot the web editor or place box-drawing glyphs on a larger canvas. The source is the accepted printed projection, never the temporary reveal-hidden view. Use the existing document-composition semantics: `printed_tree()` plus settings and saved hiding converted to repository-relative paths with `repo_path(path, settings.root)`. `TreeSession.saved_hidden()` is tree-relative; `Document.hidden` is repository-relative. This conversion matters for subtree exports.
+Keep the implementation in small, independently testable modules with these responsibilities (names to be settled during implementation):
 
-A small layout representation makes future raster output possible without tying the tree engine to SVG. It should describe only what this renderer needs: row positions, label runs, branch segments, and dimensions. Bounds must account for names, annotations, optional counts, attribution, Unicode display, and font metrics. Font packaging or measurement is an implementation gate: an SVG must remain legible when embedded as an image without fetching the web app's fonts. Test a bundled, license-compatible font strategy against supported consumers before promising identical metrics. Avoid `foreignObject`, scripts, and external resource dependencies in generated artifacts.
-
-### Required SVG round-trip: metadata and authority
-
-Use one namespaced application-data element inside SVG's standard `metadata` element. The payload is versioned JSON containing explicit tree records, document settings, saved hiding, and appearance options. SVG supports application-specific metadata for round-tripping; [the SVG document-structure specification](https://www.w3.org/TR/SVG2/struct.html#MetadataElement) describes this use. An `<img>` embedding applies a restricted processing mode, reinforcing the choice of a self-contained drawing; see [SVG processing modes](https://www.w3.org/TR/SVG2/conform.html#processing-modes).
-
-Define and test this schema before releasing SVG support. Metadata and a validated reader are part of the first release, not deferred enhancements. These are required data responsibilities, not final field names:
-
-| Data | Contract |
+| Boundary | Responsibility |
 | --- | --- |
-| Format and schema version | Explicit treestamp identity and supported version; reject unsupported versions. |
-| Ordered printed nodes | Exact tree-relative paths, node kinds, optional symlink targets, annotations, counts, and hierarchy. Derive display names from identity; do not use display strings as identifiers. |
-| Document settings | Selected root, counts, attribution, and retained textual style for subsequent Markdown export. |
-| Saved hiding | The same excluded-path information retained by a current Markdown document. |
-| Appearance | Versioned graphical presentation options, independent of curation. |
-| Optional provenance | Repository and commit information for context; never a substitute for the source snapshot or permission to fetch it automatically. |
+| Artifact dispatch | Identify a supported text or SVG container and select its reader/writer; distinguish malformed recognized artifacts from unrelated files. |
+| Text document codec | Existing managed-region parsing, configuration, identity validation, and rendering. |
+| SVG metadata codec | Envelope versioning, bounded XML extraction, base64 transport, and delegation to the text document codec. No layout knowledge. |
+| Document composition | Produce the accepted document projection from a session, shared across output formats. |
+| Visual style | Consume a validated document plus presentation options; produce layout primitives. No source-format parsing, Git access, or metadata serialization. |
+| Layout and SVG drawing | Shared row/label/branch/dimension primitives and safe serialization of static SVG geometry/text. Styles may supply different layouts without replacing the metadata codec. |
+| SVG artifact writer | Combine a generated drawing and the shared metadata envelope into one standalone file. |
+| CLI and hosted adapters | Source selection, repository reconciliation, explicit output controls, and safe publication using the shared core. |
 
-Reuse `path_value()` and `read_path_value()` for exact Git identities, including the existing `git_bytes` representation. Define the same lossless treatment for targets that are not valid Unicode. JSON serialization must escape characters that cannot appear in XML text, and XML serialization must escape markup characters. Display labels use a separate readable escaping policy. Delimiter-looking filenames, whitespace, control characters, and invalid UTF-8 must not turn into ambiguous node identities.
+The first visual style uses continuous line/path geometry, with the web editor's [`treeGuides()`](../../web/src/treestamp_web/static/tree-view.js) as a topology reference. It must not screenshot the browser or emulate continuity with box-drawing text. A second SVG style should require only a style implementation, registration, and style-specific tests; it must reuse the artifact reader, metadata writer, and editor flow. A small internal registry/protocol is sufficient; a public plugin framework is unnecessary.
 
-Do not make a Markdown region the canonical metadata payload. That would retain the very row and delimiter parsing this format can avoid. A future Markdown export can be regenerated from the validated structured document through the existing text renderer.
+Keep `Settings.style` as the existing textual style (`unicode`, `ascii`, or `list`). SVG style identifiers/options live outside `Document` and session curation. Readers return an artifact-level result containing the document and optional appearance preferences. Known styles retain their options on re-export. An unknown visual style must not prevent reading otherwise supported document metadata: load the document, report the appearance fallback, and offer the default or another supported style. An unknown document codec or envelope version is different and must fail explicitly rather than guess.
 
-On import, validate the supported payload and return an artifact-level result containing `(document, appearance)`; regenerate the visible representation from both. Graphical appearance remains outside `Document` and `Settings`, but must survive loading and re-export. SVG paths, text elements, colors, and positions are not parsed back into tree facts. Manual drawing edits are therefore discarded on regeneration, while valid changes to supported metadata are subject to ordinary model validation. Missing, duplicate, malformed, or unsupported metadata causes an explicit unsupported-artifact or invalid-artifact error. Do not silently guess from visible text or fetch linked resources.
+Document composition uses `TreeSession.printed_tree()`, settings, and document-level hiding. Convert `saved_hidden()` paths with `repo_path(path, settings.root)`: session paths are tree-relative while `Document.hidden` is repository-relative. Use the accepted printed projection, never the reveal-hidden display. SVG rendering consumes the model without reparsing the original source; text serialization remains necessary for its embedded payload. Existing text-codec preflight remains applicable, so SVG does not introduce graphical-only tree facts that the current text formats cannot represent.
 
-No signature or checksum is required for the initial format. A checksum is not authentication and does not establish that the visible drawing corresponds to the data. The contract deliberately defines metadata as authoritative; an importer should explain that the treestamp is being restored from embedded data and show the regenerated preview. Integrity/authenticity mechanisms would need a separate requirement.
+## Payload, fidelity, and cost
 
-### Document round-trip; full-session archives are excluded
+The envelope declares its own version, a supported textual document codec identifier/version, base64 encoding, and graphical style/options. These are format versions, not installed package version numbers. A generator version may be diagnostic only. Freeze the exact namespace and envelope schema before implementation and test independent fixtures for compatibility.
 
-SVG reimport preserves the information in `Document`, including saved hiding, and the artifact appearance. It does not promise to restore the complete editing session. This is the same document-versus-session distinction that already applies to Markdown. [`TreeSession`](../../src/treestamp/session.py) explicitly keeps hidden annotations and descendant layouts in session memory while only `printed_tree` and `saved_hidden` belong in a document. Consequently, exported metadata may name excluded paths, just as Markdown does, but must not silently include hidden notes or the complete hidden/folded subtree.
+Base64 covers the full current text domain more reliably than XML-escaped text. In a local probe, XML normalized CRLF and rejected a filename containing U+FFFF even though the existing text codec accepted it. Base64 preserved the exact region bytes in both cases. CDATA would not solve XML character restrictions. Do not add compression in the first version: it complicates limits and debugging for little benefit at ordinary sizes.
 
-With valid embedded metadata, the printed projection can be recovered from the artifact alone. Refreshing it against a repository, expanding omitted descendants, or restoring hidden files still requires the corresponding source tree and the existing reconciliation flow. The web session envelope depends on cached source data; embedding it does not make an export self-contained. A full-session archive would need the complete source snapshot plus curation and a distinct, explicit product contract. Defer that capability.
+The document fidelity guarantee is the existing text codec's semantics, including its normalizations. It is not byte preservation of an arbitrary source README or serialization of every in-memory field. Current normalization includes annotation tabs, zero counts, and hidden paths below folded parents. Text alone can also lose an unobservable presentation preference: a root-only ASCII tree is inferred as Unicode, and count visibility defaults when no collapsed folder demonstrates it. Retain the two presentation preferences (`text_style` and `show_counts`) in the envelope, validate them with the existing settings rules, and apply them after parsing. These fields preserve output choices without duplicating the tree, roots, hidden paths, or annotations. They must agree with observable settings in the payload; contradictory supported metadata is invalid. For `text_style`, canonical region output before and after applying the preference must agree; this permits the root-only ASCII/Unicode ambiguity while retaining observable list framing. For `show_counts`, reject false if any parsed node has positive file/directory counts; absence of counts permits either preference because zero or unknown counts are not evidence of a hidden-count choice. Do not use rendering alone to check count visibility: the current renderer prints stored node counts regardless of `Settings.show_counts`. These checks use the existing parsed model and renderer, without adding a second tree grammar. Graphical appearance stays separate.
 
-### Import and resource boundaries
+Measurements on 2026-11-23 used the existing codec at `1b796c5` and Python 3.11.11. The probe extracted this repository's README region and constructed flat documents with 10, 100, and 1,000 descendants. Generated cases included root/per-entry notes, a collapsed directory with counts, a subtree root and hidden path, delimiter-looking and byte filenames, XML metacharacters, symlinks with escaped targets, and Git links. It asserted exact recovered region bytes and equality of parsed Documents with their inputs for those cases.
 
-An imported SVG is data, not executable markup. Extract the supported metadata with a bounded, non-networked parser, reject DTD/entity expansion, enforce payload/node/depth limits, and validate tree relationships, uniqueness, kinds, counts, paths, targets, and settings. Do not insert uploaded SVG markup into the browser DOM. Generate the displayed preview from validated data. Reuse existing validators where they express the same invariants; add a structured document decoder rather than routing through the text parser. In particular, preserve the existing root identity and collapsed-directory count rules and require `normalized_hidden(document) == document.hidden`, as the Markdown reader does. Supported metadata/appearance cannot request external resources; references elsewhere in the unconsumed drawing markup are never resolved or retained. This does not require a general SVG/CSS validator.
+| Case | Region bytes | Base64 payload bytes | Metadata-only SVG bytes |
+| --- | ---: | ---: | ---: |
+| Current README (35 visible rows) | 1,709 | 2,280 | 2,456 |
+| 10 descendants | 906 | 1,208 | 1,384 |
+| 100 descendants | 7,618 | 10,160 | 10,336 |
+| 1,000 descendants | 75,658 | 100,880 | 101,056 |
 
-Metadata can be removed by image optimizers or export tools. Such an SVG remains an ordinary image but no longer qualifies as an editable treestamp artifact. A raster renderer could later share the layout, but arbitrary image import and metadata retention through image transformations are not implied by supporting image export.
+These are illustrative costs, not size limits. They exclude the drawing and final appearance/preferences fields. Base64 costs approximately one third beyond the textual bytes; relative to a drawing-only SVG, the entire embedded payload is additional. Long notes and deep indentation can exceed these examples. For 1,000 descendants, median local timings over 11 runs were approximately 27 ms for region rendering, 10 ms for parsing, and under 1 ms for container encoding/XML parsing/decoding. No production performance claim follows from this probe. The meaningful cost is duplicate document representation, which is acceptable for ordinary documentation artifacts; explicit input/output byte, node, depth, and layout limits remain required.
 
-### User interface and command boundaries
+## Authority, validation, and session scope
 
-Tree remains the editing view; Markdown previews and copies the textual export. Add SVG preview and Copy SVG/Download SVG as graphical export actions, available for the same accepted session without reloading or converting the source. Copy SVG means copying serialized SVG markup; Download SVG saves those same bytes. Native image clipboard transfer is not part of this proposal. Keep graphical output separate from the Markdown text-style selector. Final placement needs a small UI design pass. A standalone SVG reader/writer must not reuse Markdown marker splicing or silently change the behavior of existing CLI `print`, `check`, or `update` commands. Add an explicit export entry point and a deliberate SVG load path after the container contract is tested.
+Metadata is authoritative. Changing paths, labels, colors, or coordinates in the visible SVG does not edit the recovered treestamp. Valid changes to the embedded textual treestamp are accepted through ordinary parsing; unsupported or malformed data produces an actionable error. Import regenerates the preview from recovered data and explains that it uses embedded treestamp data. No checksum is needed: it would neither authenticate the file nor establish agreement between drawing and metadata.
 
-## Delivery sequence
+Require exactly one supported payload at the specified location in an SVG document. Bound the entire file before parsing, reject DTD/entity expansion, disable network resolution, enforce strict base64 decoding and decoded-size limits, and delegate text decoding and structural validation to the existing document codec (including its current UTF-8/surrogateescape behavior). Keep node/depth limits and document root/count/hidden-path invariants. Never inject imported SVG markup into the DOM or resolve references from its drawing. Only validated presentation options reach the renderer; they cannot request external resources. Ignoring drawing content does not require building a general SVG/CSS validator.
 
-1. Review the paired input/output boundaries, document round-trip contract, and typography strategy.
-2. Implement the structured metadata schema, SVG reader, and pure renderer with round-trip tests against existing `Document` inputs. These may be built incrementally internally, but all are required before presenting SVG as a supported format.
-3. Expose SVG loading, preview, Copy SVG, and Download SVG for existing textual loads, SVG loads, and newly created trees. Add explicit CLI export/update adapters using the same core reader and renderer. Preserve current reconciliation and atomic-publication behavior.
-4. Evaluate raster export only when needed. Full-session archives are outside this ADR.
+An exported artifact contains the same printed tree and document-level hiding as text output. It must not add hidden notes, omitted descendants, repository snapshots, or cache-bound session envelopes. Updating against a repository and expanding omitted nodes still use the existing source-selection/reconciliation flow.
 
-This branch currently changes the landing illustration and restricts editing Settings to Tree. It does not implement these SVG stages.
+Sessions are ephemeral interactions: visit, edit, export, and leave. **Resume session** is a best-effort convenience after brief accidental navigation, dependent on browser state and cached source availability. It provides no persistence guarantee, and users are not instructed to save/share state-bearing URLs. SVG loading must work through its embedded document and ordinary repository selection without session recovery. Removing the resume convenience later must have no effect on any artifact codec or renderer. Session archives are outside this design.
 
-## Acceptance criteria
+An optimizer may remove metadata while leaving a perfectly viewable image. That file then lacks an editable treestamp payload and should be rejected as such. Read the original `.svg` file, not a rasterized preview or transformed image response.
 
-For the paired format:
+## GitHub README compatibility
 
-- A textual treestamp loaded through the current codec can be edited and copied/downloaded as SVG without changing its source format or reloading the repository. An SVG treestamp can be loaded, reconciled with the repository, edited, and exported as SVG or Markdown. Newly created trees use the same output paths.
-- Copy SVG and Download SVG serialize the same accepted document and appearance. Failed exports preserve the accepted editing session.
-- Branches join exactly across rows and stop at the correct last sibling; hidden entries and folded descendants are omitted from the drawing.
-- Output dimensions accommodate long labels and annotations; deterministic typography is verified in direct SVG viewing and image embedding, including light/dark appearance and accessible title/description.
-- CLI and hosted exports agree for the same document and appearance. Existing text-codec, Markdown-formatting, and reconciliation tests remain unchanged.
+Use a standalone SVG from the first release. A README references it with an ordinary relative image link:
 
-Required round-trip criteria:
+```markdown
+![Repository tree](assets/treestamp.svg)
+```
 
-- Structured metadata round-trips exact `Document` facts, including special paths, byte paths, all node kinds, counts, notes, and saved hiding, without parsing displayed text.
-- Metadata includes only the declared document facts, not extra hidden notes or the complete source snapshot.
-- Visible drawing changes never alter recovered tree facts. Missing/invalid metadata rejects clearly; valid metadata produces a regenerated preview.
-- Imports reject invalid versions, duplicate application payloads, invalid trees, excessive resource use, entities, and external-resource requests in supported metadata/appearance without changing the accepted session.
+GitHub [documents relative image links](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#images) and [SVG image display](https://docs.github.com/en/repositories/working-with-files/using-files/working-with-non-code-files#rendering-and-diffing-images). GFM parsing alone is not the whole rendering contract: GitHub additionally [sanitizes rendered markup](https://github.com/github/markup#github-markup). A non-publishing probe of GitHub's [`POST /markdown` endpoint](https://docs.github.com/en/rest/markdown/markdown#render-a-markdown-document), with `mode=gfm` on 2026-11-23, stripped an inline `<svg><text>…</text></svg>` to plain text while preserving the image reference as an `img` element. Do not offer inline SVG markup as something users can paste into a README and expect to render.
 
-## Alternatives and unresolved details
+The app opens the selected treestamp-containing file itself: a Markdown document or a standalone SVG. It neither follows README image references to locate a treestamp nor maintains README-to-SVG relationships. Downloaded/copied SVG can be saved under any user-chosen repository path. Existing repository-relative root semantics apply regardless of that file's directory.
 
-Adding `svg` to `Settings.style` would mix a container/media type with three text layouts and spread changes through parsers and Markdown export. Capturing the editor as an image would couple export to browser state and make CLI output harder to reproduce. Recovering data from SVG labels would recreate delimiter and layout ambiguity. Storing only the web envelope would falsely suggest durable source portability. A mandatory full snapshot would expand disclosure and size beyond today's document contract.
+All visual styles must comply with a shared conservative static SVG profile: basic `svg`, grouping, paths/lines, rectangles, and text/tspan geometry; explicit dimensions/viewBox; inline presentation attributes; concrete colors; and accessible title/description. No scripts, event handlers, animation, `foreignObject`, HTML, external images/styles/fonts, app CSS variables, or dependence on the README's CSS. Encode display text separately from metadata so byte/control/non-XML characters have readable safe labels while metadata preserves identity. Metadata must not be required for the drawing to display.
 
-Before implementation, settle the portable font strategy, annotation wrapping, output-size limits, export-control placement, exact JSON schema and namespace identifier, payload limits, and SVG source-selection/update behavior. These are explicit follow-up design choices; this ADR does not claim they are already supported.
+Typography and wrapping must work in image embedding without app fonts. Start with a portable monospace fallback and conservative measured layout; do not promise identical glyph metrics across clients. Assess long names/notes, wide Unicode, escaped byte names, root-only trees, and both appearance palettes. A font strategy or styling technique that requires unsupported GitHub behavior must be changed or omitted.
+
+This profile is a design constraint, not proof of a finished renderer. Before release, inspect an actual generated artifact embedded in a GitHub README and directly as an image, test the supported browser matrix, and re-load the original repository SVG bytes. A local SVG preview and the Markdown API probe cannot establish end-to-end rendering or metadata retention. Each additional style must pass the same compatibility checks.
+
+## Output selection and file destinations
+
+Choosing an export representation does not change the loaded source path or authorize overwriting it in a different format. Treat input identity/container and selected export format as separate values. The web editor currently copies output and does not write to the repository; SVG download remains a local export. The terminal editor's **Write to document**, and headless maintenance commands, do publish to files and therefore require an explicit container-aware contract.
+
+| Loaded source | Write back to source | Cross-format export |
+| --- | --- | --- |
+| README or another Markdown document | Replace its managed textual region, preserving unrelated prose and document formatting. | Copy/download/export a standalone SVG; leave the Markdown source and its links unchanged. |
+| Standalone SVG treestamp | Replace that SVG artifact using the accepted document and selected supported SVG appearance. | Copy/export a complete textual region for insertion into a README or other Markdown document; leave the SVG source unchanged. |
+| Newly created tree | No loaded-document write target, matching today's editor. | Copy/export the chosen representation to an explicitly selected destination. |
+
+A Markdown container may use any existing text style; an SVG container may use any supported graphical style. Switching an export preview to another format must not silently change what **Write to document** writes. The write action should identify the loaded destination/container clearly. Copy/export of another format does not switch the loaded source or reset its dirty baseline. Changing the loaded source remains a deliberate load operation.
+
+Use the source container's preparation/comparison adapter for dirty-state detection, check, update, and write. Retain captured-original comparison, changed-on-disk refusal, atomic replacement, and repository path protections. For Markdown, use the existing managed-region splicing/preservation path. For SVG, prepare a complete regenerated artifact; externally edited drawing markup is not preserved, consistent with metadata authority. A failed write preserves the accepted state and original file. Generic text output may still be used internally as payload but cannot become the publication/comparison path for a loaded SVG.
+
+CLI cross-format export must have an explicit format and destination (or stdout), distinct from updating the loaded source. If a future export action targets an existing Markdown document, use managed-region insertion/update rules and preserve unrelated content; never truncate a README to only the exported region. Reject using the loaded source as the destination of a different container format. Exact commands and overwrite interaction remain implementation design work; no automatic extension-based conversion is implied.
+
+An SVG export does not insert a Markdown image link, remove an existing text region, or rewrite other documents. Converting a README's presentation to SVG is therefore two deliberate user actions: save the SVG artifact, then replace/insert the README image reference. Converting back means copying the textual treestamp into the Markdown document. Treestamp need not track those relationships or treat that multi-file edit as an application transaction.
+
+## Delivery and acceptance
+
+1. Review this revised container contract and settle envelope schema, version rules, limits, typography/wrapping, and source-selection/update dispatch.
+2. Implement paired SVG reading/writing, shared document composition, the metadata codec, and the first pure style/layout renderer. Keep the core independent of DOM, network, Git, and terminal widgets.
+3. Expose SVG loading, preview, Copy SVG, and Download SVG through the same editor/reconciliation flow as textual documents and newly created trees. Copy and Download serialize the same artifact bytes; copying markup is not copying a native clipboard image. Provide deliberate CLI adapters without silently changing existing Markdown marker-splicing behavior or atomic write safeguards.
+4. Validate the complete conversion matrix: each existing text style and each SVG style as inputs to every supported output, including explicit, non-destructive refusal of known text-style representation limits. Add a minimal second-style test implementation to demonstrate that styling requires no metadata/editor changes. Add raster output only when a separate requirement exists.
+
+Round-trip tests must cover the current document semantics, all node kinds, byte/special paths, subtree hiding, annotations, counts, folds, explicit presentation preferences, and known/unknown graphical styles. Compare canonical decoded document semantics across conversions, not incidental SVG serialization or surrounding README prose. Visible drawing edits cannot change recovered facts; absent, duplicate, contradictory, malformed, oversized, or unsupported payloads fail without replacing the accepted editor state. Verify that no extra hidden data is disclosed.
+
+Rendering tests must verify connected branches and last-sibling endpoints, dimension/wrapping bounds, safe escaping, and the shared GitHub-compatible profile. CLI and hosted output must agree for the same document/appearance. Test source-container writes, cross-format exports, unchanged source identities/baselines, external-file changes, and failure preservation separately. Failed export preserves the accepted session. No runtime SVG implementation is included in this ADR change; the connected landing illustration remains an independent UI experiment.

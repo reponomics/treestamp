@@ -80,6 +80,8 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 
 In production, the service authenticates to GitHub as a GitHub App, using the App's private key to obtain installation tokens; [web/README.md](../web/README.md) lists the options for local development. It logs structured events containing the repository name, commit, result, and request budget, not document contents.
 
+The browser's **Resume session** action is an ephemeral convenience for brief return visits, with no recovery guarantee. State-bearing URLs and local records do not constitute durable saved sessions. See [Web UI flow](ui-flow.md#best-effort-return-convenience). Exported document formats are independent of this convenience.
+
 ## Build and release
 
 [MAINTENANCE.md](./MAINTENANCE.md) describes CI, releases, PyPI publication, and deployment of the hosted editor.
@@ -94,7 +96,7 @@ The CLI exposes source creation, document loading and extraction, read-only comp
 
 ### Document format
 
-[ADR 0004: Structured SVG artifacts](adr/0004-structured-svg-artifacts.md) proposes a separate graphical container with authoritative structured metadata. It is a proposed extension, not a supported output format.
+[ADR 0004: SVG artifacts with an embedded textual treestamp](adr/0004-structured-svg-artifacts.md) proposes paired SVG reading and writing with the complete existing textual treestamp embedded as metadata. Visual styles, container handling, and file destinations are separate from editing and ephemeral session recovery. This is design work for a future release, not an implemented interface.
 
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region.
 
