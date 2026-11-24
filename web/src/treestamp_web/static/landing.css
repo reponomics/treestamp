@@ -1,0 +1,63 @@
+/* A quiet introduction: the repository is the action; the tree is the illustration.
+   Keep these styles independent of the picker and editor's viewport layout. */
+.entry-welcome {
+  flex: none;
+  width: min(100%, 44rem);
+  margin: clamp(1.5rem, 6vh, 4.5rem) auto var(--s7);
+}
+
+.entry-hero { margin-bottom: var(--s7); }
+.entry-hero h2 {
+  font-size: clamp(2.75rem, 7vw, 4.5rem);
+  line-height: 1.1;
+  margin-bottom: var(--s4);
+}
+.entry-purpose { font-size: clamp(1.125rem, 2.5vw, 1.5rem); line-height: 1.4; }
+.entry-credit { margin-top: var(--s2); color: var(--ink-secondary); }
+.entry-credit a { color: inherit; }
+.entry-credit a:hover { color: var(--accent); }
+
+#entry-form label { display: block; margin-bottom: var(--s2); font-weight: var(--weight-strong); }
+.entry-repo-row { display: flex; align-items: stretch; gap: var(--s2); }
+#entry-url { flex: 1; width: 100%; min-width: 0; background: var(--controls-surface); }
+#entry-browse { flex: none; white-space: nowrap; }
+#entry-guidance { margin-top: var(--s3); max-width: 62ch; color: var(--ink-secondary); text-wrap: pretty; }
+.entry-offramp { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); }
+#explore-example { margin-left: auto; }
+
+/* The illustration uses the editor/picker branch renderer and .indent geometry.
+   Only its ink is quieter; line segments meet across adjacent rows. */
+.entry-treestamp { margin: var(--s6) 0 0; padding: var(--s5) 0; }
+.sample-tree {
+  margin: 0;
+  padding: 0;
+  --tree-step: 4ch;
+  --tree-guide-ink: var(--rule-strong);
+  list-style: none;
+  font-family: var(--mono);
+  font-size: var(--t-base);
+  line-height: 2;
+  color: var(--ink-secondary);
+}
+.sample-row { display: flex; align-items: center; gap: var(--s1); min-height: 2em; white-space: nowrap; }
+.sample-name { min-width: 9ch; }
+.sample-root { color: var(--ink); }
+.sample-note { margin-left: var(--s4); color: var(--ink-secondary); }
+:root[data-theme="dark"] .sample-tree {
+  --tree-guide-ink: color-mix(in srgb, var(--ink) 42%, var(--paper));
+  color: color-mix(in srgb, var(--ink) 67%, var(--paper));
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="dark"] .sample-root { color: color-mix(in srgb, var(--ink) 82%, var(--paper)); }
+
+@media (max-width: 39.999rem) {
+  .entry-welcome { margin-top: var(--s5); }
+  .entry-hero { margin-bottom: var(--s5); }
+  .sample-note { display: none; }
+  .entry-treestamp { margin-top: var(--s5); padding-top: var(--s3); }
+}
+
+@media (max-width: 23rem) {
+  .entry-repo-row { flex-wrap: wrap; justify-content: flex-end; }
+  #entry-url { flex-basis: 100%; }
+}

@@ -529,7 +529,7 @@ def test_resume_progress_after_placement_preserves_notes_without_reopening_queue
     expect(page.locator("#region")).to_have_text(previous)
     expect(page.locator("#placement-dialog")).to_be_hidden()
     page.locator(".wordmark").click()
-    expect(page.locator("#entry-title")).to_have_text("Open a tree")
+    expect(page.locator("#entry-welcome")).to_be_visible()
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).to_have_text(previous)

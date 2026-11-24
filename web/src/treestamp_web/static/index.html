@@ -13,8 +13,11 @@
   <script src="/static/theme.js"></script>
   <link rel="preload" href="/static/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/buttons.css">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/landing.css">
   <script type="module" src="/static/app.js"></script>
+  <script type="module" src="/static/landing.js"></script>
 </head>
 <body class="no-tree">
   <header class="masthead">
@@ -32,10 +35,10 @@
             <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
           </g>
         </svg>
-        <h1>treestamp</h1>
+        <h1 class="brand-wordmark">treestamp</h1>
         <span class="attribution">by <span class="reponomics-wordmark">reponomics<span class="brand-period">.</span></span></span>
       </a>
-      <button id="theme-toggle" class="utility" type="button">Dark mode</button>
+      <button id="theme-toggle" type="button">Dark mode</button>
       <a class="docs button-link" href="https://github.com/reponomics/treestamp" target="_blank" rel="noopener" aria-label="treestamp on GitHub (opens in a new tab)" title="treestamp on GitHub (opens in a new tab)">
         <svg class="control-icon github-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>
         <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7m0-7L10 14m0-10H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></svg>
@@ -45,20 +48,37 @@
 
   <main id="entry" class="entry">
     <section id="entry-welcome" class="entry-welcome" aria-labelledby="entry-title">
-      <h2 id="entry-title">Open a tree</h2>
-      <p class="entry-purpose">Create a treestamp for your project documentation.</p>
+      <div class="entry-hero">
+        <h2 id="entry-title" class="brand-wordmark">treestamp</h2>
+        <p class="entry-purpose">an open source editor for directory trees</p>
+        <p class="entry-credit">built by the humans and agents at <a href="https://github.com/reponomics">reponomics</a></p>
+      </div>
       <form id="entry-form" autocomplete="off">
         <label for="entry-url">Public GitHub repository</label>
         <div class="entry-repo-row">
-          <input id="entry-url" type="text" placeholder="owner/repo or a GitHub link" required spellcheck="false">
-          <button id="entry-browse" type="submit" disabled>Browse</button>
+          <input id="entry-url" type="text" placeholder="owner/repo or a GitHub link" aria-describedby="entry-guidance" required spellcheck="false">
+          <button id="entry-browse" class="primary" type="submit" disabled>Browse</button>
         </div>
+        <p id="entry-guidance">Choose a folder to create a treestamp, or a file to load one. Transfer notes if needed, then make it your own in the editor.</p>
       </form>
       <p id="entry-error" class="entry-error" role="alert" hidden></p>
       <div class="entry-offramp">
         <button id="entry-return-welcome" type="button" hidden>Resume session</button>
         <button id="explore-example" type="button">Try example</button>
       </div>
+      <figure class="entry-treestamp">
+        <figcaption class="visually-hidden">An example treestamp showing a project's folders and files with notes.</figcaption>
+        <ul class="sample-tree" aria-hidden="true">
+          <li class="sample-row sample-root" data-depth="0"><span class="sample-name">your-project/</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">docs/</span><span class="sample-note"># guides and reference</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">getting-started.md</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">architecture.md</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">src/</span><span class="sample-note"># the work itself</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">app.py</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">tests/</span><span class="sample-note"># room to experiment</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">README.md</span><span class="sample-note"># a place to begin</span></li>
+        </ul>
+      </figure>
     </section>
 
     <section id="reload-settings" class="entry-browser" aria-label="Choose a folder or file" hidden>
@@ -76,7 +96,7 @@
       <p id="reload-error" class="entry-error" role="alert" hidden></p>
       <div class="entry-browser-foot">
         <button id="entry-return" class="entry-return" type="button" hidden>Resume session</button>
-        <button id="reload" type="button" disabled>Create</button>
+        <button id="reload" class="primary" type="button" disabled>Create</button>
       </div>
     </section>
   </main>

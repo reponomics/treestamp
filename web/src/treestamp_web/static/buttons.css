@@ -1,0 +1,36 @@
+/* Shared action controls. See docs/ui-patterns.md.
+   Default: bordered secondary action, including links styled as buttons.
+   .primary: the next step or confirmation, sharing all base geometry.
+   Views may adjust geometry, never redefine these appearance/state recipes.
+   Tabs, tree disclosures, and selection rows have separate semantic patterns. */
+
+button, .button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  font: inherit;
+  font-weight: var(--weight-strong);
+  min-height: 2.25rem;
+  cursor: pointer;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--well);
+  color: var(--ink);
+  padding: var(--s1) var(--s3);
+  white-space: nowrap;
+  text-decoration: none;
+}
+/* Keep touch controls and icon-only actions easy to hit. */
+@media (pointer: coarse), (max-width: 47.999rem) {
+  button, .button-link { min-height: 2.75rem; }
+}
+button:where(:enabled):hover, .button-link:hover { border-color: var(--accent); color: var(--accent); }
+button.primary:enabled {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--weight-strong);
+}
+button.primary:enabled:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
+button:disabled { cursor: default; background: var(--well); border-color: var(--rule-strong); color: var(--ink-secondary); }

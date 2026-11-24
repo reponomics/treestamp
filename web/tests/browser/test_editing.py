@@ -316,6 +316,7 @@ def test_rejected_presentation_restores_accepted_controls(
     page.locator("#style").select_option("ascii")
     expect(page.locator("#error")).to_be_visible()
     expect(page.locator("#style")).to_have_value("unicode")
+    page.locator("#tab-editor").click()
     page.locator("#show_counts").uncheck()
     expect(page.locator("#show_counts")).to_be_checked()
     page.locator("#attribution").check()

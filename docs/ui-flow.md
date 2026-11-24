@@ -16,6 +16,10 @@ The web editor's entry flow is repository entry → source selection → editing
 
 Browsing candidates preserves the accepted treestamp, its saved record, and its URL. Successfully opening a new source replaces the accepted session. Controls remain available at every viewport size: repository controls and settings occupy a sidebar on desktop; narrower layouts use a compact repository bar and a settings sheet.
 
+## Editing and export views
+
+**Tree** owns editing controls, including notes, hiding, reveal-hidden, Unhide all, and Settings. Leaving Tree closes an open Settings sheet and hides its desktop sidebar section. **Markdown** previews the exported plaintext, lets the user choose its text format, and provides Copy treestamp. Returning to Tree restores editing controls without resetting curation. **Info** also hides editing Settings.
+
 ## Source selection
 
 Activating a folder row selects it and toggles its expansion. **Create** starts a treestamp rooted at the selected folder. Activating a file selects it; **Load** reads its existing treestamp. Left and Right provide keyboard expansion and navigation without changing the selected source. Source paths retain exact byte identities and significant whitespace.

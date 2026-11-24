@@ -1,0 +1,32 @@
+# Shared web UI patterns
+
+The web app uses native HTML controls and shared CSS rather than a component framework. Reuse the patterns below across the landing page, repository picker, editor, and dialogs. The forest palette and IBM Plex typefaces are defined in `web/src/treestamp_web/static/style.css`.
+
+## Action buttons
+
+`web/src/treestamp_web/static/buttons.css` owns action-button typography, surfaces, borders, corners, and enabled, hover, disabled states. The shared focus ring is defined with the other focusable controls in `style.css`.
+
+| Pattern | Markup | Use |
+| --- | --- | --- |
+| Secondary | `<button type="button">…</button>` | Navigation, alternative actions, repeated editor tools, Cancel, Close, Resume session, and Try example. Always has a visible surface and border. |
+| Primary | `<button class="primary" type="submit">…</button>` | The next step or confirmation: Browse, Create/Load, Apply, and note placement. Uses the accent fill when enabled. |
+| Navigation link styled as a button | `<a class="button-link" href="https://github.com/reponomics/treestamp">GitHub</a>` | Navigation such as visiting GitHub. Shares the secondary button's appearance and hover/focus treatment; retains native link semantics. |
+| Icon-only action | A secondary button or button link with an icon and an accessible name | Same appearance as its text equivalent. A view may make it square or visually hide its label where space is constrained. |
+
+Use the native `disabled` attribute for unavailable button actions. Disabled primary buttons use the same disabled treatment as other buttons. Do not imitate a disabled control by changing its opacity, and do not make an anchor look disabled when it can still navigate.
+
+Views may adjust placement, width, spacing, and compact control dimensions to fit their layout. They must not assign independent background, border, font-weight, corner, or hover recipes to ordinary actions. Secondary actions remain visibly button-like at every breakpoint. Introduce a new shared variant only when a distinct interaction role requires it; do not create a variant for one screen or one action.
+
+Copy is a repeated editor action and uses the secondary treatment. Its temporary success label and green border communicate confirmation. The TUI-mode pressed appearance communicates a persistent setting. These state treatments do not create separate button families. The theme switch describes its next action in its label and keeps the secondary treatment in both themes.
+
+## Controls with different semantics
+
+Tabs use an underline and `aria-selected` to identify the active panel. Tree disclosures use compact branch-aligned controls and `aria-expanded`. Selectable rows use the shared selection treatment. Preserve those patterns instead of making them look like ordinary action buttons.
+
+## Brand typography
+
+Apply `.brand-wordmark` to the treestamp name in the navbar and landing hero. It owns IBM Plex Sans, semibold weight, and letter spacing. Each layout controls its own size and margins. Directory trees and the landing illustration use IBM Plex Mono. The Reponomics wordmark retains its separate brand typeface.
+
+## Checking changes
+
+Compare controls with the same role across views and in both themes, including hover, keyboard focus, and disabled states. Browser tests compare their computed appearance without hard-coding palette values. Follow the [visual review protocol](ui-review.md) to check spacing, action hierarchy, and responsive layout.

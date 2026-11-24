@@ -50,6 +50,7 @@ const repoTooltip = document.getElementById("repo-tooltip");
 const repoInfoDialog = document.getElementById("repo-info-dialog");
 const loadedNote = document.getElementById("loaded-note");
 const settingsPanel = document.getElementById("settings");
+const settingsTrigger = document.querySelector(".settings-open");
 const tabs = { editor: document.getElementById("tab-editor"), stamp: document.getElementById("tab-stamp"), info: document.getElementById("tab-info") };
 const panels = { editor: document.getElementById("editor-panel"), stamp: document.getElementById("stamp-panel"), info: document.getElementById("info-panel") };
 const tabNames = Object.keys(tabs);
@@ -878,6 +879,10 @@ copy.addEventListener("click", async () => {
 });
 
 function selectTab(name) {
+  const editing = name === "editor";
+  if (!editing && settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  settingsPanel.hidden = !editing;
+  settingsTrigger.hidden = !editing;
   stage.dataset.view = name;
   for (const key of tabNames) {
     const active = key === name;

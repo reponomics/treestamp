@@ -68,7 +68,6 @@ export class EntryFlow {
     this.canReturn = canReturn;
     this.url = repo;
     element("entry-url").value = repo;
-    element("entry-title").textContent = "Open a tree";
     element("entry-browse").disabled = !repo.trim();
     this.clearError();
     this.showPanel("welcome");

@@ -27,7 +27,7 @@ def test_first_visit_waits_for_intent_and_browsing_does_not_create_a_draft(
         ),
     )
     page.goto(service + "/")
-    expect(page.get_by_role("heading", name="Open a tree")).to_be_visible()
+    expect(page.locator("#entry-title")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("dialog[open]")).to_have_count(0)
     assert requests == []
@@ -231,7 +231,7 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
     page.locator("#browse-source").click()
     expect(page.locator("#entry-change-repo")).to_have_text("Back")
     page.locator("#entry-change-repo").click()
-    expect(page.locator("#entry-title")).to_have_text("Open a tree")
+    expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#entry-url")).to_have_value("fixture/repo")
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()
