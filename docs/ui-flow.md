@@ -2,6 +2,8 @@
 
 The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor exports Markdown for the user to copy into documentation; it does not write files or commit to GitHub.
 
+The proposed next-release [SVG export experience](svg-export-flow.md) covers the future Export tab and terminal SVG save/copy flow; it does not describe current behavior.
+
 ## Arrivals and navigation
 
 | Arrival | Initial experience |
