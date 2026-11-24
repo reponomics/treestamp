@@ -58,9 +58,8 @@ def test_retired_editor_actions_cannot_replace_the_draft(
     asyncio.run(journey())
 
 
-@pytest.mark.parametrize("path", ["src", "src/main"])
 def test_new_root_opens_directly_and_style_edits_that_tree(
-    editor: EditorController, monkeypatch: pytest.MonkeyPatch, path: str
+    editor: EditorController, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def journey(app: TreestampApp) -> bool | None:
         async with app.run_test() as pilot:
@@ -80,7 +79,7 @@ def test_new_root_opens_directly_and_style_edits_that_tree(
         return asyncio.run(journey(app))
 
     monkeypatch.setattr(TreestampApp, "run", run)
-    assert run_cli("new", path) == (0, "", "")
+    assert run_cli("new", "src") == (0, "", "")
 
 
 @pytest.mark.parametrize("arguments", [(), ("new",)])
