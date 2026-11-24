@@ -42,7 +42,7 @@ Non-trivial changes must add or update automated tests in the same pull request,
 
 Changes that leave behavior unchanged, such as documentation, refactoring already covered by existing tests, and dependency updates that pass the relevant suites, need no new tests. Run focused checks while implementing a change and the relevant complete checks before review. Automated browser tests do not replace manual checks of keyboard operation, terminal display, or clipboard delivery.
 
-For visual inspection, `make web-ui-screenshots UI_URL=http://127.0.0.1:8000` captures the main views at phone, tablet, desktop, and spacious desktop sizes. Open `output/ui-review/index.html` for the gallery; the manifest lists missing captures. This is a screenshot tool, not a visual pass/fail test.
+For optional visual inspection, `make web-ui-screenshots UI_URL=http://127.0.0.1:8000` captures the main views at phone, tablet, desktop, and spacious desktop sizes. Open `output/ui-review/index.html` for the gallery; the manifest lists missing captures. This is a screenshot tool, not a visual pass/fail test or contribution requirement. The [local UI review protocol](ui-review.md) explains inspection, coverage maintenance, temporary findings, and cleanup.
 
 ## Suites and commands
 

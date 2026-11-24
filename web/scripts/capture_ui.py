@@ -92,7 +92,13 @@ def open_example(page: Page) -> None:
     visible(page, "#rows .row")
 
 
+def show_repository_hover(page: Page) -> None:
+    page.locator("#repo-info").hover()
+    visible(page, "#repo-tooltip")
+
+
 def open_note(page: Page) -> None:
+    page.mouse.move(0, 0)  # Dismiss the preceding repository hover.
     # Exercise a real long filename without replacing app text in the DOM.
     scripts = page.locator('.row[data-path="src/treestamp"] .name')
     if scripts.get_attribute("aria-expanded") == "false":
@@ -228,6 +234,7 @@ def capture_profile(
     actions = [
         ("welcome", lambda: show_welcome(page, args.url)),
         ("editor", lambda: open_example(page)),
+        ("repository-hover", lambda: show_repository_hover(page)),
         ("note", lambda: open_note(page)),
         ("settings", lambda: show_settings(page)),
         ("discard", lambda: show_reset(page)),

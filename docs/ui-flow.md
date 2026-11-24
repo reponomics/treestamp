@@ -7,16 +7,16 @@ The web editor opens repository-root treestamps directly from the landing page. 
 | Arrival | Initial experience |
 | --- | --- |
 | First visit to `/` | Repository entry |
-| Return to `/` with a saved session | Repository entry with **Resume session** |
+| Return to `/` with a cached draft | Repository entry with **Resume session** |
 | Bare `/owner/repo` | Source selection for that repository |
-| Explicit session, commit, or source settings in the URL | Open the specified session or source |
+| Explicit session, commit, or source settings in the URL | Attempt to open the specified session or source |
 | **Try example** | Open a curated, bundled snapshot of reponomics/treestamp |
 
-The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session**. **Create treestamp** opens a fresh tree at the repository root without reading a document. **Load treestamp** reads an existing treestamp from root `README.md`. **Choose another folder or file…** opens source selection. Pressing Enter in the repository input defaults to Create. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or restores the saved session after a return visit.
+The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session**. **Create treestamp** opens a fresh tree at the repository root without reading a document. **Load treestamp** reads an existing treestamp from root `README.md`. **Choose another folder or file…** opens source selection. Pressing Enter in the repository input defaults to Create. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or attempts to restore the cached draft after a short return visit.
 
 Root README validation happens in the load request while the landing page remains visible. A missing README, absent or malformed treestamp, or service error appears inline and retains the entered repository and previous session. All entry actions are disabled while a request is pending.
 
-Browsing candidates preserves the accepted treestamp, its saved record, and its URL. Successfully opening a new source replaces the accepted session. Controls remain available at every viewport size: repository controls and settings occupy a sidebar on desktop; narrower layouts use a compact repository bar and a settings sheet.
+Browsing candidates preserves the accepted treestamp, its cached record, and its URL. Successfully opening a new source replaces the accepted session. Controls remain available at every viewport size: repository controls and settings occupy a sidebar on desktop; narrower layouts use a compact repository bar and a settings sheet.
 
 ## Editing and export views
 
@@ -28,15 +28,17 @@ Two stacked instructions explain creating a new treestamp from a folder and load
 
 Browsing does not inspect every file for treestamp markers. If a selected document has no treestamp, the chooser explains the problem and keeps that file selected so the user can choose another. Malformed markers, unreadable contents, missing paths, and service failures retain the current work and provide recovery guidance.
 
-## Saved sessions
+## Returning to recent work
 
-The browser stores one accepted session locally. Saving happens after successful opening or editing; returning visitors explicitly choose **Resume session** to restore it. Explicit session URLs take precedence over local storage. Storage failures do not prevent editing.
+The browser caches one accepted draft after successful opening or editing. **Resume session** is a best-effort convenience for short return visits, not a save or backup feature. Storage failures do not prevent editing, and returning later is not guaranteed to recover the draft. Users obtain their treestamp through Copy treestamp and keep it in their own document.
 
-Restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the saved session and offers repository browsing to start fresh. The service does not substitute a different commit into a saved session. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor); local storage supports short return visits, not durable backup storage.
+Repository draft restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the cached draft and offers repository browsing to start fresh; it does not silently substitute another commit. Bundled examples can be restored from their included data without the server snapshot. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor).
+
+The address can also encode editing state, and explicit address state takes precedence over the local cache. This is implementation behavior, not a durable session-sharing workflow; users are not expected to save URLs to preserve their work.
 
 ## Transferring notes on load
 
-Loading a document whose annotated paths disappeared opens one **Transfer notes** modal over the prepared editor in Tree view. The modal immediately shows the source note and destination tree; there is no separate invitation or preparation page. Creating a treestamp and resuming a saved session bypass this step.
+Loading a document whose annotated paths disappeared opens one **Transfer notes** modal over the prepared editor in Tree view. The modal immediately shows the source note and destination tree; there is no separate invitation or preparation page. Creating a treestamp and resuming recent work bypass this step.
 
 The modal keeps one source name and note above the destination tree. **Transfer here** (Enter) transfers the note, **Skip note** (S) leaves it out, and **Undo** (U) reverses the preceding decision. Left and Right close and open folders; the selected folder also has an Open/Close control. The current release processes notes sequentially.
 
@@ -52,7 +54,7 @@ Replace the sequential interaction with a list of unresolved, transferred, and i
 
 **Discard changes** restores the accepted starting point after confirmation. That baseline is captured after note transfer, including transfers and skips. Later edits to notes, hidden entries, folds, and formatting are discarded. New treestamps return to their starting folder layout; examples return to their curated starting point.
 
-The session envelope retains both initial and current curation, so the baseline survives saved-session restoration and shared links. Sessions without initial curation adopt their restored curation as the baseline. A failed discard preserves the current treestamp and its saved state.
+The session envelope retains both initial and current curation, so a successfully restored cached draft retains its discard baseline. Older state without initial curation adopts its restored curation as the baseline. A failed discard preserves the current treestamp and its cached state.
 
 ## Terminal behavior
 

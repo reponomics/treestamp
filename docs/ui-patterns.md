@@ -9,15 +9,17 @@ The web app uses native HTML controls and shared CSS rather than a component fra
 | Pattern | Markup | Use |
 | --- | --- | --- |
 | Secondary | `<button type="button">…</button>` | Navigation, alternative actions, repeated editor tools, Cancel, Close, Resume session, and Try example. Always has a visible surface and border. |
-| Primary | `<button class="primary" type="submit">…</button>` | The next step or confirmation: Create, the selected source action, Apply, and Transfer here. On the landing page, Create is the default and Load remains a visible secondary alternative. Uses the accent fill when enabled. |
+| Primary | `<button class="primary" type="button">…</button>` | The next step or confirmation: Create, the selected source action, Apply, and Transfer here. On the landing page, Create is the default and Load remains a visible secondary alternative. Uses the accent fill when enabled. |
 | Navigation link styled as a button | `<a class="button-link" href="https://github.com/reponomics/treestamp">GitHub</a>` | Navigation such as visiting GitHub. Shares the secondary button's appearance and hover/focus treatment; retains native link semantics. |
 | Icon-only action | A secondary button or button link with an icon and an accessible name | Same appearance as its text equivalent. A view may make it square or visually hide its label where space is constrained. |
+
+Button prominence and submission behavior are independent: use `type="submit"` for form submission and `type="button"` for other actions.
 
 Use the native `disabled` attribute for unavailable button actions. Disabled primary buttons use the same disabled treatment as other buttons. Do not imitate a disabled control by changing its opacity, and do not make an anchor look disabled when it can still navigate.
 
 Views may adjust placement, width, spacing, and compact control dimensions to fit their layout. They must not assign independent background, border, font-weight, corner, or hover recipes to ordinary actions. Secondary actions remain visibly button-like at every breakpoint. Introduce a new shared variant only when a distinct interaction role requires it; do not create a variant for one screen or one action.
 
-Copy is a repeated editor action and uses the secondary treatment. Its temporary success label and green border communicate confirmation. The TUI-mode pressed appearance communicates a persistent setting. These state treatments do not create separate button families. The theme switch describes its next action in its label and keeps the secondary treatment in both themes.
+Copy is a repeated editor action and uses the secondary treatment. Its temporary success label and green border communicate confirmation. The TUI-mode pressed appearance communicates a toggle that stays enabled until switched off in the current page; it is not persisted across page loads. These state treatments do not create separate button families. The theme switch describes its next action in its label and keeps the secondary treatment in both themes.
 
 ## Controls with different semantics
 
@@ -29,4 +31,4 @@ Apply `.brand-wordmark` to the treestamp name in the navbar and landing hero. It
 
 ## Checking changes
 
-Compare controls with the same role across views and in both themes, including hover, keyboard focus, and disabled states. Browser tests compare their computed appearance without hard-coding palette values. Follow the [visual review protocol](ui-review.md) to check spacing, action hierarchy, and responsive layout.
+Compare controls with the same role across views and in both themes, including hover, keyboard focus, and disabled states. Browser tests compare their computed appearance without hard-coding palette values. The [optional local visual-review protocol](ui-review.md) provides a repeatable way to inspect spacing, action hierarchy, and responsive layout.
