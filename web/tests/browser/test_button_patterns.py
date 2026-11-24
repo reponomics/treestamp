@@ -91,9 +91,9 @@ def test_secondary_buttons_and_links_share_appearance_across_screens(
 
     page.locator("#explore-example").click()
     expect(page.locator("#workspace")).to_be_visible()
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.mouse.move(0, 0)
-    for selector in ("#submit", "#browse-source", "#visit-repo", "#copy"):
+    for selector in ("#visit-repo", "#copy"):
         action = page.locator(selector)
         expect(action).to_be_visible()
         expect(action).to_be_enabled()
@@ -102,7 +102,12 @@ def test_secondary_buttons_and_links_share_appearance_across_screens(
     page.locator(".wordmark").click()
     expect(page.locator("#entry-welcome")).to_be_visible()
     page.mouse.move(0, 0)
-    for selector in ("#entry-return-welcome", "#explore-example"):
+    for selector in (
+        "#entry-return-welcome",
+        "#explore-example",
+        "#entry-load",
+        "#entry-browse",
+    ):
         action = page.locator(selector)
         expect(action).to_be_visible()
         expect(action).to_be_enabled()
@@ -113,17 +118,17 @@ def test_primary_actions_share_appearance_and_distinguish_disabled_state(
     page: Page, service: str, scheme: str, width: int
 ) -> None:
     open_landing(page, service, scheme, width)
-    browse = page.locator("#entry-browse")
-    expect(browse).to_be_disabled()
-    disabled = appearance(browse)
+    direct_create = page.locator("#entry-create")
+    expect(direct_create).to_be_disabled()
+    disabled = appearance(direct_create)
     page.locator("#entry-url").fill("fixture/repo")
-    expect(browse).to_be_enabled()
-    primary = appearance(browse)
+    expect(direct_create).to_be_enabled()
+    primary = appearance(direct_create)
     assert primary != disabled
     assert primary != appearance(page.locator("#explore-example"))
 
-    browse.click()
-    create = page.locator("#reload")
+    page.locator("#entry-browse").click()
+    create = page.locator("#source-create")
     expect(create).to_be_enabled()
     page.mouse.move(0, 0)
     assert appearance(create) == primary

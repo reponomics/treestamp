@@ -71,9 +71,9 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
     page.fill("#entry-url", "fixture/repo")
     page.click("#entry-browse")
     page.locator('.source-row[data-path="README.md"]').click()
-    page.click("#reload")
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
 
     controls = page.locator(".controls").bounding_box()
     stage = page.locator("#result").bounding_box()
@@ -130,7 +130,7 @@ def test_desktop_sidebar_fits_with_a_repository_summary(
     expect(page.locator("#reveal")).to_be_in_viewport(ratio=1)
     expect(page.locator("#url")).to_be_hidden()
     expect(page.locator("#active-repository")).to_have_text("reponomics/treestamp")
-    expect(page.locator("#submit")).to_be_in_viewport(ratio=1)
+    expect(page.locator("#repo-info")).to_be_in_viewport(ratio=1)
 
 
 def test_a_tall_tree_scrolls_inside_its_pane_on_a_wide_window(
@@ -142,7 +142,7 @@ def test_a_tall_tree_scrolls_inside_its_pane_on_a_wide_window(
     page.fill("#entry-url", "fixture/repo")
     page.click("#entry-browse")
     page.locator('.source-row[data-path="README.md"]').click()
-    page.click("#reload")
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
     assert page.evaluate("document.documentElement.scrollHeight <= window.innerHeight")
     tree = page.locator(".tree-scroll")
@@ -179,7 +179,7 @@ def test_long_note_keeps_other_row_actions_in_view(
     page.fill("#entry-url", "fixture/repo")
     page.click("#entry-browse")
     page.locator('.source-row[data-path="README.md"]').click()
-    page.click("#reload")
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
 
     src = page.locator('.row[data-path="src"]')
@@ -215,9 +215,9 @@ def test_loaded_tree_is_available_in_first_viewport(
     page.fill("#entry-url", "fixture/repo")
     page.click("#entry-browse")
     page.locator('.source-row[data-path="README.md"]').click()
-    page.click("#reload")
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.evaluate("document.fonts.ready")
     # Clicking controls may scroll automatically; assess the actual page start.
     page.evaluate("window.scrollTo(0, 0)")
@@ -263,12 +263,13 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     expect(dialog.locator(".dialog-hint")).to_be_in_viewport(ratio=1)
     page.keyboard.press("Escape")
 
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     dialog = page.locator("#reload-settings")
-    expect(page.locator("#reload")).to_be_enabled()
+    expect(page.locator("#source-create")).to_be_enabled()
     assert dialog.evaluate("element => element.scrollWidth <= element.clientWidth")
-    page.locator("#reload").scroll_into_view_if_needed()
-    expect(page.locator("#reload")).to_be_in_viewport(ratio=1)
+    for selector in ("#source-create", "#source-load"):
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
     assert_no_page_overflow(page)
 
 
@@ -289,7 +290,7 @@ def test_phone_and_tablet_example_give_most_of_the_viewport_to_the_tree(
     assert tree["y"] + tree["height"] <= height
     assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
     assert_no_page_overflow(page)
-    for selector in ["#submit", "#browse-source", "#visit-repo"]:
+    for selector in [".wordmark", "#repo-info", "#visit-repo"]:
         expect(page.locator(selector)).to_be_in_viewport(ratio=1)
     page.locator('.row[data-path="src/treestamp"] .fold').click()
     expect(page.locator('.row[data-path^="src/treestamp/"]').first).to_be_visible()

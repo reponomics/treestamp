@@ -1,6 +1,6 @@
 # Web UI flow
 
-The web editor's entry flow is repository entry → source selection → editing. Source selection identifies either the folder a new treestamp describes or the document containing an existing treestamp. The web editor exports Markdown for the user to copy into documentation; it does not write files or commit to GitHub.
+The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor exports Markdown for the user to copy into documentation; it does not write files or commit to GitHub.
 
 ## Arrivals and navigation
 
@@ -8,11 +8,13 @@ The web editor's entry flow is repository entry → source selection → editing
 | --- | --- |
 | First visit to `/` | Repository entry |
 | Return to `/` with a saved session | Repository entry with **Resume session** |
-| Bare `/owner/repo` | Source selection for that repository, with **Resume session** when a matching saved session exists |
+| Bare `/owner/repo` | Source selection for that repository |
 | Explicit session, commit, or source settings in the URL | Open the specified session or source |
 | **Try example** | Open a curated, bundled snapshot of reponomics/treestamp |
 
-**Open a tree** and the treestamp wordmark open repository entry. The folder control, **New or load treestamp**, opens source selection within the current repository. **Back** returns from source selection to repository entry. **Resume session** returns to the accepted editor state or restores the saved session after a return visit.
+The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session**. **Create treestamp** opens a fresh tree at the repository root without reading a document. **Load treestamp** reads an existing treestamp from root `README.md`. **Choose another folder or file…** opens source selection. Pressing Enter in the repository input defaults to Create. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or restores the saved session after a return visit.
+
+Root README validation happens in the load request while the landing page remains visible. A missing README, absent or malformed treestamp, or service error appears inline and retains the entered repository and previous session. All entry actions are disabled while a request is pending.
 
 Browsing candidates preserves the accepted treestamp, its saved record, and its URL. Successfully opening a new source replaces the accepted session. Controls remain available at every viewport size: repository controls and settings occupy a sidebar on desktop; narrower layouts use a compact repository bar and a settings sheet.
 
@@ -22,7 +24,7 @@ Browsing candidates preserves the accepted treestamp, its saved record, and its 
 
 ## Source selection
 
-Activating a folder row selects it and toggles its expansion. **Create** starts a treestamp rooted at the selected folder. Activating a file selects it; **Load** reads its existing treestamp. Left and Right provide keyboard expansion and navigation without changing the selected source. Source paths retain exact byte identities and significant whitespace.
+Two stacked instructions explain creating a new treestamp from a folder and loading an existing treestamp from a file. Activating a folder row selects it and toggles its expansion. **Create** starts a treestamp rooted at the selected folder. Activating a file selects it; **Load** reads its existing treestamp. Both actions remain visible with stable labels: only Create is enabled for a folder, and only Load for a file. Both are disabled while loading or opening a selection. There is no Resume session action in this screen; Back leads to repository entry where recent work can be resumed. Left and Right provide keyboard expansion and navigation without changing the selected source. Source paths retain exact byte identities and significant whitespace.
 
 Browsing does not inspect every file for treestamp markers. If a selected document has no treestamp, the chooser explains the problem and keeps that file selected so the user can choose another. Malformed markers, unreadable contents, missing paths, and service failures retain the current work and provide recovery guidance.
 
@@ -32,19 +34,23 @@ The browser stores one accepted session locally. Saving happens after successful
 
 Restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the saved session and offers repository browsing to start fresh. The service does not substitute a different commit into a saved session. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor); local storage supports short return visits, not durable backup storage.
 
-## Placing notes before editing
+## Transferring notes on load
 
-Loading a document whose annotated paths disappeared offers **Place notes** or **Continue without them** before editing begins. Creating a treestamp and resuming a saved session bypass this step.
+Loading a document whose annotated paths disappeared opens one **Transfer notes** modal over the prepared editor in Tree view. The modal immediately shows the source note and destination tree; there is no separate invitation or preparation page. Creating a treestamp and resuming a saved session bypass this step.
 
-The placement view keeps one source name and note above the destination tree. Enter places the note, S skips it, and U reverses the preceding decision. Left and Right close and open folders; the selected folder also has an Open/Close control.
+The modal keeps one source name and note above the destination tree. **Transfer here** (Enter) transfers the note, **Skip note** (S) leaves it out, and **Undo** (U) reverses the preceding decision. Left and Right close and open folders; the selected folder also has an Open/Close control. The current release processes notes sequentially.
 
-Placing a directory transfers notes at identical relative paths beneath it recursively when entry kinds match. Missing paths and conflicting notes remain queued. Replacing an existing destination note requires confirmation. Undo reverses the whole directory transfer together. **Skip remaining and edit** completes preparation with the unplaced notes omitted.
+Transferring a directory carries notes at identical relative paths beneath it recursively when entry kinds match. Missing paths and conflicting notes remain queued. Replacing an existing destination note requires confirmation. Undo reverses the whole directory transfer together. **Continue without remaining notes** finishes with unresolved notes omitted; Escape has the same effect when no request is pending. Resolving the final note completes the modal automatically.
 
-Destination browsing is provisional: opening folders or revealing hidden entries does not change saved folds or exclusions. Placement reveals the actual destination of a transferred note. The previous accepted session remains in browser storage until preparation finishes. Failed requests preserve the last accepted placement decision. A fresh document load starts placement again from the document.
+The editor behind the modal presents the initial incoming tree, but does not accept it yet. Destination browsing is provisional: opening folders or revealing hidden entries does not change saved folds or exclusions. Transfer reveals the actual destination of a transferred note. The previous accepted session, URL, and browser record remain intact until the modal finishes. Failed requests preserve the last accepted transfer decision. Cancelling or superseding the load restores the preceding presentation. A fresh document load starts transfer again from the document.
+
+### Follow-up: navigable note list
+
+Replace the sequential interaction with a list of unresolved, transferred, and ignored notes. Users should be able to visit notes in any order, revisit a transfer, remove or change its destination, and mark a note ignored. A single Done action should finish whenever the user chooses, with clear treatment of any unresolved notes. This is deferred beyond the current release; Undo and Skip remain the supported controls for now.
 
 ## Discard changes
 
-**Discard changes** restores the accepted starting point after confirmation. That baseline is captured after note placement, including placements and skips. Later edits to notes, hidden entries, folds, and formatting are discarded. New treestamps return to their starting folder layout; examples return to their curated starting point.
+**Discard changes** restores the accepted starting point after confirmation. That baseline is captured after note transfer, including transfers and skips. Later edits to notes, hidden entries, folds, and formatting are discarded. New treestamps return to their starting folder layout; examples return to their curated starting point.
 
 The session envelope retains both initial and current curation, so the baseline survives saved-session restoration and shared links. Sessions without initial curation adopt their restored curation as the baseline. A failed discard preserves the current treestamp and its saved state.
 

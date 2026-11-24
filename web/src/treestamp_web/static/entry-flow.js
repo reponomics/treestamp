@@ -39,28 +39,32 @@ export class EntryFlow {
 
   bindEvents() {
     element("entry-url").addEventListener("input", () => {
-      element("entry-browse").disabled = !element("entry-url").value.trim();
+      this.renderWelcome();
       this.clearError();
     });
     element("entry-form").addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!this.busy) this.browse(element("entry-url").value.trim(), { canReturn: this.canReturn });
+      this.openRoot(event.submitter?.id === "entry-load" ? "file" : "dir");
+    });
+    element("entry-browse").addEventListener("click", () => {
+      const repo = element("entry-url").value.trim();
+      if (!this.busy && repo) this.browse(repo, { canReturn: this.canReturn });
     });
     element("entry-change-repo").addEventListener("click", () => this.welcome(this.url, this.canReturn));
     element("explore-example").addEventListener("click", () => this.onExample());
-    for (const id of ["entry-return", "entry-return-welcome"]) {
-      element(id).addEventListener("click", () => this.onCancel());
-    }
-    element("reload").addEventListener("click", () => this.submit());
+    element("entry-return-welcome").addEventListener("click", () => this.onCancel());
+    element("source-create").addEventListener("click", () => this.submit("dir"));
+    element("source-load").addEventListener("click", () => this.submit("file"));
   }
 
   showPanel(panel) {
+    this.panel = panel;
     element("entry").hidden = false;
     element("workspace").hidden = true;
     element("entry-welcome").hidden = panel !== "welcome";
     element("reload-settings").hidden = panel !== "browse";
     document.body.classList.add("choosing-source");
-    for (const id of ["entry-return", "entry-return-welcome"]) element(id).hidden = !this.canReturn;
+    element("entry-return-welcome").hidden = !this.canReturn;
   }
 
   welcome(repo = "", canReturn = false) {
@@ -68,7 +72,7 @@ export class EntryFlow {
     this.canReturn = canReturn;
     this.url = repo;
     element("entry-url").value = repo;
-    element("entry-browse").disabled = !repo.trim();
+    this.renderWelcome();
     this.clearError();
     this.showPanel("welcome");
     element("entry-url").focus({ preventScroll: true });
@@ -104,40 +108,62 @@ export class EntryFlow {
   setBusy(busy) {
     this.busy = busy;
     this.browser.setDisabled(busy);
-    for (const id of ["entry-url", "entry-change-repo", "entry-return", "entry-return-welcome", "explore-example"]) element(id).disabled = busy;
-    element("entry-browse").disabled = busy || !element("entry-url").value.trim();
+    for (const id of ["entry-url", "entry-change-repo", "entry-return-welcome", "explore-example"]) element(id).disabled = busy;
+    this.renderWelcome();
     this.renderSelection();
+  }
+
+  renderWelcome() {
+    const disabled = this.busy || !element("entry-url").value.trim();
+    for (const id of ["entry-create", "entry-load", "entry-browse"]) element(id).disabled = disabled;
+    element("entry-progress").textContent = this.busy ? this.opening || "Opening…" : "";
+  }
+
+  openRoot(kind) {
+    const repo = element("entry-url").value.trim();
+    if (this.busy || !repo) return;
+    this.url = repo;
+    return this.openSource(kind, kind === "dir" ? "." : "README.md");
   }
 
   renderSelection() {
     const selected = this.browser.selectedEntry();
-    const directory = selected?.kind !== "file";
-    element("reload").textContent = this.busy ? "Opening…" : directory ? "Create" : "Load";
-    element("reload").disabled = this.busy || this.loading || !selected;
+    const unavailable = this.busy || this.loading;
+    element("source-create").disabled = unavailable || selected?.kind !== "dir";
+    element("source-load").disabled = unavailable || selected?.kind !== "file";
+    element("source-progress").textContent = this.busy ? "Opening…" : "";
   }
 
-  async submit() {
+  submit(kind) {
     const selected = this.browser.selectedEntry();
-    if (this.busy || this.loading || !selected) return;
+    if (this.busy || this.loading || selected?.kind !== kind) return;
+    return this.openSource(kind, selected.path);
+  }
+
+  async openSource(kind, path) {
     this.clearError();
+    this.opening = kind === "dir" ? "Creating treestamp…" : "Loading treestamp…";
     this.setBusy(true);
     let accepted = false;
     try {
-      accepted = selected.kind === "dir"
-        ? await this.onCreate({ url: this.url, root: selected.path })
-        : await this.onOpen({ url: this.url, document: selected.path });
+      accepted = kind === "dir"
+        ? await this.onCreate({ url: this.url, root: path })
+        : await this.onOpen({ url: this.url, document: path });
       if (accepted) this.hide(true);
     } catch (_) {
       this.showError("Could not open this selection.", "Try again. Your current treestamp is unchanged.");
     } finally {
       this.setBusy(false);
-      if (!accepted) this.restoreSelectionFocus();
+      if (!accepted) {
+        if (this.panel === "welcome") element("entry-url").focus({ preventScroll: true });
+        else this.restoreSelectionFocus();
+      }
     }
   }
 
   restoreSelectionFocus() {
     const active = document.activeElement;
-    if (active === document.body || active === element("reload")) this.browser.focus();
+    if (active === document.body || active === element("source-create") || active === element("source-load")) this.browser.focus({ reveal: true });
   }
 
   hide(focusEditor = false) {

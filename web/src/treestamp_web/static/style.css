@@ -197,11 +197,10 @@ p { margin: 0; }
 /* The first choice supplies context before the editor appears. Keep instructions
    at reading size and action widths tied to their labels, not the whole canvas. */
 .entry { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-block: var(--s3); overflow-y: auto; }
-.entry-return { margin-top: var(--s4); }
 .entry-browser { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: var(--s2); }
-.entry-browser-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
-.entry-instructions { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s6); }
-.entry-instructions p { display: flex; align-items: baseline; gap: var(--s2); }
+.entry-browser-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s4); }
+.entry-instructions { display: grid; gap: var(--s3); }
+.entry-instructions p { display: grid; gap: var(--s1); }
 .entry-instructions span { color: var(--ink-secondary); }
 .entry-browser-head > button { flex: none; }
 .entry-selection { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
@@ -211,11 +210,9 @@ p { margin: 0; }
 .entry-selection .source-browser-status { padding: var(--s3); }
 .entry-error { color: var(--error-ink); overflow-wrap: anywhere; }
 #entry-error { margin-top: var(--s4); }
-.entry-browser-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s2); }
-.entry-browser-foot .entry-return { margin: 0 auto 0 0; }
+.entry-browser-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); }
+#source-progress { color: var(--ink-secondary); }
 @media (max-width: 47.999rem) {
-  .entry-instructions { display: grid; gap: 0; }
-  .entry-instructions p { display: grid; grid-template-columns: 7.5rem auto; }
   .entry-browser-head { gap: var(--s2); }
   .entry-browser-head button { padding-inline: var(--s2); }
 }
@@ -252,9 +249,11 @@ p { margin: 0; }
 body.no-tree #editor-panel, body.no-tree #stamp-panel,
 body.no-tree #copy, body.no-tree .settings-open { display: none; }
 
-/* ---------- the opener */
+/* ---------- repository context */
 
-.field-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
+#form { position: relative; }
+
+.field-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
 .field-head label { font-size: var(--t-md); font-weight: var(--weight-strong); line-height: 1.2; }
 .field-head .github-link { margin-left: auto; white-space: nowrap; }
 .repo-row { display: flex; flex-direction: column; gap: var(--s3); }
@@ -269,17 +268,14 @@ body.no-tree #copy, body.no-tree .settings-open { display: none; }
 #form .repository-context { flex: 1; }
 #form .field-head { flex-wrap: nowrap; margin-bottom: var(--s3); }
 #reset-tree { align-self: flex-start; }
-.repo-action-icon { display: inline; }
 .repo-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--s2); }
 .repo-actions button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); }
-#browse-source { width: 2.25rem; padding: 0; }
-body.no-tree #browse-source { display: none; }
-.repo-links { position: relative; display: flex; align-items: center; gap: var(--s1); flex: none; margin-left: auto; }
+.repo-links { position: static; display: flex; align-items: center; gap: var(--s1); flex: none; margin-left: auto; }
 .repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; padding: 0; }
 @media (pointer: coarse), (max-width: 47.999rem) {
   .repo-links .icon-button { width: 2.75rem; }
 }
-.repo-tooltip { position: absolute; z-index: 5; top: 100%; right: 0; width: min(22rem, calc(100vw - 4rem)); padding: var(--s3); border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--card); color: var(--ink); box-shadow: var(--lift); overflow-wrap: anywhere; }
+.repo-tooltip { position: absolute; z-index: 5; top: 100%; right: 0; width: min(22rem, 100%); padding: var(--s3); border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--card); color: var(--ink); box-shadow: var(--lift); overflow-wrap: anywhere; }
 .repo-tooltip p + p, .repo-info-dialog > p + p { margin-top: var(--s2); }
 .repo-info-dialog { max-width: 30rem; overflow-wrap: anywhere; }
 @media (max-width: 23rem) {
@@ -465,7 +461,6 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
 .check { display: flex; align-items: flex-start; gap: var(--s2); cursor: pointer; }
 .check input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; flex: none; margin: .2rem 0 0; }
 .settings .check { min-height: 2.25rem; padding-block: var(--s1); }
-#loaded-note { margin-top: var(--s2); color: var(--ink-secondary); }
 #show-all { align-self: flex-start; margin: 0 0 0 calc(1.1rem + var(--s2)); }
 .meta-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
 
@@ -503,13 +498,10 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
 #copy-status:empty { display: none; }
 /* Confirmation changes the label and edge without a solid color flash. */
 #copy.copied:enabled { color: var(--ok); border-color: var(--ok); }
-.stage-status { padding: var(--s2) var(--s4) 0; color: var(--ink-secondary); }
-.stage-status:empty { display: none; }
 #editor-panel, #stamp-panel, #info-panel { padding: var(--s4); }
 .stage[data-view="info"] #copy,
 .stage[data-view="info"] #copy-status,
-.stage[data-view="info"] .settings-open,
-.stage[data-view="info"] .stage-status { display: none; }
+.stage[data-view="info"] .settings-open { display: none; }
 .editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); padding: var(--s2) var(--s3); border: 1px solid var(--rule); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; background: var(--controls-surface); }
 .selection-context { color: var(--ink-secondary); }
 .selection-actions { display: flex; gap: var(--s2); padding-left: var(--s2); border-left: 3px solid var(--accent); }
@@ -712,17 +704,12 @@ pre {
 .row:focus { outline: none; }
 .row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
 
-.entry-browser-foot > #reload { white-space: normal; }
-
-/* Placement is a short, focused step between loading and ordinary editing. */
-.placement-dialog { position: fixed; inset: 0; margin: auto; overflow: auto; width: min(38rem, calc(100vw - 2rem)); }
-.placement-dialog.placing { max-width: none; width: min(62rem, calc(100vw - 2rem)); height: min(48rem, calc(100dvh - 2rem)); max-height: none; padding: 0; overflow: hidden; }
-#placement-choice > p { margin-block: var(--s3); }
+/* Transfer unresolved notes in one modal over the prepared editor. */
+.placement-dialog { position: fixed; inset: 0; margin: auto; max-width: none; width: min(62rem, calc(100vw - 2rem)); height: min(48rem, calc(100dvh - 2rem)); max-height: none; padding: 0; overflow: hidden; }
+#placement-explanation { margin-bottom: var(--s3); flex-shrink: 0; }
 #placement-work { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s4); }
 .placement-main { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 .placement-main > :not(#placement-rows) { flex-shrink: 0; }
-#placement-choice .dialog-actions { flex-wrap: wrap; }
-#placement-choice .dialog-actions button { max-width: 100%; white-space: normal; }
 .placement-head { display: flex; gap: var(--s4); justify-content: space-between; align-items: baseline; margin-bottom: var(--s4); }
 .placement-head h2 { margin: 0; }
 #placement-progress { margin: 0; color: var(--ink-secondary); white-space: nowrap; }
@@ -753,10 +740,10 @@ pre {
 #placement-undo { margin-right: auto; }
 .placement-exit { display: flex; align-items: baseline; gap: var(--s3); justify-content: space-between; margin-top: var(--s3); }
 #placement-key-hint { margin: 0; }
-#placement-finish { flex-shrink: 0; }
+#placement-finish { flex-shrink: 0; max-width: 100%; white-space: normal; }
 #placement-replace-question { overflow-wrap: anywhere; max-height: 50dvh; overflow: auto; }
 @media (max-width: 40rem) {
-  .placement-dialog.placing { width: calc(100vw - 1rem); height: calc(100dvh - 1rem); }
+  .placement-dialog { width: calc(100vw - 1rem); height: calc(100dvh - 1rem); }
   #placement-work { padding: var(--s3); }
   .placement-head { gap: var(--s2); margin-bottom: var(--s2); }
   .placement-head h2 { font-size: var(--t-md); }
@@ -794,7 +781,6 @@ pre {
   .repo-links { grid-column: 3; grid-row: 1; }
   .repo-actions { grid-column: 2; grid-row: 1; gap: var(--s1); flex-wrap: nowrap; }
   .repo-actions button, .repo-actions .button-link, .repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; min-height: 2.25rem; padding: 0; }
-  .repo-action-icon { display: inline; }
   .canvas-caption, #status { grid-column: 1 / -1; }
   .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .stage-head { flex: none; padding: var(--s1) var(--s2); gap: var(--s1); }
@@ -822,9 +808,4 @@ pre {
   .repo-actions button, .repo-actions .button-link { width: auto; gap: var(--s2); padding-inline: var(--s2); }
   .stage-head > #copy, .stage-head > .settings-open { width: auto; padding-inline: var(--s2); }
   .canvas-caption { display: none; }
-}
-
-@media (max-width: 47.999rem) {
-  .no-tree #submit { width: auto; gap: var(--s2); padding-inline: var(--s2); }
-  .no-tree #submit .repo-action-label { position: static; width: auto; height: auto; clip-path: none; overflow: visible; }
 }

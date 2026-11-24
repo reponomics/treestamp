@@ -13,7 +13,7 @@ EXAMPLES = [("treestamp", ".", "Package metadata and dependencies")]
 
 
 def explore_from_editor(page: Page) -> None:
-    page.locator("#submit").click()
+    page.locator(".wordmark").click()
     page.locator("#explore-example").click()
 
 

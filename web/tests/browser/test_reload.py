@@ -31,11 +31,13 @@ def test_return_from_chooser_preserves_curation_and_source(
     add_note(page, "keep current work")
     original = page.locator("#region").text_content()
     address = page.url
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator('.source-row[data-path="src"]').click()
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
-    expect(page.locator("#submit")).to_be_focused()
+    expect(page.locator("#tab-editor")).to_be_focused()
     expect(page.locator("#region")).to_have_text(original)
     assert page.url == address
     with page.expect_request("**/api/op") as request:
@@ -61,15 +63,17 @@ def test_failed_explicit_open_preserves_draft_and_cannot_initialize_new(
             },
         ),
     )
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator('.source-row[data-path="README.md"]').click()
-    page.locator("#reload").click()
+    page.locator("#source-load").click()
     expect(page.locator("#reload-error")).to_contain_text("Malformed")
     expect(page.locator("#reload-settings")).to_be_visible()
-    expect(page.locator("#reload")).to_be_enabled()
+    expect(page.locator("#source-load")).to_be_enabled()
     expect(page.locator("#region")).to_have_text(original)
     assert page.url == address
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     add_note(page, "work after failed open")
 
 
@@ -87,7 +91,6 @@ def test_explicit_new_root_is_repository_relative_and_initial_depth_is_one(
     assert data["document"] == ""
     expect(page.locator("#rows .row")).to_have_count(3)
     expect(page.locator("#region")).to_contain_text('root = "src"')
-    expect(page.locator("#loaded-note")).to_be_hidden()
     address = page.url
     page.reload()
     expect(page.locator("#rows .row")).to_have_count(3)
@@ -104,15 +107,15 @@ def test_successful_reopen_discards_unwritten_notes_hiding_and_folds(
     page.locator('.row[data-path="docs"] .fold').click()
     page.locator('.row[data-path="scripts"]').focus()
     page.locator("#row-visibility").click()
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_response("**/api/preview*") as response:
-        page.locator("#reload").click()
+        page.locator("#source-load").click()
     assert response.value.ok
     assert response.value.json()["state"]["revision"] == 0
     expect(page.locator("#region")).to_have_text(original)
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#stage-status")).to_have_text("Treestamp is up to date")
 
 
 def test_edits_and_count_toggles_retain_the_captured_commit(
@@ -179,10 +182,11 @@ def test_visual_selection_retains_exact_source_identity(
             status=404, json={"error": {"message": "Exact path not found."}}
         ),
     )
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator(".source-row").nth(1).click()
     with page.expect_request("**/api/preview") as request:
-        page.locator("#reload").click()
+        page.locator("#source-create" if kind == "dir" else "#source-load").click()
     assert request.value.post_data_json[field] == path
     expect(page.locator("#reload-error")).to_contain_text("Exact path not found.")
 
@@ -193,17 +197,26 @@ def test_selected_entry_determines_creation_or_opening(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
     page.goto(f"{service}/fixture/repo")
-    expect(page.locator("#reload")).to_have_text("Create")
+    create = page.locator("#source-create")
+    load = page.locator("#source-load")
+    expect(create).to_be_enabled()
+    expect(load).to_be_visible()
+    expect(load).to_be_disabled()
+    positions = [button.bounding_box() for button in (create, load)]
     page.locator('.source-row[data-path="README.md"]').click()
-    expect(page.locator("#reload")).to_have_text("Load")
+    expect(create).to_be_visible()
+    expect(create).to_be_disabled()
+    expect(load).to_be_enabled()
+    assert [button.bounding_box() for button in (create, load)] == positions
     page.locator('.source-row[data-path="src"]').click()
-    expect(page.locator("#reload")).to_have_text("Create")
+    expect(create).to_be_enabled()
+    expect(load).to_be_disabled()
+    assert [button.bounding_box() for button in (create, load)] == positions
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_request("**/api/preview") as request:
-        page.locator("#reload").click()
+        page.locator("#source-load").click()
     assert request.value.post_data_json == {
         "url": "fixture/repo",
         "document": "README.md",
     }
     expect(page.locator("#reload-settings")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_have_text("Treestamp is up to date")

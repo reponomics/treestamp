@@ -55,10 +55,8 @@ def test_info_stays_selected_through_an_initial_repository_load(
     page.route("**/api/preview*", lambda route: pending.append(route))
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows")).to_have_attribute("aria-busy", "true")
-    expect(page.locator("#submit")).to_be_disabled()
     page.get_by_role("tab", name="Info", exact=True).click()
     expect(page.locator("#info-panel")).to_be_visible()
-    expect(page.locator("#stage-status")).to_be_hidden()
     assert len(pending) == 1
     if failed:
         pending[0].fulfill(
@@ -68,11 +66,10 @@ def test_info_stays_selected_through_an_initial_repository_load(
     else:
         pending[0].continue_()
         expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     expect(page.locator("#tab-info")).to_have_attribute("aria-selected", "true")
     expect(page.locator("#info-panel")).to_be_visible()
     expect(page.locator("#editor-panel")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_be_hidden()
     expect(page.locator("#copy")).to_be_hidden()
 
 

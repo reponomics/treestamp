@@ -25,7 +25,6 @@ import {
   valuesFromSettings,
 } from "./logic.js";
 
-const form = document.getElementById("form");
 const fields = {
   url: document.getElementById("url"),
   style: document.getElementById("style"),
@@ -34,7 +33,6 @@ const fields = {
   attribution: document.getElementById("attribution"),
   document: document.getElementById("document"),
 };
-const submit = document.getElementById("submit");
 const visitRepo = document.getElementById("visit-repo");
 const status = document.getElementById("status");
 const errorPanel = document.getElementById("error");
@@ -43,12 +41,11 @@ const errorHint = document.getElementById("error-hint");
 document.getElementById("error-dismiss").addEventListener("click", (event) => {
   const restoreFocus = document.activeElement === event.currentTarget;
   errorPanel.hidden = true;
-  if (restoreFocus) submit.focus({ preventScroll: true });
+  if (restoreFocus) tabs[stage.dataset.view || "editor"].focus({ preventScroll: true });
 });
 const repoInfo = document.getElementById("repo-info");
 const repoTooltip = document.getElementById("repo-tooltip");
 const repoInfoDialog = document.getElementById("repo-info-dialog");
-const loadedNote = document.getElementById("loaded-note");
 const settingsPanel = document.getElementById("settings");
 const settingsTrigger = document.querySelector(".settings-open");
 const tabs = { editor: document.getElementById("tab-editor"), stamp: document.getElementById("tab-stamp"), info: document.getElementById("tab-info") };
@@ -69,7 +66,6 @@ const region = document.getElementById("region");
 const copy = document.getElementById("copy");
 const copyLabel = document.getElementById("copy-label");
 const copyStatus = document.getElementById("copy-status");
-const stageStatus = document.getElementById("stage-status");
 const tuiMode = document.getElementById("tui-mode");
 const keymapDialog = document.getElementById("keymap-dialog");
 const noteDialog = document.getElementById("note-dialog");
@@ -83,6 +79,9 @@ let controller = null;
 let countdown = null;
 // The editing session: identity of the commit plus the state the server hands back.
 let editor = null;
+// Presentation may temporarily show an incoming tree; only render() adopts it.
+let presented = null;
+let provisional = null;
 let editingSession = 0;
 let pendingDraft = draftForLocation(window.location);
 
@@ -128,13 +127,9 @@ function setBusy(busy, opening) {
   if (!opening) return;
   status.classList.toggle("busy", busy);
   if (busy) {
-    submit.disabled = true;
     status.textContent = "Loading…";
-    stageStatus.textContent = "Loading…";
   } else if (!countdown) {
-    submit.disabled = false;
     status.textContent = "";
-    stageStatus.textContent = "";
   }
 }
 
@@ -143,7 +138,6 @@ function clearCountdown() {
     clearInterval(countdown);
     countdown = null;
     if (!status.classList.contains("busy")) {
-      submit.disabled = false;
       status.textContent = "";
     }
   }
@@ -162,12 +156,10 @@ function showError(message, hint, retryAfter) {
   clearCountdown();
   if (retryAfter) {
     let remaining = retryAfter;
-    submit.disabled = true;
     const tick = () => {
       status.textContent = `Retry in ${remaining}s`;
       if (remaining <= 0) {
         clearCountdown();
-        submit.disabled = false;
         status.textContent = "";
       }
       remaining -= 1;
@@ -227,7 +219,7 @@ function appendRowDetails(item, row) {
 }
 
 function selectRow(path) {
-  const row = editor?.rows.find((entry) => entry.path === path);
+  const row = presented?.prepared.rows.find((entry) => entry.path === path);
   selectedPath = row?.path ?? "";
   for (const item of rowsList.children) {
     const selected = Boolean(row) && item.dataset.path === selectedPath;
@@ -374,6 +366,9 @@ function render(data, opening = false) {
   document.querySelectorAll(".dialog-error").forEach((node) => { node.hidden = true; });
   clearCountdown();
   const previous = editor;
+  showSettings(data, !opening && Boolean(previous?.rows.length));
+  if (opening) selectedPath = "";
+  presentPreview(data, prepared);
   pendingDraft = null;
   editor = {
     owner: data.repository.owner,
@@ -388,32 +383,32 @@ function render(data, opening = false) {
     loaded: data.loaded,
     region: data.region,
   };
-  showSettings(data, !opening && Boolean(previous?.rows.length));
-  document.getElementById("tree-document").textContent = displayPath(data.document);
-  document.querySelector(".canvas-caption").hidden = !data.document;
-  loadedNote.textContent = data.loaded ? "Document opened" : "";
-  loadedNote.hidden = !data.loaded;
-  stageStatus.textContent = opening && data.loaded
-    ? (data.dirty ? "Treestamp updated" : "Treestamp is up to date") : "";
-  status.textContent = "";
   if (opening) {
-    selectedPath = "";
     editingSession += 1;
     queue = Promise.resolve(true);
   }
+  history.replaceState(null, "", prepared.address);
+  saveDraft(prepared.address);
+}
+
+// Render validated data without changing the accepted session, URL, or draft.
+function presentPreview(data, prepared) {
+  presented = { data, prepared };
+  document.getElementById("tree-document").textContent = displayPath(data.document);
+  document.querySelector(".canvas-caption").hidden = !data.document;
+  status.textContent = "";
 
   document.querySelectorAll("[data-repo-branch]").forEach((node) => { node.textContent = data.repository.default_branch || "Unavailable"; });
   document.querySelectorAll("[data-repo-commit]").forEach((node) => { node.textContent = data.ref.commit; });
   visitRepo.href = data.repository.url;
   visitRepo.hidden = false;
 
-  const address = prepared.address;
   repoInfo.disabled = false;
   document.getElementById("reset-tree").disabled = false;
-  renderRepository(document.getElementById("active-repository"), `${editor.owner}/${editor.repo}`);
-  fields.url.value = `${editor.owner}/${editor.repo}`;
+  renderRepository(document.getElementById("active-repository"), `${data.repository.owner}/${data.repository.name}`);
+  fields.url.value = `${data.repository.owner}/${data.repository.name}`;
 
-  renderRows(editor.rows);
+  renderRows(prepared.rows);
   document.getElementById("tree-attribution").hidden = !data.state.curation.settings.attribution;
 
   renderRegion(data.region);
@@ -425,8 +420,6 @@ function render(data, opening = false) {
   revealLabel.textContent = hiddenCount ? `Reveal hidden entries (${hiddenCount})` : "Reveal hidden entries";
   showAll.disabled = hiddenCount === 0;
   document.body.classList.remove("no-tree");
-  history.replaceState(null, "", address);
-  saveDraft(address);
 }
 
 // The marker and config lines are shown quietly so the tree reads first; the text is unchanged.
@@ -439,33 +432,113 @@ function renderRegion(text) {
   }));
 }
 
-// A first load failed and there is no tree to keep showing.
-function leaveStage() {
-  stageStatus.textContent = "No treestamp";
+// ---------- requests
+
+function rememberPreviewDOM() {
+  // Keep the actual nodes so cancellation also preserves selection and controls
+  // when there was no accepted tree yet (for example, a saved draft on startup).
+  const containers = [rowsList, region, document.getElementById("active-repository")];
+  const contents = containers.map((node) => [node, [...node.childNodes]]);
+  const nodes = [
+    document.getElementById("tree-document"), document.querySelector(".canvas-caption"),
+    status, visitRepo, repoInfo, errorPanel,
+    document.getElementById("reset-tree"), document.getElementById("tree-attribution"),
+    copy, copyLabel, copyStatus, revealLabel, showAll, rowNote, rowVisibility, selectedPathLabel,
+    ...document.querySelectorAll("[data-repo-branch], [data-repo-commit]"),
+  ];
+  const attributes = nodes.map((node) => [node, [...node.attributes].map(({ name, value }) => [name, value])]);
+  // Only leaf labels have their text replaced; restoring a button's text would
+  // discard its icon and other child elements.
+  const labels = nodes.filter((node) => !node.children.length).map((node) => [node, node.textContent]);
+  return () => {
+    for (const [node, children] of contents) node.replaceChildren(...children);
+    for (const [node, saved] of attributes) {
+      for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
+      for (const [name, value] of saved) node.setAttribute(name, value);
+    }
+    for (const [node, text] of labels) node.textContent = text;
+  };
 }
 
-// ---------- requests
+function presentIncoming(body, prepared, ticket) {
+  const entry = document.getElementById("entry");
+  const workspace = document.getElementById("workspace");
+  const restoreDOM = rememberPreviewDOM();
+  const previous = {
+    presented, selectedPath, values: formValues(), url: fields.url.value,
+    view: stage.dataset.view, entryHidden: entry.hidden, workspaceHidden: workspace.hidden,
+    choosing: document.body.classList.contains("choosing-source"),
+    empty: document.body.classList.contains("no-tree"),
+  };
+  provisional = { ticket, restore() {
+    presented = previous.presented;
+    selectedPath = previous.selectedPath;
+    restoreDOM();
+    setValues(previous.values);
+    fields.url.value = previous.url;
+    selectTab(previous.view || "editor");
+    entry.hidden = previous.entryHidden;
+    workspace.hidden = previous.workspaceHidden;
+    document.body.classList.toggle("choosing-source", previous.choosing);
+    document.body.classList.toggle("no-tree", previous.empty);
+  } };
+  errorPanel.hidden = true;
+  selectedPath = "";
+  showSettings(body, false);
+  presentPreview(body, prepared);
+  selectTab("editor");
+  entry.hidden = true;
+  workspace.hidden = false;
+  document.body.classList.remove("choosing-source");
+  // The request has finished; only acceptance is pending while notes are reviewed.
+  rowsList.setAttribute("aria-busy", "true");
+  status.classList.remove("busy");
+  status.textContent = "Review notes";
+}
+
+function restoreIncoming(ticket = provisional?.ticket) {
+  if (!provisional || provisional.ticket !== ticket) return;
+  const pending = provisional;
+  provisional = null;
+  pending.restore();
+}
+
+function finishIncoming(ticket, opening) {
+  if (ticket === generation && rowsList.getAttribute("aria-busy") === "true") setBusy(false, opening);
+  restoreIncoming(ticket);
+}
 
 async function acceptResponse(body, opening, ticket) {
   try {
-    preparePreview(body, window.location.origin);
-    if (opening && body.placement?.total > 0) body = await placement.run(body);
+    const prepared = preparePreview(body, window.location.origin);
+    if (opening && body.placement?.total > 0) {
+      // Validate the transfer tree before exposing either part of the preview.
+      preparePreview({ ...body, rows: body.placement.rows }, window.location.origin);
+      presentIncoming(body, prepared, ticket);
+      body = await placement.run(body);
+    }
     if (!body || ticket !== generation) return false;
+    setBusy(false, opening);
     render(body, opening);
+    if (provisional?.ticket === ticket) provisional = null;
     return true;
   } catch (err) {
+    if (ticket === generation) setBusy(false, opening);
+    restoreIncoming(ticket);
+    if (ticket !== generation) return false;
     showError("The page could not display the treestamp.", String(err && err.message), null);
     return false;
+  } finally {
+    finishIncoming(ticket, opening);
   }
 }
 
 function rejectResponse(body, responseStatus) {
-  if (!editor?.rows.length) leaveStage();
   const error = (body && body.error) || {};
   const message = error.message || `The service returned status ${responseStatus}.`;
   const hint = error.code === "snapshot_unavailable" && !editor?.rows.length
     ? document.getElementById("entry").hidden
-      ? "Choose Open a tree to load the repository again."
+      ? "Choose the treestamp wordmark to return to the start page."
       : "Browse the repository to start a new treestamp."
     : hintFor(error.code, responseStatus);
   showError(message, hint, error.retry_after || null);
@@ -475,6 +548,7 @@ function rejectResponse(body, responseStatus) {
 // Previews abort whatever is in flight. Operations never abort: each one waits for the
 // previous response so it carries the newest state, which is what keeps notes from being lost.
 async function call(url, init, { abortable }) {
+  restoreIncoming();
   placement.cancel();
   if (controller) controller.abort();
   const mine = new AbortController();
@@ -489,7 +563,6 @@ async function call(url, init, { abortable }) {
   } catch (err) {
     if (mine.signal.aborted || ticket !== generation) return false;
     setBusy(false, abortable);
-    if (!editor?.rows.length) leaveStage();
     showError("Could not reach the service.", "Check your connection and try again.", null);
     return false;
   }
@@ -724,15 +797,6 @@ function browseRepository(repo) {
   entryFlow.browse(repo, { canReturn: Boolean(editor?.rows.length || pendingDraft) });
 }
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  openWelcome();
-});
-
-document.getElementById("browse-source").addEventListener("click", () => {
-  browseRepository(fields.url.value.trim());
-});
-
 function openWelcome() {
   if (entryFlow.busy) return;
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
@@ -746,7 +810,7 @@ async function resumeSession() {
     entryFlow.hide();
     fields.url.value = `${editor.owner}/${editor.repo}`;
     errorPanel.hidden = true;
-    submit.focus({ preventScroll: true });
+    tabs[stage.dataset.view || "editor"].focus({ preventScroll: true });
     return;
   }
   if (!pendingDraft || entryFlow.busy) return;
@@ -819,6 +883,8 @@ reveal.addEventListener("change", () => { if (editor) operate("restore"); });
 showAll.addEventListener("click", () => { if (editor) operate("unhide_all"); });
 
 function loadExample(name) {
+  restoreIncoming();
+  placement.cancel();
   if (controller) controller.abort();
   controller = null;
   generation += 1;
@@ -931,7 +997,7 @@ function exampleAt(address) {
   const route = parseRoute(window.location.pathname, window.location.hash);
   const query = new URLSearchParams(window.location.search);
   try { setValues(valuesFromQuery(query)); }
-  catch (error) { showError(error.message, "", null); leaveStage(); return; }
+  catch (error) { showError(error.message, "", null); return; }
   const address = window.location.pathname + window.location.search + window.location.hash;
   const example = exampleAt(address);
   if (example) {

@@ -157,16 +157,16 @@ export class SourceBrowser {
     return visible;
   }
 
-  focus() {
+  focus({ reveal = false } = {}) {
     const target = this.tree.querySelector('[tabindex="0"]') || this.container;
     target.focus({ preventScroll: true });
+    if (reveal) target.scrollIntoView({ block: "nearest" });
   }
 
   focusEntry(key) {
     this.focused = key;
     this.render();
-    this.focus();
-    this.tree.querySelector('[tabindex="0"]')?.scrollIntoView({ block: "nearest" });
+    this.focus({ reveal: true });
   }
 
   toggle(entry) {

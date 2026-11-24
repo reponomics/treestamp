@@ -311,7 +311,7 @@ def test_pages_and_static_files(client: TestClient) -> None:
         response = client.get(path)
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/html")
-        assert '<form id="form"' in response.text
+        assert '<form id="entry-form"' in response.text
         assert response.headers["Content-Security-Policy"] == "default-src 'self'"
     assert client.get("/static/app.js").status_code == 200
     assert client.get("/static/style.css").status_code == 200

@@ -1,5 +1,5 @@
-// A provisional, one-time load step. Intermediate responses never enter the editor
-// or local storage; the shared Python placement model owns all transfer decisions.
+// A provisional, one-time load step over the prepared editor. Intermediate
+// decisions are not saved as the accepted session until this modal finishes.
 import { treeGuides, appendTreeGuides } from "./tree-view.js";
 import { displayPath, pathKey, preparePreview, rowName, treeNavigation, hintFor } from "./logic.js";
 
@@ -36,8 +36,6 @@ export class NotePlacement {
   }
 
   bind() {
-    element("placement-start").addEventListener("click", () => this.start());
-    element("placement-decline").addEventListener("click", () => this.finish());
     element("placement-finish").addEventListener("click", () => this.finish());
     element("placement-place").addEventListener("click", () => this.place());
     element("placement-skip").addEventListener("click", () => this.skip());
@@ -63,18 +61,16 @@ export class NotePlacement {
     this.expanded = [...initial.state.curation.expanded];
     this.reveal = false;
     this.selected = this.rows[0].path;
-    this.active = false;
+    this.active = true;
     this.busy = false;
-    this.dialog.classList.remove("placing");
-    element("placement-choice").hidden = false;
-    element("placement-work").hidden = true;
     element("placement-error").hidden = true;
-    const count = initial.placement.total;
-    element("placement-choice-summary").textContent = `${count} ${count === 1 ? "note refers to a path that is" : "notes refer to paths that are"} no longer in the tree.`;
     element("placement-reveal").checked = false;
+    this.render();
+    this.setBusy(false);
+    const result = new Promise((resolve) => { this.resolve = resolve; });
     this.dialog.showModal();
-    element("placement-start").focus();
-    return new Promise((resolve) => { this.resolve = resolve; });
+    this.focus();
+    return result;
   }
 
   cancel() {
@@ -94,16 +90,6 @@ export class NotePlacement {
   finish() {
     if (this.busy || !this.resolve) return;
     this.settle(this.accepted);
-  }
-
-  start() {
-    this.active = true;
-    element("placement-choice").hidden = true;
-    element("placement-work").hidden = false;
-    this.dialog.classList.add("placing");
-    this.render();
-    this.setBusy(false);
-    this.focus();
   }
 
   currentRow() {
@@ -140,7 +126,7 @@ export class NotePlacement {
     folder.textContent = row.collapsed ? "Open folder" : "Close folder";
     folder.disabled = this.busy;
     element("placement-target-hint").textContent = compatible
-      ? (row.hidden ? "Placing here will include this hidden entry." : "")
+      ? (row.hidden ? "Transferring here will include this hidden entry." : "")
       : current.kind === "dir" ? "Choose a folder for this directory." : "Choose a file, or open this folder to look inside.";
   }
 
@@ -180,9 +166,9 @@ export class NotePlacement {
   render() {
     const info = this.accepted.placement;
     const current = info.current;
-    element("placement-progress").textContent = `${info.remaining} left · ${info.placed_count} placed`;
+    element("placement-progress").textContent = `${info.remaining} left · ${info.placed_count} transferred`;
     element("placement-source").textContent = displayPath(current.path).split("/").pop() + (current.kind === "dir" ? "/" : "");
-    element("placement-note").textContent = current.annotation || "Place this folder to carry the notes inside it.";
+    element("placement-note").textContent = current.annotation || "Transfer this folder to carry the notes inside it.";
     element("placement-directory-hint").hidden = current.kind !== "dir";
     const scrollTop = this.tree.scrollTop;
     const guides = treeGuides(this.rows);
@@ -224,7 +210,7 @@ export class NotePlacement {
       this.reveal = reveal;
       if (!body.placement.current) this.settle(body);
     } catch (error) {
-      if (!controller.signal.aborted) this.error("Could not update placement. Your last decision is unchanged. Try again.");
+      if (!controller.signal.aborted) this.error("Could not transfer notes. Your last decision is unchanged. Try again.");
     } finally {
       this.finishRequest(controller);
     }
@@ -249,7 +235,7 @@ export class NotePlacement {
       element("placement-replace-cancel").focus();
       return;
     }
-    this.error([error.message || "Could not update placement.", hintFor(error.code, status)].filter(Boolean).join(" "));
+    this.error([error.message || "Could not transfer notes.", hintFor(error.code, status)].filter(Boolean).join(" "));
   }
 
   error(message) {

@@ -18,11 +18,11 @@ pytestmark = pytest.mark.browser
 def open_editor(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     page.wait_for_selector("#rows .row")
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
 
 
 def browse_other_repository(page: Page, repository: str) -> None:
-    page.locator("#submit").click()
+    page.locator(".wordmark").click()
     page.locator("#entry-url").fill(repository)
     page.locator("#entry-browse").click()
 
@@ -49,7 +49,6 @@ def test_exploring_the_example_opens_it_without_a_request(
     expect(page.locator("#rows .row")).not_to_have_count(0)
     expect(page.locator("#url")).to_have_value("reponomics/treestamp")
     expect(page.locator("#error")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_be_hidden()
     expect(page.locator("#status")).to_have_text("")
 
 
@@ -62,12 +61,13 @@ def test_a_failed_load_keeps_the_open_tree(page: Page, service: str) -> None:
         ),
     )
     browse_other_repository(page, "fixture/elsewhere")
-    expect(page.locator("#reload")).to_have_text("Create")
-    page.click("#reload")
+    expect(page.locator("#source-create")).to_be_enabled()
+    page.click("#source-create")
     expect(page.locator("#reload-error")).to_contain_text("Repository unavailable.")
     expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#rows .row")).to_have_count(9)
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#copy")).to_be_visible()
 
 
@@ -88,11 +88,12 @@ def test_cancelling_load_preserves_tree_and_restores_source_fields(
     )
     browse_other_repository(page, "fixture/another-repository")
     expect(page.locator("#reload-settings")).to_be_visible()
-    expect(page.locator("#reload")).to_have_text("Create")
+    expect(page.locator("#source-create")).to_be_enabled()
     page.locator('.source-row[data-path="src"]').click()
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
-    expect(page.locator("#submit")).to_be_focused()
+    expect(page.locator("#tab-editor")).to_be_focused()
     expect(page.locator("#document")).to_have_value(initial_document)
     expect(page.locator("#root")).to_have_value(initial_root)
     assert page.locator("#region").text_content() == original_region
@@ -126,7 +127,7 @@ def test_dismissing_error_preserves_draft_and_allows_later_errors(
     dismiss.focus()
     dismiss.press("Enter")
     expect(page.locator("#error")).to_be_hidden()
-    expect(page.locator("#submit")).to_be_focused()
+    expect(page.locator("#tab-editor")).to_be_focused()
     expect(row.locator(".note")).to_contain_text("Preserve this annotation")
     assert page.locator("#region").text_content() == original_region
     assert page.url == original_address
@@ -265,12 +266,13 @@ def test_invalid_candidate_keeps_the_accepted_draft(
 
     page.route("**/api/preview*", invalid_candidate)
     browse_other_repository(page, "fixture/replacement")
-    page.locator("#reload").click()
+    page.locator("#source-create").click()
     expect(page.locator("#reload-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#copy")).to_be_enabled()
 
 
@@ -455,10 +457,10 @@ def test_reopening_after_a_failed_edit_allows_copy(
     expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
     assert page.evaluate("window.copiedBlocks") == [original_region]
     browse_other_repository(page, "fixture/reopened")
-    page.locator("#reload").click()
+    page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#url")).to_have_value("fixture/reopened")
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.locator("#copy").click()
     expect(page.locator("#copy-label")).to_have_text("Copied")
     assert len(page.evaluate("window.copiedBlocks")) == 2
@@ -599,7 +601,6 @@ def test_tree_edit_keeps_opener_status_and_settings_position(
     expect(page.locator("html")).to_have_attribute("data-edit-pending", "true")
     expect(page.locator("#rows")).to_have_attribute("aria-busy", "true")
     expect(page.locator("#status")).to_have_text(initial_status)
-    expect(page.locator("#submit")).to_be_enabled()
     pending_box = settings.bounding_box()
     assert pending_box is not None
     assert pending_box["y"] == pytest.approx(initial_box["y"], abs=1)
@@ -751,7 +752,7 @@ def test_expired_saved_link_does_not_export_an_unvalidated_placeholder(
         ),
     )
     page.reload()
-    expect(page.locator("#error")).to_contain_text("Choose Open a tree")
+    expect(page.locator("#error")).to_contain_text("Snapshot expired.")
     expect(page.locator("#error")).not_to_contain_text("Copy your current tree")
     expect(page.locator("#rows .row")).to_have_count(0)
     page.locator("#copy").evaluate("button => button.click()")

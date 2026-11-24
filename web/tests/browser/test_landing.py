@@ -26,11 +26,13 @@ def test_landing_actions_are_reachable_and_keyboard_browsing_returns_to_welcome(
     welcome = page.locator("#entry-welcome")
     hero = welcome.get_by_role("heading")
     repository = page.locator("#entry-url")
+    create = page.locator("#entry-create")
+    load = page.locator("#entry-load")
     browse = page.locator("#entry-browse")
     example = page.locator("#explore-example")
     expect(hero).to_be_visible()
     expect(repository).to_be_focused()
-    for control in (repository, browse, example):
+    for control in (repository, create, load, browse, example):
         expect(control).to_be_in_viewport(ratio=1)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     for container in (page.locator("#entry"), welcome):
@@ -39,9 +41,13 @@ def test_landing_actions_are_reachable_and_keyboard_browsing_returns_to_welcome(
     # The illustration must not add a keyboard stop between input and action.
     repository.fill("fixture/repo")
     repository.press("Tab")
+    expect(create).to_be_focused()
+    create.press("Tab")
+    expect(load).to_be_focused()
+    load.press("Tab")
     expect(browse).to_be_focused()
     browse.press("Enter")
-    expect(page.locator("#reload")).to_be_enabled()
+    expect(page.locator("#source-create")).to_be_enabled()
     expect(welcome).to_be_hidden()
     expect(page.locator("#reload-settings")).to_be_visible()
 

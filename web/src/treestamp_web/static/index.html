@@ -57,9 +57,14 @@
         <label for="entry-url">Public GitHub repository</label>
         <div class="entry-repo-row">
           <input id="entry-url" type="text" placeholder="owner/repo or a GitHub link" aria-describedby="entry-guidance" required spellcheck="false">
-          <button id="entry-browse" class="primary" type="submit" disabled>Browse</button>
         </div>
-        <p id="entry-guidance">Choose a folder to create a treestamp, or a file to load one. Transfer notes if needed, then make it your own in the editor.</p>
+        <p id="entry-guidance">Create a new tree at the repository root, or load a treestamp from README.md.</p>
+        <div class="entry-primary-actions">
+          <button id="entry-create" class="primary" type="submit" disabled>Create treestamp</button>
+          <button id="entry-load" type="submit" disabled>Load treestamp</button>
+        </div>
+        <p id="entry-progress" role="status"></p>
+        <button id="entry-browse" class="entry-source-choice" type="button" disabled>Choose another folder or file…</button>
       </form>
       <p id="entry-error" class="entry-error" role="alert" hidden></p>
       <div class="entry-offramp">
@@ -84,8 +89,8 @@
     <section id="reload-settings" class="entry-browser" aria-label="Choose a folder or file" hidden>
       <div class="entry-browser-head">
         <div class="entry-instructions">
-          <p><strong>New treestamp</strong><span>Select folder</span></p>
-          <p><strong>Load treestamp</strong><span>Select file</span></p>
+          <p><strong>Create a new treestamp</strong><span>Select a folder to start your tree.</span></p>
+          <p><strong>Load a treestamp</strong><span>Select a file containing an existing treestamp.</span></p>
         </div>
         <button id="entry-change-repo" type="button">Back</button>
       </div>
@@ -95,8 +100,9 @@
       </div>
       <p id="reload-error" class="entry-error" role="alert" hidden></p>
       <div class="entry-browser-foot">
-        <button id="entry-return" class="entry-return" type="button" hidden>Resume session</button>
-        <button id="reload" class="primary" type="button" disabled>Create</button>
+        <button id="source-create" class="primary" type="button" disabled>Create</button>
+        <span id="source-progress" role="status"></span>
+        <button id="source-load" class="primary" type="button" disabled>Load</button>
       </div>
     </section>
   </main>
@@ -106,7 +112,7 @@
 
   <main id="workspace" class="workspace" hidden>
     <aside class="controls">
-      <form id="form" autocomplete="off">
+      <div id="form">
         <div class="field-head">
           <div class="repository-context"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 0v14h14M3 19a2 2 0 0 1 2-2"/></svg><p id="active-repository" class="repository-identity"></p></div>
           <div class="repo-links">
@@ -123,15 +129,13 @@
           <input id="url" name="url" type="hidden">
           <p class="canvas-caption" hidden><span class="caption-label">Document: </span><span id="tree-document"></span></p>
           <div class="repo-actions">
-            <button id="submit" type="submit" title="Open a tree"><svg class="control-icon repo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="repo-action-label">Open a tree</span></button>
-            <button id="browse-source" class="icon-button" type="button" aria-label="New or load treestamp" title="New or load treestamp"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v2M3 7h16l-3 12H1L3 7Z"/></svg></button>
             <a id="visit-repo" class="github-link button-link" href="#" target="_blank" rel="noopener" title="Visit repo (opens in a new tab)" hidden><span class="repo-action-label">Visit repo</span>
             <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7m0-7L10 14m0-10H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></svg>
             </a>
           </div>
         </div>
         <p id="status" class="status" role="status" aria-live="polite"></p>
-      </form>
+      </div>
 
       <section id="error" class="panel error" hidden role="alert">
         <button id="error-dismiss" type="button" aria-label="Dismiss error" title="Dismiss error">
@@ -159,7 +163,6 @@
               <button id="show-all" type="button" disabled>Unhide all</button>
             </div>
           </fieldset>
-          <p id="loaded-note" hidden></p>
           <div class="settings-reset"><button id="reset-tree" type="button" disabled>Discard changes</button></div>
         </div>
       </section>
@@ -183,7 +186,6 @@
         <span id="copy-status" role="status" aria-live="polite"></span>
       </div>
 
-      <p id="stage-status" class="stage-status" role="status" aria-live="polite">Loading…</p>
 
       <div id="editor-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-editor">
         <div class="editor-toolbar">
@@ -253,22 +255,13 @@
     </section>
   </main>
 
-  <dialog id="placement-dialog" class="dialog placement-dialog" aria-label="Place notes before editing">
-    <section id="placement-choice">
-      <p class="placement-eyebrow">Before you edit</p>
-      <h2 id="placement-choice-title">This treestamp no longer matches the repository.</h2>
-      <p id="placement-choice-summary">Some notes refer to paths that are no longer in the tree.</p>
-      <p class="group-note">Choose where each note belongs in the updated tree, or leave it out.</p>
-      <div class="dialog-actions">
-        <button id="placement-decline" type="button">Continue without them</button>
-        <button id="placement-start" class="primary" type="button">Place notes</button>
-      </div>
-    </section>
-    <section id="placement-work" hidden>
+  <dialog id="placement-dialog" class="dialog placement-dialog" aria-labelledby="placement-title" aria-describedby="placement-explanation">
+    <section id="placement-work">
       <header class="placement-head">
-        <h2>Place notes</h2>
+        <h2 id="placement-title">Transfer notes</h2>
         <p id="placement-progress" role="status" aria-live="polite"></p>
       </header>
+      <p id="placement-explanation" class="group-note">Some notes belong to paths that are no longer in this tree. Transfer them to new locations, or continue without them.</p>
       <div class="placement-main">
         <div class="placement-source-slot">
           <span class="placement-eyebrow">From</span>
@@ -292,11 +285,11 @@
         <div class="placement-decisions">
           <button id="placement-undo" type="button" disabled>Undo</button>
           <button id="placement-skip" type="button">Skip note</button>
-          <button id="placement-place" class="primary" type="button">Place here</button>
+          <button id="placement-place" class="primary" type="button">Transfer here</button>
         </div>
         <div class="placement-exit">
-          <p id="placement-key-hint" class="group-note">↑↓ Select · ←→ Folders · Enter Place · S Skip · U Undo</p>
-          <button id="placement-finish" type="button">Skip remaining and edit</button>
+          <p id="placement-key-hint" class="group-note">↑↓ Select · ←→ Folders · Enter Transfer · S Skip · U Undo</p>
+          <button id="placement-finish" type="button">Continue without remaining notes</button>
         </div>
       </footer>
     </section>

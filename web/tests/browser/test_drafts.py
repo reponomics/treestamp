@@ -36,13 +36,17 @@ def test_return_restores_notes_hides_and_can_resume_from_picker(
     expect(page.locator("#workspace")).to_be_hidden()
     assert not any("/api/op" in url or "/api/preview" in url for url in requests)
     assert page.url == service + destination
-    page.locator("#entry-return-welcome:visible, #entry-return:visible").click()
+    if destination != "/":
+        page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#region")).to_have_text(original)
     expect(page.locator("#draft-status, #forget-draft")).to_have_count(0)
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     expect(page.locator("#replace-draft-warning")).to_have_count(0)
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).to_have_text(original)
 
@@ -93,7 +97,7 @@ def test_expired_draft_does_not_silently_load_head_and_can_start_fresh(
     assert previews == []
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == saved
     page.locator("#entry-browse").click()
-    page.locator("#reload").click()
+    page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#rows .row")).not_to_have_count(0)
 
@@ -148,6 +152,6 @@ def test_failed_network_restore_can_be_replaced_by_a_fresh_load(
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#entry-error")).to_contain_text("Could not reach the service")
     page.locator("#entry-browse").click()
-    page.locator("#reload").click()
+    page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#rows .row")).not_to_have_count(0)

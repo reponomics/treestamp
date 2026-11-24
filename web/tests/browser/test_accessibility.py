@@ -13,7 +13,7 @@ pytestmark = pytest.mark.browser
 def open_editor(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
 
 
 def test_accessibility_fold_spacers_are_not_exposed_as_buttons(

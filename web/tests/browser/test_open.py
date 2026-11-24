@@ -10,31 +10,23 @@ from playwright.sync_api import Page, expect  # noqa: E402
 pytestmark = pytest.mark.browser
 
 
-def test_updated_open_shows_compact_completion_without_a_confirmation(
-    page: Page, service: str
+@pytest.mark.parametrize("updated", [False, True])
+def test_open_accepts_updated_or_unchanged_trees_without_a_confirmation(
+    page: Page, service: str, updated: bool
 ) -> None:
     def change_notice(route):
         response = route.fetch()
         data = response.json()
-        data["dirty"] = True
-        data["notice"] = "Treestamp updated"
+        data["dirty"] = updated
+        data["notice"] = "Snapshot comparison completed"
         route.fulfill(response=response, json=data)
 
     page.route("**/api/preview*", change_notice)
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#notice")).to_have_count(0)
-    expect(page.locator("#stage-status")).to_have_text("Treestamp updated")
+    expect(page.locator("#error")).to_be_hidden()
     expect(page.locator("#status")).to_have_text("")
     expect(page.locator("dialog[open]")).to_have_count(0)
-
-
-def test_unchanged_open_has_no_update_notice(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo?root=.")
-    expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#notice")).to_have_count(0)
-    expect(page.locator("#stage-status")).to_have_text("Treestamp is up to date")
-    expect(page.locator("#status")).to_have_text("")
 
 
 def test_unavailable_captured_source_never_falls_back_to_latest_head(
@@ -58,7 +50,6 @@ def test_unavailable_captured_source_never_falls_back_to_latest_head(
     )
     page.reload()
     expect(page.locator("#error")).to_contain_text("Captured snapshot unavailable.")
-    expect(page.locator("#stage-status")).to_have_text("No treestamp")
     assert page.url == address
     assert previews == []
 

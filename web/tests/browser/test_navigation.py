@@ -17,7 +17,7 @@ def row(page: Page, path: str) -> Locator:
 def open_editor(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.locator("#tui-mode").click()
     expect(page.locator("#tui-mode")).to_have_attribute("aria-pressed", "true")
 

@@ -13,7 +13,8 @@ pytestmark = pytest.mark.browser
 def open_source_browser(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     expect(page.locator('.source-row[data-path="."]')).to_be_visible()
 
 
@@ -31,7 +32,7 @@ def test_choose_folder_and_create_without_typing(
     src.locator(".source-name").click()
     expect(src).to_have_attribute("aria-selected", "true")
     expect(src).to_have_attribute("aria-expanded", "true")
-    page.locator("#reload").click()
+    page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#rows .row")).to_have_count(3)
     expect(page.locator("#region")).to_contain_text('root = "src"')
@@ -76,28 +77,41 @@ def test_unified_keyboard_visits_files_and_expands_folders(
     expect(tree.locator('[data-path="."]')).to_be_focused()
 
 
-def test_failed_document_load_preserves_selection_and_accepted_draft(
-    page: Page, service: str
+@pytest.mark.parametrize(("width", "height"), [(320, 568), (1280, 900)])
+def test_failed_document_load_preserves_visible_selection_and_accepted_draft(
+    page: Page, service: str, width: int, height: int
 ) -> None:
+    page.set_viewport_size({"width": width, "height": height})
     open_source_browser(page, service)
     previous = page.locator("#region").text_content()
     address = page.url
     saved = page.evaluate("localStorage.getItem('treestamp.current-draft')")
     page.locator('.source-row[data-path="docs"]').click()
-    selected = page.locator('.source-row[data-path="docs/guide.md"]')
+    selected = page.locator('.source-row[data-path="README.md"]')
     selected.locator(".source-name").click()
-    page.locator("#reload").click()
-    expect(page.locator("#reload-error")).to_contain_text("No treestamp found")
+    message = "Could not load this file."
+    page.route(
+        "**/api/preview",
+        lambda route: route.fulfill(
+            status=503,
+            json={"error": {"code": "upstream_unavailable", "message": message}},
+        ),
+    )
+    page.locator("#source-load").click()
+    expect(page.locator("#reload-error")).to_contain_text(message)
     expect(selected).to_have_attribute("aria-selected", "true")
     expect(selected).to_be_focused()
+    expect(selected).to_be_in_viewport(ratio=1)
     expect(page.locator('.source-row[data-path="docs"]')).to_have_attribute(
         "aria-selected", "false"
     )
-    expect(page.locator("#reload")).to_have_text("Load")
+    expect(page.locator("#source-load")).to_be_enabled()
+    expect(page.locator("#source-create")).to_be_disabled()
     expect(page.locator("#region")).to_have_text(previous)
     assert page.url == address
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == saved
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#region")).to_have_text(previous)
 
 
@@ -133,11 +147,14 @@ def test_source_browser_failure_preserves_the_existing_draft(
             json={"error": {"code": "upstream_unavailable", "message": "Try again"}},
         ),
     )
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     expect(page.locator("#reload-error")).to_contain_text("Try again")
-    expect(page.locator("#reload")).to_be_disabled()
+    expect(page.locator("#source-load")).to_be_disabled()
+    expect(page.locator("#source-create")).to_be_disabled()
     expect(page.locator("#region")).to_have_text(previous)
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).to_have_text(previous)
 
@@ -173,7 +190,7 @@ def test_visual_selection_preserves_byte_path_identity(
         ),
     )
     with page.expect_request("**/api/preview*") as request:
-        page.locator("#reload").click()
+        page.locator("#source-create").click()
     assert request.value.post_data_json["root"] == raw_path
 
 
@@ -204,7 +221,8 @@ def test_picker_matches_editor_tree_density_and_indentation(
         }"""
         root_before = editor_root.evaluate(geometry, ".name")
         folder_before = editor_folder.evaluate(geometry, ".name")
-        page.locator("#browse-source").click()
+        page.locator(".wordmark").click()
+        page.locator("#entry-browse").click()
         source_root = page.locator('.source-row[data-path="."]')
         source_folder = page.locator('.source-row[data-path="src"]')
         expect(source_folder).to_be_visible()

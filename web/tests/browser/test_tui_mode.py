@@ -15,7 +15,7 @@ pytestmark = pytest.mark.browser
 def open_editor(page: Page, service: str, *, tui_mode: bool = True) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     expect(page.locator("#tui-mode")).to_have_attribute("aria-pressed", "false")
     if tui_mode:
         page.locator("#tui-mode").click()
@@ -119,7 +119,8 @@ def test_tui_annotation_uses_dialog_and_preserves_native_text_input(
     expect(docs.locator(".note")).to_have_text("# ahHSf?")
     expect(docs).to_be_focused()
 
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator("#entry-change-repo").click()
     repository = page.locator("#entry-url")
     repository.fill("")

@@ -83,18 +83,13 @@ def placement_service(placement_repo: Fixture) -> Iterator[str]:
 def open_document(page: Page, base: str) -> None:
     page.goto(base + "/")
     page.get_by_label("Public GitHub repository").fill("fixture/repo")
-    page.get_by_role("button", name="Browse", exact=True).click()
-    page.locator('#source-browser [data-path="README.md"]').click()
-    page.get_by_role("button", name="Load", exact=True).click()
+    page.locator("#entry-load").click()
     expect(page.locator("#placement-dialog")).to_be_visible()
-    expect(page.locator("#placement-choice-summary")).to_have_text(
-        "4 notes refer to paths that are no longer in the tree."
-    )
+    expect(page.locator("#placement-work")).to_be_visible()
 
 
 def start(page: Page, base: str) -> None:
     open_document(page, base)
-    page.locator("#placement-start").click()
     expect(page.locator("#placement-source")).to_have_text("old-tools/")
 
 
@@ -103,9 +98,12 @@ def destination(page: Page, path: str) -> Locator:
 
 
 def expect_provisional(page: Page) -> None:
-    expect(page.locator("#workspace")).to_be_hidden()
-    expect(page.locator("#rows .row")).to_have_count(0)
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#entry")).to_be_hidden()
+    expect(page.locator("#rows .row").first).to_be_visible()
+    assert page.locator("#placement-dialog").evaluate("node => node.matches(':modal')")
     assert page.evaluate(DRAFT) is None
+    assert page.url.endswith("/")
 
 
 def test_recursive_folder_placement_undo_and_finish_enter_editor(
@@ -115,15 +113,16 @@ def test_recursive_folder_placement_undo_and_finish_enter_editor(
     page.on("pageerror", lambda error: errors.append(str(error)))
     start(page, placement_service)
     expect_provisional(page)
+    initial_progress = page.locator("#placement-progress").text_content()
     destination(page, "tools").click()
     page.locator("#placement-place").click()
     expect(page.locator("#placement-source")).to_have_text("retired.py")
-    expect(page.locator("#placement-progress")).to_have_text("1 left · 3 placed")
+    expect(page.locator("#placement-progress")).not_to_have_text(initial_progress)
     expect(destination(page, "tools")).to_contain_text("Data preparation tools")
     expect_provisional(page)
     page.locator("#placement-undo").click()
     expect(page.locator("#placement-source")).to_have_text("old-tools/")
-    expect(page.locator("#placement-progress")).to_have_text("4 left · 0 placed")
+    expect(page.locator("#placement-progress")).to_have_text(initial_progress)
     expect(destination(page, "tools")).not_to_contain_text("Data preparation tools")
     expect(page.locator("#placement-undo")).to_be_disabled()
     page.locator("#placement-place").click()
@@ -152,12 +151,13 @@ def test_recursive_folder_placement_undo_and_finish_enter_editor(
 
 
 @pytest.mark.parametrize("restore", ["fragment", "local"])
-def test_decline_accepts_updated_tree_and_restore_does_not_prompt_again(
+def test_finish_without_transfers_accepts_tree_and_restore_does_not_prompt_again(
     page: Page, placement_service: str, restore: str
 ) -> None:
     open_document(page, placement_service)
     expect_provisional(page)
-    page.locator("#placement-decline").click()
+    page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#workspace")).to_be_visible()
     region = page.locator("#region").text_content()
     assert region and "Keep this existing note" in region
@@ -187,10 +187,33 @@ def test_browsing_destinations_does_not_expand_the_accepted_draft(
     expect(destination(page, "tools/formats/csv.py")).to_be_visible()
     expect_provisional(page)
     page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator('#rows .row[data-path="tools"]')).to_be_visible()
     expect(page.locator('#rows .row[data-path="tools/formats"]')).to_have_count(0)
     expect(page.locator("#region")).not_to_contain_text("Normalize incoming columns")
+
+
+def test_skipped_annotation_can_be_undone_before_finishing_without_transfers(
+    page: Page, placement_service: str
+) -> None:
+    start(page, placement_service)
+    source = page.locator("#placement-source").text_content()
+    note = page.locator("#placement-note").text_content()
+    page.locator("#placement-skip").click()
+    expect(page.locator("#placement-source")).not_to_have_text(source)
+    expect(page.locator("#placement-undo")).to_be_enabled()
+    expect_provisional(page)
+    page.locator("#placement-undo").click()
+    expect(page.locator("#placement-source")).to_have_text(source)
+    expect(page.locator("#placement-note")).to_have_text(note)
+    expect(page.locator("#placement-undo")).to_be_disabled()
+    expect_provisional(page)
+    page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
+    expect(page.locator("#region")).not_to_contain_text(note)
+    expect(page.locator("#region")).to_contain_text("Keep this existing note")
+    assert page.evaluate(DRAFT) is not None
 
 
 def test_replacement_requires_a_choice_and_preserves_existing_note_on_cancel(
@@ -216,6 +239,7 @@ def test_replacement_requires_a_choice_and_preserves_existing_note_on_cancel(
     expect(page.locator("#placement-source")).to_have_text("csv.py")
     expect(destination(page, "keep.py")).to_contain_text("Keep this existing note")
     page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#region")).to_contain_text("Keep this existing note")
     expect(page.locator("#region")).not_to_contain_text("Normalize incoming columns")
 
@@ -227,6 +251,7 @@ def test_failed_request_keeps_the_last_accepted_decision_and_can_retry(
     destination(page, "tools").click()
     page.locator("#placement-place").click()
     expect(page.locator("#placement-source")).to_have_text("retired.py")
+    progress = page.locator("#placement-progress").text_content()
     page.route(
         "**/api/placement",
         lambda route: route.fulfill(
@@ -236,7 +261,7 @@ def test_failed_request_keeps_the_last_accepted_decision_and_can_retry(
     page.locator("#placement-undo").click()
     expect(page.locator("#placement-error")).to_contain_text("Please try again.")
     expect(page.locator("#placement-source")).to_have_text("retired.py")
-    expect(page.locator("#placement-progress")).to_have_text("1 left · 3 placed")
+    expect(page.locator("#placement-progress")).to_have_text(progress)
     expect(destination(page, "tools")).to_contain_text("Data preparation tools")
     expect_provisional(page)
     page.unroute("**/api/placement")
@@ -244,6 +269,7 @@ def test_failed_request_keeps_the_last_accepted_decision_and_can_retry(
     expect(page.locator("#placement-source")).to_have_text("old-tools/")
     expect(page.locator("#placement-error")).to_be_hidden()
     page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
 
 
@@ -291,30 +317,32 @@ def test_fresh_same_document_load_restarts_placement_without_losing_saved_draft(
     page: Page, placement_service: str
 ) -> None:
     start(page, placement_service)
+    initial_progress = page.locator("#placement-progress").text_content()
     destination(page, "tools").click()
     page.locator("#placement-place").click()
     expect(page.locator("#placement-source")).to_have_text("retired.py")
     page.locator("#placement-skip").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#workspace")).to_be_visible()
     previous = page.locator("#region").text_content()
     saved = page.evaluate(DRAFT)
     address = page.url
     assert previous and "Data preparation tools" in previous
-    page.locator("#browse-source").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="README.md"]').click()
-    page.locator("#reload").click()
-    expect(page.locator("#placement-choice-summary")).to_have_text(
-        "4 notes refer to paths that are no longer in the tree."
-    )
-    page.locator("#placement-start").click()
+    page.locator("#source-load").click()
+    expect(page.locator("#placement-work")).to_be_visible()
     expect(page.locator("#placement-source")).to_have_text("old-tools/")
-    expect(page.locator("#placement-progress")).to_have_text("4 left · 0 placed")
-    expect(page.locator("#region")).to_have_text(previous)
+    expect(page.locator("#placement-progress")).to_have_text(initial_progress)
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
     assert page.evaluate(DRAFT) == saved
     assert page.url == address
     for selector in ("#placement-skip", "#placement-finish", "#placement-reveal"):
         expect(page.locator(selector)).to_be_enabled()
     page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
     assert page.evaluate(DRAFT) != saved
@@ -336,25 +364,28 @@ def test_file_and_folder_destinations_make_incompatible_choices_unavailable(
     expect(page.locator("#placement-folder")).to_be_enabled()
     expect(page.locator("#placement-target-hint")).to_contain_text("Choose a file")
     page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
 
 
 def test_failed_new_document_placement_preserves_the_previous_saved_draft(
     page: Page, placement_service: str
 ) -> None:
     open_document(page, placement_service)
-    page.locator("#placement-decline").click()
+    page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#workspace")).to_be_visible()
-    original = page.locator("#region").text_content()
     saved = page.evaluate(DRAFT)
-    page.locator("#browse-source").click()
+    address = page.url
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="README.md"]').click()
-    page.locator("#reload").click()
-    page.locator("#placement-start").click()
+    page.locator("#source-load").click()
     destination(page, "tools").click()
     page.locator("#placement-place").click()
     expect(page.locator("#placement-source")).to_have_text("retired.py")
     assert page.evaluate(DRAFT) == saved
-    expect(page.locator("#region")).to_have_text(original)
+    assert page.url == address
+    candidate = page.locator("#region").text_content()
     page.route("**/api/placement", lambda route: route.abort())
     page.locator("#placement-skip").click()
     expect(page.locator("#placement-error")).to_contain_text(
@@ -362,17 +393,55 @@ def test_failed_new_document_placement_preserves_the_previous_saved_draft(
     )
     expect(page.locator("#placement-source")).to_have_text("retired.py")
     assert page.evaluate(DRAFT) == saved
-    expect(page.locator("#region")).to_have_text(original)
+    assert page.url == address
+    expect(page.locator("#region")).to_have_text(candidate)
     page.unroute("**/api/placement")
     page.locator("#placement-finish").click()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).to_contain_text("Data preparation tools")
     assert page.evaluate(DRAFT) != saved
 
 
+def test_invalid_transfer_preview_restores_previous_draft_and_presentation(
+    page: Page, placement_service: str
+) -> None:
+    page.goto(placement_service + "/")
+    page.locator("#explore-example").click()
+    expect(page.locator("#workspace")).to_be_visible()
+    page.locator("#tab-stamp").click()
+    previous = page.locator("#region").text_content()
+    rows = page.locator("#rows").inner_html()
+    saved = page.evaluate(DRAFT)
+    address = page.url
+    page.locator(".wordmark").click()
+
+    def corrupt_transfer(route: Route) -> None:
+        response = route.fetch()
+        candidate = response.json()
+        candidate["placement"]["current"] = None
+        route.fulfill(response=response, json=candidate)
+
+    page.route("**/api/preview", corrupt_transfer)
+    page.locator("#entry-url").fill("fixture/repo")
+    page.locator("#entry-load").click()
+    expect(page.locator("#entry-error")).to_be_visible()
+    expect(page.locator("#placement-dialog")).to_be_hidden()
+    expect(page.locator("#entry-welcome")).to_be_visible()
+    expect(page.locator("#workspace")).to_be_hidden()
+    expect(page.locator("#tab-stamp")).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#region")).to_have_text(previous)
+    assert page.locator("#rows").inner_html() == rows
+    assert page.evaluate(DRAFT) == saved
+    assert page.url == address
+    page.locator("#entry-return-welcome").click()
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#region")).to_have_text(previous)
+
+
 @pytest.mark.parametrize("width,height", [(320, 568), (390, 667)])
 @pytest.mark.parametrize("long_note", [False, True])
-def test_mobile_transfer_keeps_invitation_and_work_actions_in_view(
+def test_mobile_transfer_keeps_work_actions_in_view(
     page: Page, placement_service: str, width: int, height: int, long_note: bool
 ) -> None:
     page.set_viewport_size({"width": width, "height": height})
@@ -389,11 +458,8 @@ def test_mobile_transfer_keeps_invitation_and_work_actions_in_view(
         page.route("**/api/preview*", long_source)
     open_document(page, placement_service)
     dialog = page.locator("#placement-dialog")
-    for selector in ("#placement-start", "#placement-decline"):
-        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
     assert dialog.evaluate("node => node.scrollWidth <= node.clientWidth")
     assert dialog.evaluate("node => node.scrollHeight <= node.clientHeight + 1")
-    page.locator("#placement-start").click()
     expect(page.locator("#placement-work")).to_be_visible()
     if long_note:
         expect(page.locator("#placement-source")).to_have_text("source/")
@@ -433,10 +499,10 @@ def test_discard_restores_post_placement_session_without_reopening_queue(
 ) -> None:
     open_document(page, placement_service)
     if transfer:
-        page.locator("#placement-start").click()
         place_folder_and_finish(page)
     else:
-        page.locator("#placement-decline").click()
+        page.locator("#placement-finish").click()
+        expect(page.locator("#placement-dialog")).to_be_hidden()
         expect(page.locator("#workspace")).to_be_visible()
     baseline = page.locator("#region").text_content()
     assert baseline and "Historical importer" not in baseline
@@ -522,10 +588,11 @@ def test_resume_progress_after_placement_preserves_notes_without_reopening_queue
     previous = page.locator("#region").text_content()
     record = page.evaluate(DRAFT)
     address = page.url
-    page.locator("#browse-source").click()
-    expect(page.locator("#entry-return")).to_have_text("Resume session")
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="tools"]').click()
-    page.locator("#entry-return").click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#region")).to_have_text(previous)
     expect(page.locator("#placement-dialog")).to_be_hidden()
     page.locator(".wordmark").click()

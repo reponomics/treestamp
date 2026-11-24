@@ -152,7 +152,7 @@ def show_picker(page: Page, repo: str) -> None:
 
 def select_document(page: Page) -> None:
     page.locator('.source-row[data-path="README.md"] .source-name').click()
-    visible(page, "#reload")
+    visible(page, "#source-load")
 
 
 def show_load_error(page: Page) -> None:
@@ -171,20 +171,16 @@ def show_load_error(page: Page) -> None:
         ),
     )
     try:
-        page.locator("#reload").click()
+        page.locator("#source-load").click()
         visible(page, "#reload-error")
     finally:
         page.unroute(pattern)
 
 
-def show_placement_choice(page: Page) -> None:
-    page.locator("#reload").click()
-    visible(page, "#placement-choice")
-
-
 def show_placement_tree(page: Page) -> None:
-    page.locator("#placement-start").click()
+    page.locator("#source-load").click()
     visible(page, "#placement-work")
+    visible(page, "#workspace")
 
 
 def show_expired_draft(page: Page, url: str) -> None:
@@ -241,7 +237,6 @@ def capture_profile(
         ("picker-folder", lambda: show_picker(page, args.repo)),
         ("picker-file", lambda: select_document(page)),
         ("failed-load", lambda: show_load_error(page)),
-        ("placement-invitation", lambda: show_placement_choice(page)),
         ("placement-tree", lambda: show_placement_tree(page)),
         ("expired-draft", lambda: show_expired_draft(page, args.url)),
     ]
