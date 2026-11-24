@@ -89,7 +89,7 @@ cov-python: ## Run both Python coverage suites and report their combined total
 	$(PY) -m coverage combine --data-file=.coverage.python --keep .coverage web/.coverage
 	$(PY) -m coverage report --data-file=.coverage.python --fail-under=95
 cov-all: cov-python web-js-cov ## Measure all current coverage scopes: combined Python and separate JavaScript
-ci: format-check lint typecheck cov ## Run core quality gates (see docs/testing.md for combined checks)
+ci: format-check lint typecheck cov ## Run core formatting, lint, types, and coverage checks
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
 metadata-check: ## Check built metadata, README rendering, package contents, and hashes

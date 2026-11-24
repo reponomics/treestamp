@@ -1,6 +1,6 @@
 # CLI reference
 
-This reference describes the current commands, path rules, and editor behavior. See [Design](design.md) for the document format and architecture; [ADR 0001](adr/0001-cli-path-coherence.md) records the rationale for the CLI design.
+This reference describes commands, path rules, and terminal editor behavior. See [Design](design.md) for the architecture and document format.
 
 ## Commands
 
@@ -17,7 +17,7 @@ treestamp --help
 
 With no command, `treestamp` loads a valid treestamp from `README.md` in the current working directory (cwd), or starts a new tree rooted at cwd if that README is missing or contains no treestamp. It opens the editor directly. An unreadable document or malformed treestamp fails instead of silently starting over. Bare invocation outside a Git repository fails.
 
-Use `new` to start fresh regardless of an existing README, or `load` to require an existing treestamp. These commands replace the former `tui` verb and `--load` flag; there is no terminal source picker or New/Load screen.
+Use `new` to start fresh regardless of an existing README, or `load` to require an existing treestamp.
 
 Use `treestamp help` (equivalent to `treestamp --help`) for general help, or `treestamp help <command>` for command-specific help. For example, `treestamp help new` describes source selection and `treestamp help update` describes unattended maintenance. Help works outside Git. Within the TUI, press `?` for keyboard help.
 
@@ -60,13 +60,11 @@ New treestamps start with the selected root's immediate children and collapsed d
 
 When an interactive load leaves notes without their original rows, a **Transfer notes?** modal offers to move them to the updated tree or continue without them. Enter starts transfer; Escape continues without those notes. New trees and loads without unmatched notes open the editor directly. No document changes until you choose Write.
 
-The transfer view remains queue-based for this release. One source appears above the destination tree. Navigate with the arrow keys, press Enter to transfer the note to the selected row, or `s` to skip it. A directory belongs on a directory; other notes belong on files or other leaf entries. Opening folders only changes browsing. Transferring reveals the destination in the saved draft so its annotation is included. `H` reveals hidden destinations for browsing. Replacing an existing annotation requires confirmation. `?` shows full paths and notes when a line is truncated.
+The transfer view presents one source note at a time above the destination tree. Navigate with the arrow keys, press Enter to transfer the note to the selected row, or `s` to skip it. A directory belongs on a directory; other notes belong on files or other leaf entries. Opening folders only changes browsing. Transferring reveals the destination in the saved draft so its annotation is included. `H` reveals hidden destinations for browsing. Replacing an existing annotation requires confirmation. `?` shows full paths and notes when a line is truncated.
 
 Transferring a directory also carries its pending annotated descendants recursively when their full relative paths and entry kinds match. An unannotated removed directory can stand for its annotated descendants. Missing paths, kind changes, conflicting notes, and destinations already holding another transferred note remain for individual decisions. Skipping a directory leaves its descendants available individually. Matching never uses just a basename and does not guess renamed paths.
 
-`u` undoes the last decision, including every note carried by a directory transfer. Resolving the queue opens the editor automatically. Escape skips remaining items and starts editing. Transfer is a one-time step for each document load; skipped notes are omitted when writing. A navigable list remains a [follow-up for both interfaces](ui-flow.md#follow-up-navigable-note-list).
-
-Run `make reconcile-demo` from a development checkout for a disposable example with moved files, a directory with nested notes, and a removed entry. Its writes stay in a temporary repository.
+`u` undoes the last decision, including every note carried by a directory transfer. Resolving the queue opens the editor automatically. Escape skips remaining items and starts editing. Transfer is a one-time step for each document load; skipped notes are omitted when writing.
 
 New treestamps are exported with Copy or Print; paste the complete block into your document. Copy includes markers and any configuration comment. Loaded sessions can Write directly back to the original document while preserving surrounding bytes. New-tree sessions have no write destination. To start another session, exit and invoke the desired command. Unwritten changes require confirmation before quitting.
 

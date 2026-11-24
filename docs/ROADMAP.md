@@ -12,3 +12,4 @@ These feature proposals are not prerequisites for 1.0.
 - [ ] **Codefences optional for all display modes.**
 - [ ] **Align annotations at specified column-number.**
 - [ ] **Add protection against linters/formatters for filenames with trailing whitespace.**
+- [ ] **Navigable note-transfer list in both editors.** Allow users to select notes in any order, revisit or remove transfers, ignore notes, and finish with explicit treatment of unresolved notes.

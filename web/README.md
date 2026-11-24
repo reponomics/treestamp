@@ -42,7 +42,7 @@ Counting each reference bounds repeated decoding and the targets' contribution t
 
 The [shared UI patterns](../docs/ui-patterns.md) define button roles, interaction states, and brand typography. Their CSS is shared across the landing page, picker, editor, and dialogs.
 
-Follow the [testing guide](../docs/testing.md) for hosted quality gates, JavaScript coverage, browser setup and commands, fixture contracts, and known warnings. Build the hosted container with `make web-image`.
+The [testing policy](../docs/testing.md) defines suite responsibilities and coverage scope. [Contributing](../.github/CONTRIBUTING.md#focused-checks) documents test commands, browser setup, and coverage reports. Build the hosted container with `make web-image`.
 
 The opt-in example and retained example links use bundled offline fixtures. Opening an example's live repository follows the same public default-branch policy as any other repository.
 

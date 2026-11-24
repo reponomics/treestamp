@@ -5,7 +5,7 @@ Treestamp produces a curated directory tree of a Git repository and maintains it
 - the `treestamp` Python package on PyPI, providing the command-line interface, the terminal editor, and the pre-commit hooks
 - the hosted web editor at <https://treestamp.reponomics.org>, a FastAPI service in `web/` that uses the same package and is deployed as a container on Fly.io
 
-This document describes the actors, the actions each performs, and the external interfaces of both assets. Update it when a change adds or removes an interface, an actor, or a stored or transmitted kind of data. The [security assessment](security-assessment.md) builds on this description.
+This document describes system boundaries, data flow, and interface contracts. The [CLI reference](cli-reference.md) describes terminal usage, [UI flow](ui-flow.md) describes browser interactions, and [UI patterns](ui-patterns.md) defines shared web controls. The [security assessment](security-assessment.md) builds on the boundaries described here.
 
 ## Actors
 
@@ -29,7 +29,7 @@ This document describes the actors, the actions each performs, and the external 
 
 ## Core package
 
-The modules in `src/treestamp/` have narrow responsibilities:
+The core modules are organized as follows:
 
 | Module | Responsibility |
 | --- | --- |
@@ -46,15 +46,13 @@ The modules in `src/treestamp/` have narrow responsibilities:
 
 ### Local actions
 
-- **Snapshot.** Treestamp captures the Git index (or a ref given with `--target`) once. Every later action in that run or editing session uses the same snapshot, so files changing on disk do not alter the tree being edited.
-- **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
-- **Start or load.** The CLI resolves the source before opening the terminal editor. Creation captures the selected subtree; interactive loading reads the document and prepares an updated draft against the captured index, retaining supported curation and offering transfer for unmatched notes. See the [CLI reference](cli-reference.md) for command defaults and explicit paths.
-- **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
-- **Write.** `update` and the editor's **Write to document** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. The editor offers writing only for a loaded document, and always writes back to that document. New treestamps are copied or printed for insertion into a document.
-- **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
-- **Copy.** The editor sends the complete treestamp to a native clipboard command if one is on `PATH`, otherwise to the terminal through OSC 52.
+Source acquisition captures an immutable Git index or commit snapshot. The editor derives curation state from that snapshot and an optional loaded document; subsequent edits do not reread the filesystem tree. Stored paths are repository-relative, while displayed paths are relative to the selected subtree. Document operations stay within the selected repository and reject symlink traversal and submodule-boundary crossings.
 
-The core package makes no network requests.
+Document reads locate one marked region and validate its tree and metadata. Loading into an editor applies automatic maintenance against the snapshot and retains unmatched notes for explicit transfer decisions. Extraction reads the stored region without acquiring a source snapshot. The [CLI reference](cli-reference.md) defines how commands choose these operations and handle unmatched notes.
+
+Writes render a replacement region while preserving surrounding bytes and supported document formatting. Preparation records the destination's content; publication refuses the write if that content has changed. A temporary file in the same directory replaces the destination atomically. The terminal editor writes only to its loaded document. Draft edits remain in memory until exported or written.
+
+Clipboard output uses a native clipboard command from `PATH`, falling back to terminal OSC 52. The core package makes no network requests.
 
 ## Hosted editor
 
@@ -92,35 +90,7 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
-The [CLI reference](cli-reference.md) documents command usage, path rules, and defaults. [ADR 0001](adr/0001-cli-path-coherence.md) records the rationale for those choices.
-
-Bare `treestamp` loads a valid treestamp from cwd's `README.md`, or starts a fresh tree rooted at cwd when that README is absent or unmarked. Malformed or unreadable documents fail. `treestamp new [PATH]` explicitly starts fresh at cwd or the selected directory; a regular file selects its parent without becoming a write destination. `treestamp load [DOCUMENT]` strictly loads cwd's README or an explicit document. These commands enter the editor directly, without a terminal source picker. Explicit paths are cwd-relative or absolute and select their containing repository. Loaded tree scope comes from repository-relative document metadata.
-
-`load --print` validates and extracts the stored region without acquiring a new snapshot, updating the tree, or checking unmatched notes. `new --print` generates a fresh tree from the selected root's staged index. Bare `--print` uses the same automatic source choice as bare interactive startup. Printing writes stdout, never the document; it accepts no maintenance flags.
-
-`treestamp update [DOCUMENT] [--target REF] [--compare REF] [--skip-notes-transfer]` prepares an automatic replacement for cwd's README or the specified document. `--target` chooses a local Git ref instead of the index; `--compare` enables supported leaf-rename matching. After automatic matching, notes omitted from the resulting draft block writing unless the explicit override is supplied. Matched notes remain preserved. No transfer prompt is shown in headless commands.
-
-`treestamp check [DOCUMENT] [--target REF] [--compare REF]` uses the same document, repository, and automatic maintenance rules, reports a proposed diff and any unmatched notes, and never writes. It reports drift without requiring transfer decisions.
-
-CLI document discovery rejects symlinks, including traversed components before `..` normalization. An explicitly selected document in an initialized nested repository or submodule uses that repository; an uninitialized submodule remains a boundary. Within an editing session, tree roots and document paths remain repository-relative, and document operations cannot cross into another repository.
-
-`treestamp --version` prints the installed version.
-
-Output is UTF-8. Exit codes:
-
-| Code | Meaning |
-| --- | --- |
-| 0 | Success, or the document is current |
-| 1 | `check` found that the document needs updating |
-| 2 | Invalid input or a curation constraint |
-| 3 | Git or the filesystem could not supply the required facts |
-| 130 | Interrupted |
-
-Errors are written to standard error, prefixed with `treestamp:`.
-
-### Terminal editor
-
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to document (loaded sessions only), `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. The CLI resolves and validates a source before opening the editor, which identifies its selected root and explains an empty staged tree. Interactive loads offer a Transfer notes modal only when notes lose their original paths. The existing transfer queue retains Transfer, Skip, and Undo; a navigable list is deferred for both interfaces. New sessions export through Copy or Print; loaded sessions can write back to their original document. Starting another session requires a new CLI invocation.
+The CLI exposes source creation, document loading and extraction, read-only comparison, and guarded updates. It selects repository context before invoking the shared engine. The [CLI reference](cli-reference.md) owns command syntax, path defaults, exit status, and terminal editor controls.
 
 ### Document format
 
@@ -132,7 +102,7 @@ New regions have one blank line after the start marker, between configuration an
 
 `prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference. [ADR 0002](adr/0002-formatter-compatible-documents.md) records the formatting rationale and alternatives.
 
-Both editors offer an attribution toggle, off by default. When enabled, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
+The optional attribution footer is disabled by default. When present, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 
 [Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and metadata values. Equivalent TOML formatting and the supported boundary spacing may be changed by users or formatters without changing those values.
 

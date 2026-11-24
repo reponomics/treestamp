@@ -40,15 +40,11 @@ The address can also encode editing state, and explicit address state takes prec
 
 Loading a document whose annotated paths disappeared opens one **Transfer notes** modal over the prepared editor in Tree view. The modal immediately shows the source note and destination tree; there is no separate invitation or preparation page. Creating a treestamp and resuming recent work bypass this step.
 
-The modal keeps one source name and note above the destination tree. **Transfer here** (Enter) transfers the note, **Skip note** (S) leaves it out, and **Undo** (U) reverses the preceding decision. Left and Right close and open folders; the selected folder also has an Open/Close control. The current release processes notes sequentially.
+The modal keeps one source name and note above the destination tree. **Transfer here** (Enter) transfers the note, **Skip note** (S) leaves it out, and **Undo** (U) reverses the preceding decision. Left and Right close and open folders; the selected folder also has an Open/Close control. Notes are processed sequentially.
 
 Transferring a directory carries notes at identical relative paths beneath it recursively when entry kinds match. Missing paths and conflicting notes remain queued. Replacing an existing destination note requires confirmation. Undo reverses the whole directory transfer together. **Continue without remaining notes** finishes with unresolved notes omitted; Escape has the same effect when no request is pending. Resolving the final note completes the modal automatically.
 
 The editor behind the modal presents the initial incoming tree, but does not accept it yet. Destination browsing is provisional: opening folders or revealing hidden entries does not change saved folds or exclusions. Transfer reveals the actual destination of a transferred note. The previous accepted session, URL, and browser record remain intact until the modal finishes. Failed requests preserve the last accepted transfer decision. Cancelling or superseding the load restores the preceding presentation. A fresh document load starts transfer again from the document.
-
-### Follow-up: navigable note list
-
-Replace the sequential interaction with a list of unresolved, transferred, and ignored notes. Users should be able to visit notes in any order, revisit a transfer, remove or change its destination, and mark a note ignored. A single Done action should finish whenever the user chooses, with clear treatment of any unresolved notes. This is deferred beyond the current release; Undo and Skip remain the supported controls for now.
 
 ## Discard changes
 
@@ -56,10 +52,4 @@ Replace the sequential interaction with a list of unresolved, transferred, and i
 
 The session envelope retains both initial and current curation, so a successfully restored cached draft retains its discard baseline. Older state without initial curation adopts its restored curation as the baseline. A failed discard preserves the current treestamp and its cached state.
 
-## Terminal behavior
-
-The terminal editor opens directly after the CLI resolves a source. Bare `treestamp` loads a valid treestamp from cwd's README, or creates a fresh tree at cwd when that README is missing or unmarked. `new [PATH]` and `load [DOCUMENT]` make that choice explicit. Invalid documents fail instead of starting over. There is no terminal source picker or New/Load screen.
-
-Interactive loads prepare an updated draft and offer **Transfer notes?** only for notes whose paths disappeared. Enter starts the existing queue; Escape continues without these notes. Transfer, Skip, Undo, and the queue's completion behavior remain supported. The navigable-list follow-up above applies to both interfaces. New sessions have no write destination; loaded sessions preserve their original document until Write is chosen.
-
-Terminal drafts live in the running process. Persistence comes from writing a loaded document or copying a new treestamp into documentation. Headless `load --print` extracts saved content and never enters this flow. See the [CLI reference](cli-reference.md) for source semantics, maintenance safeguards, and keyboard controls.
+Terminal interactions are documented in the [CLI reference](cli-reference.md#interactive-editor).
