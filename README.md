@@ -248,7 +248,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (20 files, 2 folders)
+│   ├── tests/ (21 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -301,7 +301,7 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (20 files, 2 folders)
+|   |-- tests/ (21 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml

@@ -324,7 +324,7 @@ def test_export_has_independent_body_bound_limiter_and_no_affinity(
 ) -> None:
     config = make_config(
         max_state_bytes=64,
-        op_rate_limit_per_minute=2,
+        svg_export_rate_limit_per_minute=2,
         fly_session_routing=True,
         fly_machine_id="a" * 14,
     )
@@ -354,3 +354,12 @@ def test_export_streaming_body_limit_without_content_length(client: TestClient) 
     )
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "export_too_large"
+
+
+def test_export_rejects_excessively_nested_metadata(client: TestClient) -> None:
+    region = render_region(Document(Node(".", "", "dir")))
+    config = "<!-- treestamp:config\nhidden = " + "[" * 600 + "]" * 600 + "\n-->\n"
+    region = region.replace("```", config + "```", 1)
+    response = client.post("/api/export/svg", json=export_body(region))
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_export"

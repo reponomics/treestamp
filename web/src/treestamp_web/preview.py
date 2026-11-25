@@ -11,6 +11,7 @@ import time
 import uuid
 from collections import Counter
 from dataclasses import asdict, dataclass, replace
+from functools import partial
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -44,6 +45,7 @@ from treestamp_web.examples import bundled_default_branch, bundled_tree
 from treestamp_web.export import parse_appearance
 from treestamp_web.github import BODY_CAP, TooLargeError
 from treestamp_web.links import LinkError, Repository, parse_link, repository
+from treestamp_web.svg_work import SvgWorkPool
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -584,7 +586,11 @@ class PreviewService:
         client: GitHubClient,
         config: Config,
         clock: Callable[[], float] = time.time,
+        *,
+        svg_work: SvgWorkPool | None = None,
     ) -> None:
+        self._svg_work = svg_work or SvgWorkPool()
+        self._owns_svg_work = svg_work is None
         self._client, self._config = client, config
         self._snapshots = SnapshotCache(config, clock)
 
@@ -593,6 +599,8 @@ class PreviewService:
 
     def close(self) -> None:
         self._snapshots.close()
+        if self._owns_svg_work:
+            self._svg_work.close()
 
     async def browse(self, repo: Repository) -> dict[str, object]:
         snapshot, acquired = await self._preview_snapshot(repo)
@@ -639,7 +647,7 @@ class PreviewService:
                 else None
             ),
         )
-        result = self._compose(
+        result = await self._compose(
             repo,
             target,
             session,
@@ -687,7 +695,7 @@ class PreviewService:
             initial_curation=initial,
             svg_appearance=appearance,
         )
-        result = self._compose(
+        result = await self._compose(
             request.repository,
             target,
             session,
@@ -716,7 +724,7 @@ class PreviewService:
             revision=len(request.decisions),
             initial_curation=session.state(),
         )
-        result = self._compose(
+        result = await self._compose(
             opening.repository, target, session, opening.document, envelope, snapshot
         )
         placement = summary(
@@ -836,7 +844,36 @@ class PreviewService:
             raise PreviewError(422, "curation", str(exc)) from None
         return _Target(snapshot.resolved, root, node, snapshot.default_branch)
 
-    def _compose(
+    async def _compose(
+        self,
+        repo: Repository,
+        target: _Target,
+        session: TreeSession,
+        document: str,
+        envelope: Envelope,
+        snapshot: Snapshot,
+        *,
+        reveal: bool = False,
+        opening: bool = False,
+        warnings: list[str] | None = None,
+    ) -> Preview:
+        compose = partial(
+            self._compose_sync,
+            repo,
+            target,
+            session,
+            document,
+            envelope,
+            snapshot,
+            reveal=reveal,
+            opening=opening,
+            warnings=warnings,
+        )
+        if envelope.svg_appearance is not None:
+            return await self._svg_work.run(compose)
+        return compose()
+
+    def _compose_sync(
         self,
         repo: Repository,
         target: _Target,

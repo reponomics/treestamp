@@ -57,7 +57,7 @@ Writes render a replacement region while preserving surrounding bytes and suppor
 
 Clipboard output uses a native clipboard command from `PATH`, falling back to terminal OSC 52.
 
-SVG source writes regenerate the complete artifact from its embedded document and appearance, while text source writes preserve surrounding prose. SVG exports create a separate repository-relative `.svg` file or explicitly replace another captured destination; they never adopt that destination or clear the source baseline. A same-source export is refused. Both containers reuse the atomic publication and conflict checks above. Incoming SVG drawing markup is discarded and never executed.
+SVG source writes regenerate the complete artifact from its embedded document and appearance, while text source writes preserve surrounding prose. SVG exports create a separate repository-relative `.svg` file or explicitly replace another captured destination; they never adopt that destination or clear the source baseline. Export destinations must identify a different file from the loaded source, including on case-insensitive filesystems. Both containers reuse the atomic publication and conflict checks above. Incoming SVG drawing markup is discarded and never executed.
 
 The core package makes no network requests.
 
@@ -73,6 +73,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 | `cache.py` | Temporary in-memory snapshot retention (one hour, renewed by successful edits) |
 | `preview.py` | Opens and edits a document against one snapshot |
 | `export.py` | Stateless bounded SVG generation from a complete textual region and validated preferences |
+| `svg_work.py` | Shared SVG worker, admission, and render-time budget |
 | `limits.py` | Per-client token-bucket rate limits, held in process memory |
 | `proxy.py` | Accepts a visitor address from `CF-Connecting-IP` only when the peer is a configured Cloudflare range |
 | `routing.py` | Fly.io session affinity, so a session's requests reach the Machine holding its snapshot |
@@ -130,7 +131,7 @@ The embedded document is authoritative. Loading regenerates the drawing; writing
 
 ### Hosted HTTP API
 
-`POST /api/export/svg` accepts exactly `region`, `text_style`, `show_counts`, and `appearance` (`style`, `theme`). It returns `{ "svg": "…" }` generated from validated complete textual data. The request cap is 2 MiB to allow JSON escaping of a 256 KiB payload; generated SVG is capped at 1 MiB. A separate limiter uses the configured operation rate. This stateless route does not acquire repositories or use session affinity; responses are not cached. SVG loads retain original bytes in the snapshot cache and metadata only in the client baseline. `present` accepts appearance only for SVG sources; Reset restores baseline appearance.
+`POST /api/export/svg` accepts exactly `region`, `text_style`, `show_counts`, and `appearance` (`style`, `theme`). It returns `{ "svg": "…" }` generated from validated complete textual data. The request cap is 2 MiB to allow JSON escaping of a 256 KiB payload; generated SVG is capped at 1 MiB. SVG export has its own per-client rate limit. Export rendering and loaded-SVG change detection share one worker and a measured render-time budget; excess work receives `503 svg_busy` with `Retry-After`. This stateless route does not acquire repositories or use session affinity; responses are not cached. SVG loads retain original bytes in the snapshot cache and metadata only in the client baseline. `present` accepts appearance only for SVG sources; Reset restores baseline appearance.
 
 The browser application uses these endpoints. They exist to serve that application and are not a supported public API.
 

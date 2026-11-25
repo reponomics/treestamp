@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -39,6 +40,7 @@ from treestamp_web.preview import (
 )
 from treestamp_web.proxy import cloudflare_identity
 from treestamp_web.routing import bind_session, replay_response
+from treestamp_web.svg_work import SvgBusyError, SvgWorkPool
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -126,11 +128,15 @@ def create_app(
         client = GitHubClient(settings, transport=transport, clock=clock)
         await client.seed_budget()
         app.state.client = client
-        app.state.service = PreviewService(client, settings, clock)
+        app.state.svg_work = SvgWorkPool()
+        app.state.service = PreviewService(
+            client, settings, clock, svg_work=app.state.svg_work
+        )
         try:
             yield
         finally:
             app.state.service.close()
+            await app.state.svg_work.aclose()
             await client.aclose()
 
     app = FastAPI(
@@ -143,7 +149,9 @@ def create_app(
     app.state.config = settings
     app.state.limiter = RateLimiter(settings.rate_limit_per_minute, clock)
     app.state.op_limiter = RateLimiter(settings.op_rate_limit_per_minute, clock)
-    app.state.export_limiter = RateLimiter(settings.op_rate_limit_per_minute, clock)
+    app.state.export_limiter = RateLimiter(
+        settings.svg_export_rate_limit_per_minute, clock
+    )
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.middleware("http")
@@ -184,6 +192,10 @@ def create_app(
             **_context(request),
         )
         return _error(status, code, str(exc), retry_after)
+
+    @app.exception_handler(SvgBusyError)
+    async def svg_busy(request: Request, exc: SvgBusyError) -> JSONResponse:
+        return _error(503, "svg_busy", str(exc), exc.retry_after)
 
     @app.exception_handler(MarkerError)
     async def marker_error(request: Request, exc: MarkerError) -> JSONResponse:
@@ -374,7 +386,7 @@ async def svg_export(request: Request) -> JSONResponse:
             ) from None
         raise
     try:
-        svg = export_svg(data)
+        svg = await request.app.state.svg_work.run(partial(export_svg, data))
     except MarkerError as exc:
         raise PreviewError(422, "invalid_export", str(exc)) from None
     return JSONResponse({"svg": svg}, headers={"Cache-Control": "no-store"})

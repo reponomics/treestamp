@@ -38,6 +38,12 @@ The byte limits are checked before building or rendering the source tree, on ope
 
 Counting each reference bounds repeated decoding and the targets' contribution to rendered output: the current codec expands a raw target byte to at most five characters, including list-style escaping. This does not impose a global memory ceiling on the service; other source data and concurrent requests remain subject to their separate limits.
 
+## SVG work limits
+
+`SVG_EXPORT_RATE_LIMIT_PER_MINUTE` limits standalone exports per client (default 30; zero disables this client limit). SVG export and loaded-SVG change detection share one rendering worker per process. Additional jobs receive `503 svg_busy` with `Retry-After` while it is occupied.
+
+The worker has two seconds of render-time credit, replenished at 0.25 seconds per elapsed second. Completed work consumes credit, including failures and work whose caller disconnected. Exhausted credit rejects new jobs until replenished; an admitted job finishes before its cost is charged. This allows short editing bursts while limiting sustained rendering across clients. The per-process work budget remains active independently of the client rate limit.
+
 ## Test and build
 
 The [shared UI patterns](../docs/ui-patterns.md) define button roles, interaction states, and brand typography. Their CSS is shared across the landing page, picker, editor, and dialogs.
