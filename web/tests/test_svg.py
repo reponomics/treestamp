@@ -53,19 +53,20 @@ def export_body(region: str | None = None, **overrides: object) -> dict[str, obj
         "region": region or render_region(Document(Node(".", "", "dir"))),
         "text_style": "unicode",
         "show_counts": True,
-        "appearance": {"style": "continuous", "theme": "light"},
+        "appearance": {"style": "continuous", "theme": "auto"},
     }
     data.update(overrides)
     return data
 
 
-def test_svg_load_is_clean_and_state_has_metadata_only(repo: Repo) -> None:
-    fake, original = svg_source(repo)
+@pytest.mark.parametrize("theme", ["auto", "light", "dark"])
+def test_svg_load_is_clean_and_state_has_metadata_only(repo: Repo, theme: str) -> None:
+    fake, original = svg_source(repo, theme=theme)
     service, client = service_for(fake)
     opened = preview(service, document="assets/tree.svg")
     assert opened.loaded and not opened.dirty
     assert opened.source_format == "svg"
-    assert opened.svg_appearance == SvgAppearance(theme="dark")
+    assert opened.svg_appearance == SvgAppearance(theme=theme)
     assert opened.notice == SVG_NOTICE
     baseline = base64.b64decode(opened.state["baseline"])
     assert (
@@ -108,8 +109,11 @@ def test_svg_dirty_comparison_requires_cached_original(repo: Repo) -> None:
     assert client.calls == calls
 
 
-def test_svg_annotation_and_appearance_reset_keep_source_baseline(repo: Repo) -> None:
-    fake, original = svg_source(repo)
+@pytest.mark.parametrize("theme", ["auto", "dark"])
+def test_svg_annotation_and_appearance_reset_keep_source_baseline(
+    repo: Repo, theme: str
+) -> None:
+    fake, original = svg_source(repo, theme=theme)
     service, _ = service_for(fake)
     opened = preview(service, document="assets/tree.svg")
     edited = op(service, opened, "annotate", "src/main.py", "Edited")
@@ -119,7 +123,7 @@ def test_svg_annotation_and_appearance_reset_keep_source_baseline(repo: Repo) ->
     assert presented.dirty and presented.svg_appearance.theme == "light"
     reset = op(service, presented, "reset")
     assert not reset.dirty and reset.region == opened.region
-    assert reset.svg_appearance.theme == "dark"
+    assert reset.svg_appearance.theme == theme
     assert reset.document == "assets/tree.svg"
     assert (repo.path / "assets/tree.svg").read_bytes() == original
 

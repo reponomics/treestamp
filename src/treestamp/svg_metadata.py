@@ -45,15 +45,15 @@ class SvgAppearance:
     """
 
     style: str = "continuous"
-    theme: str = "light"
+    theme: str = "auto"
 
     def __post_init__(self) -> None:
         if not isinstance(self.style, str) or not re.fullmatch(
             r"[a-z][a-z0-9-]{0,63}", self.style
         ):
             raise MarkerError("SVG style must be a short lowercase identifier")
-        if self.theme not in ("light", "dark"):
-            raise MarkerError("SVG theme must be light or dark")
+        if self.theme not in ("auto", "light", "dark"):
+            raise MarkerError("SVG theme must be auto, light, or dark")
 
 
 @dataclass(frozen=True)

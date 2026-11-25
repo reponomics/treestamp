@@ -31,7 +31,17 @@ __all__ = [
 _DEFAULT_APPEARANCE = SvgAppearance()
 
 # The image has no background. Appearance chooses only its foreground ink.
-_INK = {"light": "#000000", "dark": "#ffffff"}
+_INK = {"auto": "#000000", "light": "#000000", "dark": "#ffffff"}
+# Fixed author-controlled CSS only; labels and imported markup cannot supply rules.
+# No color-scheme override here: the embedding image supplies the preferred scheme.
+_AUTO_STYLE = """<style>
+  text { fill: #000000; }
+  g[stroke] { stroke: #000000; }
+  @media (prefers-color-scheme: dark) {
+    text { fill: #ffffff; }
+    g[stroke] { stroke: #ffffff; }
+  }
+</style>"""
 
 
 def parse_svg(content: bytes) -> SvgArtifact:
@@ -85,10 +95,11 @@ def render_svg(
 
 def _drawing(layout: Layout, appearance: SvgAppearance) -> str:
     foreground = _INK[appearance.theme]
-    parts = [
+    parts = [_AUTO_STYLE] if appearance.theme == "auto" else []
+    parts.append(
         f'<g fill="none" stroke="{foreground}" stroke-opacity="0.4" '
-        'stroke-width="1.25">',
-    ]
+        'stroke-width="1.25">'
+    )
     for line in layout.branches:
         parts.append(
             f'<line x1="{line.x1}" y1="{line.y1}" x2="{line.x2}" y2="{line.y2}"/>'

@@ -315,13 +315,18 @@ def test_rejected_presentation_restores_accepted_controls(
         ),
     )
     page.locator("#tab-stamp").click()
-    page.locator("#style").select_option("ascii")
+    with page.expect_response("**/api/op"):
+        page.locator("#style").select_option("ascii")
     expect(page.locator("#error")).to_be_visible()
     expect(page.locator("#style")).to_have_value("unicode")
     page.locator("#tab-editor").click()
-    page.locator("#show_counts").uncheck()
+    # Rejected edits can revert before check/uncheck verifies its temporary state.
+    # Click to request the change, then assert the accepted state after the response.
+    with page.expect_response("**/api/op"):
+        page.locator("#show_counts").click()
     expect(page.locator("#show_counts")).to_be_checked()
-    page.locator("#attribution").check()
+    with page.expect_response("**/api/op"):
+        page.locator("#attribution").click()
     expect(page.locator("#attribution")).not_to_be_checked()
     expect(page.locator("#tree-attribution")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original_region)

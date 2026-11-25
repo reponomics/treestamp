@@ -36,6 +36,9 @@ def svg_service(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     (fixture.path / "assets/tree.svg").write_text(
         render_svg(document, SvgAppearance(theme="dark")), encoding="utf-8"
     )
+    (fixture.path / "assets/auto.svg").write_text(
+        render_svg(document, SvgAppearance(theme="auto")), encoding="utf-8"
+    )
     (fixture.path / "assets/future.svg").write_text(
         render_svg(document, SvgAppearance(theme="dark")).replace(
             'style="continuous"', 'style="future-layout"'
@@ -65,7 +68,9 @@ def test_preview_copy_and_download_share_bytes_and_preserve_text_source(
     text = page.locator("#region").text_content()
     assert page.locator("#svg-image").get_attribute("src").startswith("blob:")
     svg = export_response.value.json()["svg"]
-    assert render_region(parse_svg(svg.encode()).document) == text
+    artifact = parse_svg(svg.encode())
+    assert artifact.appearance.theme == "auto"
+    assert render_region(artifact.document) == text
 
     page.locator("#svg-copy").click()
     expect(page.locator("#svg-status")).to_have_text("SVG source copied.")
@@ -88,23 +93,86 @@ def test_preview_copy_and_download_share_bytes_and_preserve_text_source(
     assert page.url == original_address
 
 
-def test_appearance_is_independent_of_app_theme_for_text_export(
-    page: Page, service: str
+@pytest.mark.parametrize(
+    "theme, ink, background",
+    [("light", 0, "rgb(255, 255, 255)"), ("dark", 255, "rgb(13, 17, 23)")],
+)
+def test_fixed_appearance_is_independent_of_app_theme_for_text_export(
+    page: Page, service: str, theme: str, ink: int, background: str
 ) -> None:
     page.add_init_script("localStorage.setItem('treestamp-theme', 'dark')")
     open_svg_export(page, service)
     expect(page.locator("#svg-download")).to_be_enabled()
     address = page.url
-    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "dark")
-    page.locator("#svg-theme").select_option("light")
+    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "auto")
+    page.locator("#svg-theme").select_option(theme)
     expect(page.locator("#svg-download")).to_be_enabled()
+    page.wait_for_function(_IMAGE_USES_INK, arg=ink)
     page.locator("#theme-toggle").click()
-    expect(page.locator("#svg-theme")).to_have_value("light")
-    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "light")
-    expect(page.locator("#svg-preview")).to_have_css(
-        "background-color", "rgb(255, 255, 255)"
-    )
+    expect(page.locator("#svg-theme")).to_have_value(theme)
+    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", theme)
+    expect(page.locator("#svg-preview")).to_have_css("background-color", background)
+    page.wait_for_function(_IMAGE_USES_INK, arg=ink)
     assert page.url == address
+
+
+# Inspect the pixels of the real decoded image, not its source attributes: the
+# browser must apply the SVG media query using the embedding app's color scheme.
+_IMAGE_USES_INK = """expected => {
+    const image = document.querySelector('#svg-image');
+    if (!image.complete || !image.naturalWidth) return false;
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let solid = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i + 3] < 250) continue;
+        solid += 1;
+        if (pixels[i] !== expected || pixels[i + 1] !== expected || pixels[i + 2] !== expected) return false;
+    }
+    return solid > 10;
+}"""
+
+
+@pytest.mark.parametrize("loaded", [False, True])
+def test_automatic_preview_follows_app_theme_without_changing_artifact(
+    page: Page, svg_service: str, loaded: bool
+) -> None:
+    page.emulate_media(color_scheme="light")
+    page.add_init_script("localStorage.setItem('treestamp-theme', 'dark')")
+    if loaded:
+        page.goto(f"{svg_service}/fixture/repo?document=assets/auto.svg")
+        expect(page.locator("#rows .row").first).to_be_visible()
+        page.locator("#tab-stamp").click()
+    else:
+        open_svg_export(page, svg_service)
+    expect(page.locator("#svg-download")).to_be_enabled()
+    expect(page.locator("#svg-theme")).to_have_value("auto")
+    expect(page.locator("#svg-image")).to_have_css("color-scheme", "dark")
+    page.wait_for_function(_IMAGE_USES_INK, arg=255)
+    address = page.url
+    cached = page.evaluate("localStorage.getItem('treestamp.current-draft')")
+    image_url = page.locator("#svg-image").get_attribute("src")
+    with page.expect_download() as before:
+        page.locator("#svg-download").click()
+    original = before.value.path().read_bytes()
+    assert parse_svg(original).appearance.theme == "auto"
+
+    page.locator("#theme-toggle").click()
+    expect(page.locator("#svg-image")).to_have_css("color-scheme", "light")
+    page.wait_for_function(_IMAGE_USES_INK, arg=0)
+    page.emulate_media(color_scheme="dark")
+    page.wait_for_function(_IMAGE_USES_INK, arg=0)
+    expect(page.locator("#svg-theme")).to_have_value("auto")
+    assert page.locator("#svg-image").get_attribute("src") == image_url
+    with page.expect_download() as after:
+        page.locator("#svg-download").click()
+    assert after.value.path().read_bytes() == original
+    assert page.url == address
+    assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == cached
 
 
 def test_failed_generation_removes_stale_image_and_disables_actions(
@@ -155,16 +223,17 @@ def test_pending_edits_disable_export_until_new_image_is_ready(
     assert page.locator("#svg-image").get_attribute("src") != old_url
 
 
-@pytest.mark.parametrize("filename", ["tree.svg", "future.svg"])
+@pytest.mark.parametrize("filename", ["tree.svg", "future.svg", "auto.svg"])
 def test_loaded_svg_defaults_to_image_and_retains_appearance_and_filename(
     page: Page, svg_service: str, filename: str
 ) -> None:
+    expected_theme = "auto" if filename == "auto.svg" else "dark"
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{svg_service}/fixture/repo?document=assets/{filename}")
     expect(page.locator("#rows .row").first).to_be_visible()
     page.locator("#tab-stamp").click()
     expect(page.locator("#output-format")).to_have_value("svg")
-    expect(page.locator("#svg-theme")).to_have_value("dark")
+    expect(page.locator("#svg-theme")).to_have_value(expected_theme)
     expect(page.locator("#svg-source-notice")).to_contain_text("regenerated")
     if filename == "future.svg":
         expect(page.locator("#svg-source-notice")).to_contain_text("using continuous")
@@ -188,7 +257,7 @@ def test_loaded_svg_defaults_to_image_and_retains_appearance_and_filename(
     expect(page.locator("#reset-dialog")).to_be_hidden()
     page.locator("#tab-stamp").click()
     page.locator("#output-format").select_option("svg")
-    expect(page.locator("#svg-theme")).to_have_value("dark")
+    expect(page.locator("#svg-theme")).to_have_value(expected_theme)
     expect(page.locator("#svg-source-notice")).to_contain_text("regenerated")
 
 

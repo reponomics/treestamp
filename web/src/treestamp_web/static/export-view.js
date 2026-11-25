@@ -15,7 +15,7 @@ export class ExportView {
     this.copy = document.getElementById("svg-copy");
     this.download = document.getElementById("svg-download");
     this.size = document.getElementById("svg-size");
-    this.appearance = { style: "continuous", theme: "light" };
+    this.appearance = { style: "continuous", theme: "auto" };
     this.visible = false;
     this.serial = 0;
     this.resource = null;
@@ -37,7 +37,7 @@ export class ExportView {
       this.source = editor.state.generation;
       this.output.value = editor.sourceFormat;
       this.appearance = editor.sourceFormat === "svg" ? editor.svgAppearance : {
-        style: "continuous", theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light",
+        style: "continuous", theme: "auto",
       };
     } else if (editor.sourceFormat === "svg") {
       this.appearance = editor.svgAppearance;

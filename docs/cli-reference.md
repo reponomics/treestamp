@@ -8,7 +8,7 @@ treestamp new [DIRECTORY] [--print]
 treestamp load [DOCUMENT] [--print]
 treestamp check [DOCUMENT]
 treestamp update [DOCUMENT] [--skip-notes-transfer]
-treestamp export [--load DOCUMENT] --format svg (--stdout | --output PATH) [--theme light|dark] [--replace]
+treestamp export [--load DOCUMENT] --format svg (--stdout | --output PATH) [--theme auto|light|dark] [--replace]
 treestamp export [--load DOCUMENT] --format markdown --stdout
 treestamp help [COMMAND]
 treestamp --version
@@ -51,7 +51,7 @@ Transferring a directory also carries its pending annotated descendants recursiv
 
 `u` undoes the last decision, including every note carried by a directory transfer. Resolving the queue opens the editor automatically. Escape skips remaining items and starts editing. Transfer is a one-time step for each document load; skipped notes are omitted when writing.
 
-Textual treestamps are exported with Copy Markdown or Print; paste the complete block into your document. Copy includes markers and configuration. Write to document updates the loaded source: it preserves surrounding Markdown prose or replaces the complete SVG from its embedded data. New trees have no source write target. Export SVG (`e`) offers Save SVG, Copy SVG, and Cancel, without adopting the export destination or clearing unsaved changes. The dialog retains the loaded SVG appearance, or uses light for a new export. It shows a textual notice instead of a graphical preview. A different existing SVG requires replacement confirmation; intervening changes refuse the write. Unwritten changes require confirmation before quitting.
+Textual treestamps are exported with Copy Markdown or Print; paste the complete block into your document. Copy includes markers and configuration. Write to document updates the loaded source: it preserves surrounding Markdown prose or replaces the complete SVG from its embedded data. New trees have no source write target. Export SVG (`e`) offers Save SVG, Copy SVG, and Cancel, without adopting the export destination or clearing unsaved changes. The dialog retains the loaded SVG appearance, or uses Automatic for a new export. Automatic produces one file for light and dark pages, without inferring a theme from the terminal. It shows a textual notice instead of a graphical preview. A different existing SVG requires replacement confirmation; intervening changes refuse the write. Unwritten changes require confirmation before quitting.
 
 ## Print without opening the editor
 
@@ -79,7 +79,7 @@ treestamp check assets/treestamp.svg
 treestamp update assets/treestamp.svg
 ```
 
-`export` loads and reconciles the source against the staged index, then produces a separate artifact. With no `--load`, it uses cwd’s README when available, otherwise a new tree rooted at cwd. Choose `--stdout` explicitly, or use `--output` with a repository-relative `.svg` path whose parent already exists. Existing destinations require `--replace`; the loaded source is never a valid export destination. Use `update` or TUI Write for that. `--theme` sets light or dark SVG appearance; without it, loaded SVG appearance is retained and other inputs use light. Markdown export supports stdout only, for manual insertion into a document. Exporting does not alter the loaded source. If refreshing would omit unmatched notes, export stops before producing output. Use `treestamp load DOCUMENT` to transfer notes and write the result first, or explicitly omit them with `treestamp update DOCUMENT --skip-notes-transfer` before exporting.
+`export` loads and reconciles the source against the staged index, then produces a separate artifact. With no `--load`, it uses cwd’s README when available, otherwise a new tree rooted at cwd. Choose `--stdout` explicitly, or use `--output` with a repository-relative `.svg` path whose parent already exists. Existing destinations require `--replace`; the loaded source is never a valid export destination. Use `update` or TUI Write for that. `--theme` selects `auto`, `light`, or `dark`. Automatic embeds both ink colors in one transparent SVG and selects them with an internal `prefers-color-scheme` media query. Without `--theme`, loaded SVG appearance is retained and other inputs use Automatic. Markdown export supports stdout only, for manual insertion into a document. Exporting does not alter the loaded source. If refreshing would omit unmatched notes, export stops before producing output. Use `treestamp load DOCUMENT` to transfer notes and write the result first, or explicitly omit them with `treestamp update DOCUMENT --skip-notes-transfer` before exporting.
 
 Save the SVG in the repository and add its README reference manually:
 

@@ -115,8 +115,8 @@ def _export_parser(
     )
     child.add_argument(
         "--theme",
-        choices=("light", "dark"),
-        help="SVG appearance (default: retained, or light)",
+        choices=("auto", "light", "dark"),
+        help="SVG appearance (default: retained, or auto)",
     )
     child.add_argument(
         "--replace",
