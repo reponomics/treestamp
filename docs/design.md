@@ -104,8 +104,6 @@ The CLI exposes source creation, document loading and extraction, read-only comp
 
 ### Document format
 
-[ADR 0004: SVG artifacts with an embedded textual treestamp](adr/0004-structured-svg-artifacts.md) defines paired SVG reading and writing with the complete existing textual treestamp embedded as metadata. Visual styles, container handling, and file destinations are separate from editing and ephemeral session recovery. The next-release implementation follows this contract; the ADR records its frozen envelope and resource limits.
-
 The [README](../README.md#3-add-it-to-your-readme) shows a complete region and describes its markers, drawing styles, and annotations. A document contains exactly one region. Generated textual output uses a code fence with either Unicode or ASCII branches; these choices do not change the encoding of filenames. Markdown-list output and legacy list documents are no longer supported. A recognized list document fails explicitly on load rather than being treated as an absent treestamp. Bare Unicode/ASCII rows remain usable by the internal tree codec; an unfenced root-only document is rejected as the former list representation.
 
 The optional config comment holds TOML with three keys, each generated only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains reserved annotation or symlink syntax, or ends in the Git-link marker. Equivalent authored configuration may include explicit defaults. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
@@ -117,6 +115,14 @@ New regions have one blank line after the start marker, between configuration an
 The optional attribution footer is disabled by default. When present, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 
 [Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and metadata values. Equivalent TOML formatting and the supported boundary spacing may be changed by users or formatters without changing those values.
+
+### SVG artifacts
+
+SVG contains the complete textual treestamp as base64 in a `{urn:treestamp:svg:1}treestamp` element inside the root SVG’s `metadata`. Required attributes are `version="1"`, `codec="treestamp-text-v1"`, `encoding="base64"`, `text_style`, `show_counts`, `style`, and `theme`. The shared text codec validates the decoded document, preserving exact paths, annotations, and curation across Markdown/SVG conversion.
+
+The `continuous` visual style draws connected branches and inline annotations on a transparent background. Appearance is separate from text notation: `auto` selects black or white ink through `prefers-color-scheme`; `light` and `dark` fix the ink color. New exports default to `auto`; loaded SVGs retain supported appearance settings. Unknown visual styles use a reported fallback; unsupported envelope or codec versions fail on load.
+
+The embedded document is authoritative. Loading regenerates the drawing; writing replaces the complete SVG. Dirty-state and `check` comparisons use the original file bytes, so external drawing edits or renderer changes can make a loaded artifact differ immediately. Layout styles share one metadata codec and serializer. Parsing and rendering bounds are defined in [svg_metadata.py](../src/treestamp/svg_metadata.py) and [svg_layout.py](../src/treestamp/svg_layout.py); import safety is described in the [security assessment](security-assessment.md).
 
 ### Pre-commit hooks
 

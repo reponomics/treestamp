@@ -1,6 +1,6 @@
-# SVG export experience
+# SVG export implementation plan (archived)
 
-Status: next-release implementation; validation and release gates are recorded in the ADR. [ADR 0004](adr/0004-structured-svg-artifacts.md) owns the artifact, codec, safety, and publication contracts. This document owns the web/TUI experience and the release sequence. The existing [UI flow](ui-flow.md) describes shipped/current behavior.
+Archived planning and review context for the SVG implementation. The proposal below is retained as history, not current guidance. Current behavior is documented in [UI flow](../ui-flow.md), the [CLI reference](../cli-reference.md#svg-export), and [Design](../design.md#svg-artifacts).
 
 ## Decisions
 
@@ -12,7 +12,7 @@ Retire the unfenced Markdown-list style in the next release. Retain fenced Unico
 
 ## Web editor
 
-Keep the three top-level views: **Tree**, **Export**, and **Info**. Export replaces the current Markdown tab; Tree retains editing controls and its existing text-copy shortcut, labeled **Copy Markdown**. Settings, hiding, and other editing controls remain confined to Tree. Reuse the [shared action and tab conventions](ui-patterns.md); do not add an SVG-specific button style.
+Keep the three top-level views: **Tree**, **Export**, and **Info**. Export replaces the current Markdown tab; Tree retains editing controls and its existing text-copy shortcut, labeled **Copy Markdown**. Settings, hiding, and other editing controls remain confined to Tree. Reuse the [shared action and tab conventions](../ui-patterns.md); do not add an SVG-specific button style.
 
 Export has a labeled **Output** selector with **Markdown** and **SVG**. It starts with the loaded container's format, or Markdown for a newly created tree/example. Switching it only changes the export view. Preserve the choice during this interaction, without introducing durable preferences or saved sessions.
 

@@ -2,7 +2,7 @@
 
 This assessment identifies the security problems most likely to occur in treestamp, or most harmful if they did, and the measures that address them. It covers the current source, including changes since release 0.1.2, and the hosted editor deployed from `main`, using the actors and interfaces in the [design document](design.md). Revise it when a change adds an interface, an actor, a credential, or a new kind of stored or transmitted data.
 
-Last reviewed: 2026-10-29. SVG boundary additions reviewed against the next-release implementation on 2026-11-24; this is not a fresh audit of unrelated surfaces.
+Last reviewed: 2026-10-29.
 
 ## Assets and trust boundaries
 
@@ -44,7 +44,7 @@ The critical code paths are repository-link parsing in `links.py`, the public-vi
 
 ## SVG boundary
 
-SVG imports extract only a versioned namespaced metadata payload. Full-buffer XML parsing rejects DTD declarations before entity processing, with caps on file size, element count, depth, and namespace URI length. The decoded complete textual region passes the existing document codec and identity validation. The application discards incoming drawing markup and regenerates static geometry/text. Browser previews use an image Blob, never imported DOM or HTML; output contains no scripts, foreignObject, external fonts/images, or active references. Automatic appearance adds only a fixed internal CSS media query for text and branch ink; no imported or user-supplied CSS reaches the generated drawing. Limits and schema are recorded in [ADR 0004](adr/0004-structured-svg-artifacts.md#implemented-envelope-and-limits).
+SVG imports extract only a versioned namespaced metadata payload. Full-buffer XML parsing rejects DTD declarations before entity processing, with caps on file size, element count, depth, and namespace URI length. The decoded complete textual region passes the existing document codec and identity validation. The application discards incoming drawing markup and regenerates static geometry/text. Browser previews use an image Blob, never imported DOM or HTML; output contains no scripts, foreignObject, external fonts/images, or active references. Automatic appearance adds only a fixed internal CSS media query for text and branch ink; no imported or user-supplied CSS reaches the generated drawing. The [SVG format contract](design.md#svg-artifacts) describes the envelope and links to its enforced resource bounds.
 
 The stateless export endpoint has an independent bounded request body and rate limiter and performs no GitHub acquisition. It accepts document data, not a session/cache envelope. SVG source updates intentionally replace externally edited drawing markup after original-byte comparison; exports require a separate `.svg` path, explicit existing-file replacement, captured-state checks, and shared atomic publication. Remaining limitations include synchronous rendering cost within those bounds and the existing final-check/replace filesystem race.
 

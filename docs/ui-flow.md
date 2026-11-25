@@ -2,8 +2,6 @@
 
 The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor copies Markdown or downloads/copies a standalone SVG. It does not write repository files or commit to GitHub.
 
-The [SVG export experience](svg-export-flow.md) specifies the Export tab and terminal save/copy flow for this next-release implementation.
-
 ## Arrivals and navigation
 
 | Arrival | Initial experience |
@@ -22,9 +20,9 @@ Browsing candidates preserves the accepted treestamp, its cached record, and its
 
 ## Editing and export views
 
-**Tree** owns editing controls, including notes, hiding, reveal-hidden, Unhide all, and Settings. Leaving Tree closes an open Settings sheet and hides its desktop sidebar section. **Export** selects Markdown or SVG independently of the loaded source. Markdown previews the exact copied region and offers Unicode/ASCII branches. SVG previews the regenerated image with Automatic / Light / Dark appearance choices, Fit width/Actual size, Download SVG, and Copy SVG. Copy SVG copies complete source, including editable metadata. The first output choice follows the loaded container; new trees use Markdown. Tree retains Copy Markdown. Returning to Tree restores editing controls without resetting curation. **Info** also hides editing Settings.
+**Tree** contains editing controls and Settings. **Export** offers Markdown source or an SVG image independently of the loaded format. Markdown uses Unicode or ASCII branches; SVG can be downloaded or copied as complete, editable source. The initial output matches the loaded format, with Markdown selected for new trees. Switching views preserves edits.
 
-New SVG exports default to Automatic: one file adapts its ink to the embedding page’s light or dark color scheme. Loaded SVGs retain their saved appearance, including fixed Light/Dark. The Automatic preview follows the app theme without changing the artifact’s metadata or regenerating its bytes; fixed overrides keep a matching preview backdrop. SVG downloads use the loaded SVG basename or `treestamp.svg`. Users save the file in their repository and add its README image reference manually. The app never inserts uploaded SVG markup into the page; it generates an image from validated embedded treestamp data. Pending or failed generation disables export actions. Changing the output view does not change source identity or dirty state. Changing appearance is part of a loaded SVG’s accepted content; Discard restores its initial appearance. Browser downloads do not claim to overwrite the source repository.
+New SVG exports use **Automatic** appearance, adapting one transparent image to light and dark color schemes. **Light** and **Dark** provide fixed overrides; loaded SVGs retain their saved appearance. Users save the SVG in their repository and reference it from their README. Loading that file reopens its embedded treestamp for editing. See [Document format](design.md#svg-artifacts) for the metadata and regeneration contract.
 
 ## Source selection
 
@@ -34,7 +32,7 @@ Browsing does not inspect every file for treestamp markers. If a selected docume
 
 ## Returning to recent work
 
-The browser caches one accepted draft after successful opening or editing. **Resume session** is a best-effort convenience for short return visits, not a save or backup feature. Storage failures do not prevent editing, and returning later is not guaranteed to recover the draft. Users obtain their treestamp through Copy treestamp and keep it in their own document.
+The browser caches one accepted draft after successful opening or editing. **Resume session** is a best-effort convenience for short return visits, not a save or backup feature. Storage failures do not prevent editing, and returning later is not guaranteed to recover the draft. Users keep their work by copying Markdown or downloading an SVG.
 
 Repository draft restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the cached draft and offers repository browsing to start fresh; it does not silently substitute another commit. Unmodified bundled examples can be restored from their included data without the server snapshot; edited examples require the captured server snapshot. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor).
 
