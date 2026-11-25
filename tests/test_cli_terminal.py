@@ -57,7 +57,7 @@ def test_check_sanitizes_surrounding_document_context_only_for_terminal(
     )
     context = f"context: \x1b[31mred\x1b[0m{eol}"
     # A valid compact region keeps the outside text within unified diff context.
-    compact = path.read_text().replace(
+    compact = path.read_text(encoding="utf-8").replace(
         "\n\n<!-- treestamp:end -->", "\n<!-- treestamp:end -->"
     )
     path.write_bytes((compact.replace("\n", eol) + context).encode("utf-8"))
