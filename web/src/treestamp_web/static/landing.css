@@ -62,8 +62,12 @@
 }
 
 @media (max-width: 39.999rem) and (max-height: 40rem) {
-  .entry-welcome { margin-top: var(--s2); }
+  .entry-welcome { margin-top: 0; }
   .entry-hero { margin-bottom: var(--s3); }
+  .entry-hero h2 { margin-bottom: var(--s2); }
+  #entry-guidance, .entry-primary-actions, .entry-source-choice, .entry-offramp {
+    margin-top: var(--s2);
+  }
 }
 
 @media (max-width: 23rem) {

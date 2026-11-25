@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 ROOT = Path(__file__).resolve().parents[2]
+SCROLLBAR_ALLOWANCE = 15  # Exercise classic scrollbar width on overlay-scrollbar hosts.
 PROFILES = [
     ("phone", 320, 568, "dark"),
     ("tablet", 768, 1024, "light"),
@@ -247,6 +248,8 @@ def capture_profile(
         ("placement-tree", lambda: show_placement_tree(page)),
         ("expired-draft", lambda: show_expired_draft(page, args.url)),
     ]
+    if name == "phone":
+        actions.insert(1, ("welcome-narrow", lambda: show_welcome(page, args.url)))
     # Register filenames before capture so interrupted runs can also be cleaned.
     metadata = json.loads(args.output.joinpath("manifest.json").read_text())
     metadata["captures"].extend(
@@ -255,6 +258,14 @@ def capture_profile(
     write_manifest(args.output, metadata)
     try:
         for state, action in actions:
+            page.set_viewport_size(
+                {
+                    "width": width - SCROLLBAR_ALLOWANCE
+                    if state == "welcome-narrow"
+                    else width,
+                    "height": height,
+                }
+            )
             gallery.take(state, action)
     finally:
         context.close()

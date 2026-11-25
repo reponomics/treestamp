@@ -12,7 +12,9 @@ pytestmark = pytest.mark.browser
 
 @pytest.mark.parametrize("scheme", ["light", "dark"])
 @pytest.mark.parametrize(
-    ("width", "height"), [(320, 568), (390, 667), (768, 1024), (1440, 900)]
+    ("width", "height"),
+    # A 305px viewport also exercises the width lost to a 15px desktop scrollbar.
+    [(305, 568), (320, 568), (390, 667), (768, 1024), (1440, 900)],
 )
 def test_landing_actions_are_reachable_and_keyboard_browsing_returns_to_welcome(
     page: Page, service: str, scheme: str, width: int, height: int
