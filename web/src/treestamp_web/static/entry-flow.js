@@ -96,13 +96,16 @@ export class EntryFlow {
 
   clearError() {
     for (const id of ["entry-error", "reload-error"]) element(id).hidden = true;
+    element("entry-url").removeAttribute("aria-invalid");
   }
 
-  showError(message, hint = "") {
+  // Only an unusable address marks the field invalid; other failures leave it as typed.
+  showError(message, hint = "", code = "") {
     for (const id of ["entry-error", "reload-error"]) {
       element(id).textContent = [message, hint].filter(Boolean).join(" ");
       element(id).hidden = false;
     }
+    if (code === "invalid_link") element("entry-url").setAttribute("aria-invalid", "true");
   }
 
   setBusy(busy) {

@@ -61,20 +61,19 @@
         <label for="entry-url">Public GitHub repository</label>
         <div class="entry-repo-row">
           <span class="entry-repo-icon"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="#github-mark"/></svg></span>
-          <input id="entry-url" type="text" placeholder="owner/repo or URL" aria-describedby="entry-guidance" required spellcheck="false">
+          <input id="entry-url" type="text" placeholder="owner/repo or URL" aria-describedby="entry-error" required spellcheck="false">
         </div>
-        <p id="entry-guidance">Create a new tree at the repository root, or load a treestamp from README.md.</p>
+        <p id="entry-error" class="entry-error" role="alert" hidden></p>
         <div class="entry-primary-actions">
           <button id="entry-create" class="primary" type="submit" disabled>Create treestamp</button>
-          <button id="entry-load" type="submit" disabled>Load treestamp</button>
+          <button id="entry-load" type="submit" disabled>Load from README</button>
         </div>
         <p id="entry-progress" role="status"></p>
         <div class="entry-secondary-actions">
-          <button id="entry-browse" type="button" disabled>Choose another folder or file…</button>
-          <button id="explore-example" type="button">Try example</button>
+          <button id="entry-browse" type="button" disabled>Pick a folder or file…</button>
+          <p class="entry-example">No repository handy? <button id="explore-example" class="text-action" type="button">Try an example</button></p>
         </div>
       </form>
-      <p id="entry-error" class="entry-error" role="alert" hidden></p>
       <button id="entry-return-welcome" type="button" hidden>Resume session</button>
       <figure class="entry-treestamp">
         <figcaption class="visually-hidden">An example treestamp showing a project's folders and files with notes.</figcaption>

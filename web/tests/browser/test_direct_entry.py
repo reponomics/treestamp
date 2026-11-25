@@ -88,6 +88,7 @@ def test_direct_readme_load_stays_on_landing_until_single_candidate_is_ready(
 @pytest.mark.parametrize(
     ("action", "status", "code"),
     [
+        ("create", 400, "invalid_link"),
         ("load", 404, "not_found"),
         ("load", 422, "document_has_no_treestamp"),
         ("load", 422, "curation"),
@@ -128,6 +129,13 @@ def test_failed_direct_open_keeps_landing_input_and_accepted_draft(
     expect(page.locator("#entry-url")).to_have_value(repository)
     for selector in ("#entry-create", "#entry-load", "#entry-browse"):
         expect(page.locator(selector)).to_be_enabled()
+    # Only an unusable address is attributed to the field, and editing clears it.
+    field = page.locator("#entry-url")
+    if code == "invalid_link":
+        expect(field).to_have_attribute("aria-invalid", "true")
+        field.press("End")
+        field.press_sequentially("/")
+    expect(field).not_to_have_attribute("aria-invalid", "true")
     assert len(requests) == 1
     assert page.url == address
     assert page.evaluate(DRAFT) == saved

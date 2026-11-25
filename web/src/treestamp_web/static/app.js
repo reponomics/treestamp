@@ -148,11 +148,11 @@ function clearCountdown() {
   }
 }
 
-function showError(message, hint, retryAfter) {
+function showError(message, hint, retryAfter, code = "") {
   errorMessage.textContent = message;
   errorHint.textContent = hint || "";
   errorPanel.hidden = false;
-  if (!document.getElementById("entry").hidden) entryFlow.showError(message, hint);
+  if (!document.getElementById("entry").hidden) entryFlow.showError(message, hint, code);
   const dialogError = document.querySelector("dialog[open] .dialog-error");
   if (dialogError) {
     dialogError.textContent = [message, hint].filter(Boolean).join(" ");
@@ -557,7 +557,7 @@ function rejectResponse(body, responseStatus) {
       ? "Choose the treestamp wordmark to return to the start page."
       : "Browse the repository to start a new treestamp."
     : hintFor(error.code, responseStatus);
-  showError(message, hint, error.retry_after || null);
+  showError(message, hint, error.retry_after || null, error.code);
   return false;
 }
 

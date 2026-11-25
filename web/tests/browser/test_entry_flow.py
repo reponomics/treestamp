@@ -62,8 +62,10 @@ def test_example_offramp_opens_one_curated_editor_without_requests(
         ),
     )
     page.goto(service + "/")
-    expect(page.get_by_role("button", name="Try example", exact=True)).to_have_count(1)
-    page.get_by_role("button", name="Try example", exact=True).click()
+    expect(page.get_by_role("button", name="Try an example", exact=True)).to_have_count(
+        1
+    )
+    page.get_by_role("button", name="Try an example", exact=True).click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#entry")).to_be_hidden()
     expect(page.locator("#example-context")).to_have_count(0)
@@ -310,8 +312,11 @@ def test_entry_controls_are_readable_and_fit_without_full_width_mobile_button(
         assert page.locator(selector).evaluate(
             "element => parseFloat(getComputedStyle(element).fontSize) >= 16"
         )
-    expect(page.locator("#explore-example")).to_have_css("text-decoration-line", "none")
-    expect(page.locator("#explore-example")).to_have_css("border-top-style", "solid")
+    # The example is an aside in a sentence, quieter than the repository actions.
+    expect(page.locator("#explore-example")).to_have_css(
+        "text-decoration-line", "underline"
+    )
+    expect(page.locator("#explore-example")).to_have_css("border-top-style", "none")
     page.locator("#entry-url").fill("fixture/repo")
     button = page.locator("#entry-create").bounding_box()
     field = page.locator("#entry-url").bounding_box()

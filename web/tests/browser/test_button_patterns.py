@@ -104,7 +104,6 @@ def test_secondary_buttons_and_links_share_appearance_across_screens(
     page.mouse.move(0, 0)
     for selector in (
         "#entry-return-welcome",
-        "#explore-example",
         "#entry-load",
         "#entry-browse",
     ):
