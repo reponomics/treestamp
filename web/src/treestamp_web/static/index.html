@@ -25,15 +25,17 @@
     <div class="masthead-inner">
       <a class="wordmark" href="/" aria-label="treestamp — choose a repository">
         <svg class="mark" viewBox="0 0 64 64" width="30" height="30" aria-hidden="true" focusable="false">
-          <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="5"/>
-          <g fill="currentColor">
-            <path d="M9 22h6l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 37z"/>
-            <path d="M37 13h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
-            <path d="M37 27h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
-            <path d="M37 41h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
-          </g>
-          <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square">
-            <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
+          <g id="treestamp-mark">
+            <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="5"/>
+            <g fill="currentColor">
+              <path d="M9 22h6l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 37z"/>
+              <path d="M37 13h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+              <path d="M37 27h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+              <path d="M37 41h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+            </g>
+            <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square">
+              <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
+            </g>
           </g>
         </svg>
         <h1 class="brand-wordmark">treestamp</h1>
@@ -53,6 +55,7 @@
         <h2 id="entry-title" class="brand-wordmark">treestamp</h2>
         <p class="entry-purpose">an open source editor for directory trees</p>
         <p class="entry-credit">built by the humans and agents at <a href="https://github.com/reponomics">reponomics</a></p>
+        <svg class="entry-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><use href="#treestamp-mark"/></svg>
       </div>
       <form id="entry-form" autocomplete="off">
         <label for="entry-url">Public GitHub repository</label>
@@ -65,13 +68,13 @@
           <button id="entry-load" type="submit" disabled>Load treestamp</button>
         </div>
         <p id="entry-progress" role="status"></p>
-        <button id="entry-browse" class="entry-source-choice" type="button" disabled>Choose another folder or file…</button>
+        <div class="entry-secondary-actions">
+          <button id="entry-browse" type="button" disabled>Choose another folder or file…</button>
+          <button id="explore-example" type="button">Try example</button>
+        </div>
       </form>
       <p id="entry-error" class="entry-error" role="alert" hidden></p>
-      <div class="entry-offramp">
-        <button id="entry-return-welcome" type="button" hidden>Resume session</button>
-        <button id="explore-example" type="button">Try example</button>
-      </div>
+      <button id="entry-return-welcome" type="button" hidden>Resume session</button>
       <figure class="entry-treestamp">
         <figcaption class="visually-hidden">An example treestamp showing a project's folders and files with notes.</figcaption>
         <ul class="sample-tree" aria-hidden="true">

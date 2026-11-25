@@ -6,7 +6,23 @@
   margin: clamp(1.5rem, 6vh, 4.5rem) auto var(--s7);
 }
 
-.entry-hero { margin-bottom: var(--s7); }
+/* The mark fills the space beside the hero text and is omitted where that space is lacking. */
+.entry-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--s5);
+  align-items: center;
+  margin-bottom: var(--s7);
+}
+.entry-hero > :not(.entry-mark) { grid-column: 1; }
+.entry-mark {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  width: clamp(7rem, 16vw, 10rem);
+  height: auto;
+  aspect-ratio: 1;
+  color: var(--accent);
+}
 .entry-hero h2 {
   font-size: clamp(2.75rem, 7vw, 4.5rem);
   line-height: 1.1;
@@ -22,12 +38,13 @@
 #entry-url { flex: 1; width: 100%; min-width: 0; background: var(--controls-surface); }
 .entry-primary-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
 .entry-primary-actions > button { flex: 1; min-width: 0; white-space: normal; }
-.entry-source-choice { margin-top: var(--s3); max-width: 100%; white-space: normal; }
+.entry-secondary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); }
+#entry-browse { max-width: 100%; white-space: normal; }
 #entry-progress { color: var(--ink-secondary); margin-top: var(--s2); }
 #entry-progress:empty { display: none; }
 #entry-guidance { margin-top: var(--s3); max-width: 62ch; color: var(--ink-secondary); text-wrap: pretty; }
-.entry-offramp { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); }
 #explore-example { margin-left: auto; }
+#entry-return-welcome { margin-top: var(--s3); }
 
 /* The illustration uses the editor/picker branch renderer and .indent geometry.
    Only its ink is quieter; line segments meet across adjacent rows. */
@@ -48,15 +65,15 @@
 .sample-root { color: var(--ink); }
 .sample-note { margin-left: var(--s4); color: var(--ink-secondary); }
 :root[data-theme="dark"] .sample-tree {
-  --tree-guide-ink: color-mix(in srgb, var(--ink) 42%, var(--paper));
-  color: color-mix(in srgb, var(--ink) 67%, var(--paper));
+  --tree-guide-ink: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  color: color-mix(in srgb, var(--ink) 82%, var(--paper));
   text-shadow: 0 1px 0 #000;
 }
-:root[data-theme="dark"] .sample-root { color: color-mix(in srgb, var(--ink) 82%, var(--paper)); }
 
 @media (max-width: 39.999rem) {
   .entry-welcome { margin-top: var(--s5); }
   .entry-hero { margin-bottom: var(--s5); }
+  .entry-mark { display: none; }
   .sample-note { display: none; }
   .entry-treestamp { margin-top: var(--s5); padding-top: var(--s3); }
 }
@@ -65,7 +82,7 @@
   .entry-welcome { margin-top: 0; }
   .entry-hero { margin-bottom: var(--s3); }
   .entry-hero h2 { margin-bottom: var(--s2); }
-  #entry-guidance, .entry-primary-actions, .entry-source-choice, .entry-offramp {
+  #entry-guidance, .entry-primary-actions, .entry-secondary-actions, #entry-return-welcome {
     margin-top: var(--s2);
   }
 }
