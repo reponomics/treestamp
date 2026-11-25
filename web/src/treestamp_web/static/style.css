@@ -666,7 +666,7 @@ pre {
   left: 0.5ch;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--tree-guide-ink, var(--ink));
+  border-left: var(--tree-guide-width, 1px) solid var(--tree-guide-ink, var(--ink));
 }
 .indent.branch.last::before { bottom: 50%; }
 .indent.branch::after {
@@ -675,7 +675,7 @@ pre {
   left: 0.5ch;
   right: calc(1ch - var(--s1));
   top: 50%;
-  border-top: 1px solid var(--tree-guide-ink, var(--ink));
+  border-top: var(--tree-guide-width, 1px) solid var(--tree-guide-ink, var(--ink));
 }
 .fold {
   min-height: 0;
