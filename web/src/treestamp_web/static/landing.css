@@ -32,24 +32,41 @@
 .entry-credit a { color: var(--accent); font-weight: var(--weight-strong); }
 .entry-credit a:hover { color: var(--accent-hover); }
 
-/* The repository field is the page's main interaction: larger type, an accent border and a soft halo. */
+/* The repository field is the page's main interaction: one solid bar whose
+   filled GitHub cell is the only accent fill until a repository is entered. */
 #entry-form label { display: block; margin-bottom: var(--s2); font-size: var(--t-md); font-weight: var(--weight-strong); }
-.entry-repo-row { display: flex; align-items: stretch; gap: var(--s2); }
+.entry-repo-row {
+  display: flex;
+  align-items: stretch;
+  min-height: 3.5rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--r-lg);
+  background: var(--controls-surface);
+  overflow: hidden;
+}
+/* The focus ring sits flush with the bar so the two read as one thicker edge. */
+.entry-repo-row:focus-within { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 0; }
+.entry-repo-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 3.5rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.entry-repo-icon svg { width: 1.5rem; height: 1.5rem; fill: currentColor; }
 #entry-url {
   flex: 1;
   width: 100%;
   min-width: 0;
-  padding: var(--s4);
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-family: var(--mono);
   font-size: var(--t-md);
-  background: var(--controls-surface);
-  border: 2px solid var(--accent);
-  border-radius: var(--r-lg);
-  box-shadow:
-    0 0 0 var(--s1) color-mix(in srgb, var(--accent) 22%, transparent),
-    0 var(--s2) var(--s6) color-mix(in srgb, var(--accent) 20%, transparent);
 }
-#entry-url:focus { outline-offset: var(--s1); }
+#entry-url:focus { outline: none; }
 .entry-primary-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
 .entry-primary-actions > button { flex: 1; min-width: 0; white-space: normal; }
 .entry-secondary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); }
@@ -93,7 +110,8 @@
   .entry-hero h2 { font-size: 3.5rem; }
   .entry-mark { display: none; }
   /* The monospace placeholder does not fit narrow phones. */
-  #entry-url { font-family: inherit; }
+  #entry-url { padding: 0 var(--s3); font-family: inherit; }
+  .entry-repo-icon { width: 2.75rem; }
   .sample-note { display: none; }
   .entry-treestamp { margin-top: var(--s5); padding: var(--s3) var(--s4); }
   .sample-tree { font-size: var(--t-base); }
@@ -105,13 +123,9 @@
   .entry-hero h2 { font-size: 2.75rem; margin-bottom: var(--s2); }
   .entry-purpose { font-size: 1.125rem; }
   .entry-credit, #entry-form label, #entry-guidance { font-size: var(--t-base); }
-  #entry-url { padding: var(--s2) var(--s3); }
+  .entry-repo-row { min-height: 3rem; }
+  #entry-url { padding: 0 var(--s2); }
   #entry-guidance, .entry-primary-actions, .entry-secondary-actions, #entry-return-welcome {
     margin-top: var(--s2);
   }
-}
-
-@media (max-width: 23rem) {
-  .entry-repo-row { flex-wrap: wrap; justify-content: flex-end; }
-  #entry-url { flex-basis: 100%; }
 }
