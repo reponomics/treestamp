@@ -1,6 +1,7 @@
 """SVG export dialog keeps failures reversible and source updates explicit."""
 
 import asyncio
+from dataclasses import replace
 
 import pytest
 from textual.widgets import Input, Static
@@ -8,6 +9,7 @@ from textual.widgets import Input, Static
 from treestamp import tui
 from treestamp.artifacts import parse_artifact
 from treestamp.editor import EditorController
+from treestamp.model import Entry, Settings, build_tree
 from treestamp.tui import TreestampApp
 from treestamp.tui_dialogs import ConfirmScreen
 from treestamp.tui_export import SvgExportScreen
@@ -176,7 +178,16 @@ def test_terminal_transport_limit_offers_file_save(
     editor: EditorController, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(tui, "_clipboard_command", lambda: None)
-    editor.state.session.set_annotation("readme", "long note " * 12_000)
+    # Stay inside the image width limit while exceeding OSC 52's byte budget.
+    tree = build_tree([Entry(f"file{index:03}.py") for index in range(200)])
+    tree = replace(
+        tree,
+        children=tuple(
+            replace(node, annotation="long note " * 40) for node in tree.children
+        ),
+    )
+    editor = EditorController(replace(editor.state.snapshot, tree=tree), Settings())
+    assert len(editor.svg_text().encode("utf-8")) > 100_000
 
     async def journey() -> None:
         app = TreestampApp(editor)
