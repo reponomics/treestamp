@@ -218,7 +218,7 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ./
 ├── .github/ (9 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (13 files, 1 folder)
+├── docs/ (14 files, 1 folder)
 ├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
@@ -241,13 +241,14 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── svg_metadata.py
 │       ├── tui.py
 │       ├── tui_dialogs.py
+│       ├── tui_export.py
 │       ├── tui_reconcile.py
 │       └── tui_rows.py
-├── tests/ (31 files)  # Contract and integration tests
+├── tests/ (39 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (18 files, 2 folders)
+│   ├── tests/ (20 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -270,7 +271,7 @@ The alternate styles below are generated from the same tree and checked for fres
 ./
 |-- .github/ (9 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
-|-- docs/ (13 files, 1 folder)
+|-- docs/ (14 files, 1 folder)
 |-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
@@ -293,13 +294,14 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- svg_metadata.py
 |       |-- tui.py
 |       |-- tui_dialogs.py
+|       |-- tui_export.py
 |       |-- tui_reconcile.py
 |       `-- tui_rows.py
-|-- tests/ (31 files)  # Contract and integration tests
+|-- tests/ (39 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (18 files, 2 folders)
+|   |-- tests/ (20 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
