@@ -127,6 +127,19 @@ def prepare_artifact_write(
     )
 
 
+def is_source_destination(destination: Path, source: Path | None) -> bool:
+    """Recognize lexical equality and existing aliases without following symlinks."""
+    if source is None:
+        return False
+    destination, source = checked_path(destination), checked_path(source)
+    if destination == source:
+        return True
+    try:
+        return destination.samefile(source)
+    except FileNotFoundError:
+        return False
+
+
 def capture_export_destination(
     destination: Path, *, repository: Path, source: Path | None = None
 ) -> DocumentSnapshot | None:
@@ -139,7 +152,7 @@ def capture_export_destination(
     document_path(repository, relative)
     if destination.suffix.lower() != ".svg":
         raise MarkerError("SVG export requires a .svg destination")
-    if source is not None and destination == checked_path(source):
+    if is_source_destination(destination, source):
         raise MarkerError("use Write to document to update the loaded source")
     if not destination.parent.is_dir():
         raise MarkerError("SVG export parent directory must already exist")

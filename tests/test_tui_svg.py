@@ -241,3 +241,56 @@ def test_new_tree_exports_automatic_svg_without_a_theme_selection(
             assert editor.state.document_path is None
 
     asyncio.run(journey())
+
+
+@pytest.mark.parametrize("alias_kind", ["hardlink", "case"])
+def test_export_dialog_avoids_and_rejects_source_alias(
+    repo: Repo, alias_kind: str
+) -> None:
+    controller = load_svg(repo)
+    source_name = "TreeStamp.svg" if alias_kind == "case" else "tree.svg"
+    if alias_kind == "case":
+        repo.write(source_name, repo.read("tree.svg"))
+        controller.adopt(controller.prepare_load(source_name))
+    suggested = repo.path / "treestamp.svg"
+    source = controller.state.document_path
+    assert source is not None
+    if alias_kind == "hardlink":
+        suggested.hardlink_to(source)
+    elif not suggested.exists():
+        pytest.skip("filesystem is case-sensitive")
+    original = source.read_bytes()
+    baseline = controller.state.baseline
+
+    async def journey() -> None:
+        app = TreestampApp(controller)
+        async with app.run_test() as pilot:
+            await press(pilot, "e")
+            screen = app.screen
+            assert isinstance(screen, SvgExportScreen)
+            field = screen.query_one(Input)
+            assert field.value == ""
+            field.value = "treestamp.svg"
+            await pilot.click("#svg-export-save")
+            await pilot.pause()
+            assert app.screen is screen
+            assert "update the loaded source" in rendered_text(
+                screen.query_one("#svg-export-error", Static)
+            )
+            assert source.read_bytes() == original
+            assert controller.state.baseline is baseline
+
+    asyncio.run(journey())
+
+
+def test_export_dialog_has_no_uninspectable_suggestion(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = load_svg(repo)
+
+    def denied(*args: object) -> bool:
+        raise PermissionError("cannot inspect identity")
+
+    monkeypatch.setattr("treestamp.tui_export.is_source_destination", denied)
+    screen = SvgExportScreen(controller, lambda text, kind: "copied")
+    assert screen.initial == ""

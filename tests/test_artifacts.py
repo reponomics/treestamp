@@ -200,3 +200,73 @@ def test_export_publish_failure_preserves_original(repo, monkeypatch):
         publish_write(prepared)
     assert destination.read_text(encoding="utf-8") == "preserve me"
     assert not list(repo.path.glob(".treestamp-*"))
+
+
+@pytest.mark.parametrize("alias_kind", ["hardlink", "case"])
+def test_export_rejects_source_alias_even_with_replacement_confirmation(
+    repo, alias_kind
+):
+    source = repo.write("Tree.svg", render_svg(sample()))
+    original = source.read_bytes()
+    alias = repo.path / ("copy.svg" if alias_kind == "hardlink" else "tree.svg")
+    if alias_kind == "hardlink":
+        alias.hardlink_to(source)
+    elif not alias.exists():
+        pytest.skip("filesystem is case-sensitive")
+    assert alias != source and alias.samefile(source)
+    with pytest.raises(MarkerError, match="update the loaded source"):
+        capture_export_destination(alias, repository=repo.path, source=source)
+    with pytest.raises(MarkerError, match="update the loaded source"):
+        prepare_svg_export(
+            sample(),
+            alias,
+            repository=repo.path,
+            source=source,
+            expected=DocumentSnapshot(alias, original),
+        )
+    assert source.read_bytes() == original and alias.read_bytes() == original
+
+
+def test_export_allows_distinct_case_names_on_case_sensitive_filesystems(repo):
+    source = repo.write("Tree.svg", render_svg(sample()))
+    destination = repo.path / "tree.svg"
+    if destination.exists():
+        pytest.skip("filesystem is case-insensitive")
+    destination.write_text("distinct file", encoding="utf-8")
+    original = source.read_bytes()
+    previous = capture_export_destination(
+        destination, repository=repo.path, source=source
+    )
+    published = publish_write(
+        prepare_svg_export(
+            sample(),
+            destination,
+            repository=repo.path,
+            source=source,
+            expected=previous,
+        )
+    )
+    assert published.content == original
+    assert not destination.samefile(source)
+    assert source.read_bytes() == original
+
+
+def test_export_identity_inspection_errors_fail_closed(repo, monkeypatch):
+    source = repo.write("source.svg", render_svg(sample()))
+    destination = repo.write("copy.svg", "preserve copy")
+    original = source.read_bytes()
+
+    def denied(*args):
+        raise PermissionError("cannot inspect identity")
+
+    monkeypatch.setattr(type(source), "samefile", denied)
+    with pytest.raises(PermissionError, match="cannot inspect identity"):
+        prepare_svg_export(
+            sample(),
+            destination,
+            repository=repo.path,
+            source=source,
+            expected=DocumentSnapshot(destination, b"preserve copy"),
+        )
+    assert source.read_bytes() == original
+    assert destination.read_text(encoding="utf-8") == "preserve copy"

@@ -1,5 +1,6 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
+import sys
 import tomllib
 from dataclasses import replace
 from itertools import product
@@ -26,6 +27,21 @@ from treestamp.model import Entry, Settings, build_tree
 
 START = b"<!-- treestamp:start -->"
 END = b"<!-- treestamp:end -->"
+
+
+def test_deeply_nested_metadata_is_a_document_error() -> None:
+    depth = sys.getrecursionlimit() * 2
+    metadata = b"hidden = " + b"[" * depth + b"]" * depth
+    content = (
+        START
+        + b"\n<!-- treestamp:config\n"
+        + metadata
+        + b"\n-->\n```text\n./\n```\n"
+        + END
+        + b"\n"
+    )
+    with pytest.raises(MarkerError, match="metadata is nested too deeply"):
+        parse_document(content)
 
 
 @pytest.mark.parametrize("metadata", ["", '<!-- treestamp:config\nroot = "."\n-->\n'])

@@ -10,7 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
 
-from treestamp.artifacts import capture_export_destination
+from treestamp.artifacts import capture_export_destination, is_source_destination
 from treestamp.document import publish_write
 from treestamp.errors import TreestampError
 from treestamp.gitio import document_path
@@ -50,9 +50,13 @@ class SvgExportScreen(ModalScreen[str | None]):
         self.editor = editor
         self.copy_svg = copy
         suggested = editor.state.snapshot.repo / "treestamp.svg"
-        self.initial = (
-            "" if suggested == editor.state.document_path else "treestamp.svg"
-        )
+        self.initial = ""
+        try:
+            if not is_source_destination(suggested, editor.state.document_path):
+                self.initial = "treestamp.svg"
+        except (TreestampError, OSError):
+            # An uninspectable suggestion is unsafe; explicit Save reports errors.
+            pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id="svg-export-panel"):
