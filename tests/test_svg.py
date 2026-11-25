@@ -273,3 +273,91 @@ def test_imported_css_is_discarded_in_automatic_svg() -> None:
     artifact = parse_svg(foreign.encode())
     assert artifact.appearance.theme == "auto"
     assert render_svg(artifact.document, artifact.appearance) == original
+
+
+@pytest.mark.parametrize("text_style", ["unicode", "ascii"])
+def test_variant_bundle_matches_individual_artifacts(text_style: str) -> None:
+    from treestamp.svg import render_svg_variants
+    from treestamp.svg_metadata import MAX_SVG_BYTES
+
+    document = sample(text_style)
+    variants = render_svg_variants(document)
+    assert set(variants) == {"auto", "light", "dark"}
+    for theme, content in variants.items():
+        appearance = SvgAppearance(theme=theme)
+        assert content == render_svg(document, appearance)
+        assert parse_svg(content.encode()).document == document
+        assert parse_svg(content.encode()).appearance == appearance
+        assert len(content.encode()) <= MAX_SVG_BYTES
+    assert (
+        sum(len(content.encode()) for content in variants.values()) <= 3 * MAX_SVG_BYTES
+    )
+
+
+def test_variant_bundle_prepares_payload_and_layout_once(monkeypatch) -> None:
+    from unittest.mock import Mock
+
+    from treestamp import svg, svg_metadata
+
+    document = sample()
+    preparation = Mock(wraps=svg.prepare_metadata)
+    parsing = Mock(wraps=svg_metadata.parse_document)
+    encoding = Mock(wraps=svg_metadata.base64.b64encode)
+    layout = Mock(wraps=LAYOUT_STYLES["continuous"])
+    monkeypatch.setattr(svg, "prepare_metadata", preparation)
+    monkeypatch.setattr(svg_metadata, "parse_document", parsing)
+    monkeypatch.setattr(svg_metadata.base64, "b64encode", encoding)
+    monkeypatch.setitem(LAYOUT_STYLES, "continuous", layout)
+    assert len(svg.render_svg_variants(document)) == 3
+    preparation.assert_called_once_with(document)
+    parsing.assert_called_once()
+    encoding.assert_called_once()
+    layout.assert_called_once_with(document)
+
+
+def test_variant_bundle_uses_registered_layout_and_rejects_unknown_style(
+    monkeypatch,
+) -> None:
+    from treestamp.svg import render_svg_variants
+
+    def alternate(document: Document) -> Layout:
+        return Layout(500, 120, (TextRun(30, 60, document.tree.annotation),), ())
+
+    monkeypatch.setitem(LAYOUT_STYLES, "alternate", alternate)
+    for theme, content in render_svg_variants(sample(), "alternate").items():
+        assert 'width="500" height="120"' in content
+        assert parse_svg(content.encode()).appearance == SvgAppearance(
+            style="alternate", theme=theme
+        )
+    with pytest.raises(MarkerError, match="unsupported SVG visual style"):
+        render_svg_variants(sample(), "unknown")
+
+
+def test_variant_bundle_does_not_return_partial_oversized_output(monkeypatch) -> None:
+    from treestamp import svg
+    from treestamp.svg_metadata import MAX_SVG_BYTES
+
+    drawing = svg._drawing
+
+    def oversized_dark(layout, appearance):
+        if appearance.theme == "dark":
+            return " " * MAX_SVG_BYTES
+        return drawing(layout, appearance)
+
+    monkeypatch.setattr(svg, "_drawing", oversized_dark)
+    with pytest.raises(MarkerError, match="1 MiB"):
+        svg.render_svg_variants(sample())
+
+
+def test_variant_bundle_escapes_untrusted_text_in_every_appearance() -> None:
+    from treestamp.svg import render_svg_variants
+
+    document = sample()
+    document = replace(
+        document,
+        tree=replace(document.tree, annotation='</text><script>alert("x")</script>'),
+    )
+    for content in render_svg_variants(document).values():
+        root = ET.fromstring(content)
+        assert root.find(f".//{{{SVG_NAMESPACE}}}script") is None
+        assert parse_svg(content.encode()).document == document

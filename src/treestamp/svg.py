@@ -14,6 +14,7 @@ from treestamp.svg_metadata import (
     SvgAppearance,
     SvgArtifact,
     encode_metadata,
+    prepare_metadata,
     read_metadata,
 )
 
@@ -26,6 +27,7 @@ __all__ = [
     "parse_svg",
     "render_svg",
     "render_svg_metadata",
+    "render_svg_variants",
 ]
 
 _DEFAULT_APPEARANCE = SvgAppearance()
@@ -81,6 +83,27 @@ def render_svg(
         raise MarkerError(f"unsupported SVG visual style: {appearance.style!r}")
     metadata = encode_metadata(document, appearance)
     layout = style(document)
+    return _serialize_svg(metadata, layout, appearance)
+
+
+def render_svg_variants(
+    document: Document, style: str = "continuous"
+) -> dict[str, str]:
+    """Produce complete appearances with one metadata preparation and layout."""
+    appearance = SvgAppearance(style=style)
+    layout_style = LAYOUT_STYLES.get(appearance.style)
+    if layout_style is None:
+        raise MarkerError(f"unsupported SVG visual style: {style!r}")
+    metadata = prepare_metadata(document)
+    layout = layout_style(document)
+    variants = {}
+    for theme in _INK:
+        variant = replace(appearance, theme=theme)
+        variants[theme] = _serialize_svg(metadata.render(variant), layout, variant)
+    return variants
+
+
+def _serialize_svg(metadata: str, layout: Layout, appearance: SvgAppearance) -> str:
     drawing = _drawing(layout, appearance)
     return _bounded(
         f'<svg xmlns="{SVG_NAMESPACE}" width="{layout.width}" '

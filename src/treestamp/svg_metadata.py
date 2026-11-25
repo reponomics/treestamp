@@ -108,29 +108,53 @@ def apply_text_preferences(
     return preferred
 
 
-def encode_metadata(document: Document, appearance: SvgAppearance) -> str:
-    """Render only the standard metadata element, usable by every visual style."""
+@dataclass(frozen=True)
+class PreparedMetadata:
+    """Validated textual payload reusable across complete appearance artifacts."""
+
+    encoded: str
+    text_style: str
+    show_counts: bool
+
+    def render(self, appearance: SvgAppearance) -> str:
+        attrs = {
+            "version": "1",
+            "codec": "treestamp-text-v1",
+            "encoding": "base64",
+            "text_style": self.text_style,
+            "show_counts": str(self.show_counts).lower(),
+            "style": appearance.style,
+            "theme": appearance.theme,
+        }
+        attributes = " ".join(
+            f"{key}={quoteattr(value)}" for key, value in attrs.items()
+        )
+        return (
+            f'<metadata><ts:treestamp xmlns:ts="{PAYLOAD_NAMESPACE}" {attributes}>'
+            f"{self.encoded}</ts:treestamp></metadata>"
+        )
+
+
+def prepare_metadata(document: Document) -> PreparedMetadata:
+    """Validate and encode the document once, independently of SVG appearance."""
     validate_document_bounds(document)
     payload = render_region(document).encode("utf-8", "surrogateescape")
     if len(payload) > MAX_PAYLOAD_BYTES:
         raise MarkerError("SVG textual payload exceeds the 256 KiB limit")
-    attrs = {
-        "version": "1",
-        "codec": "treestamp-text-v1",
-        "encoding": "base64",
-        "text_style": document.settings.style,
-        "show_counts": str(document.settings.show_counts).lower(),
-        "style": appearance.style,
-        "theme": appearance.theme,
-    }
     # Writers enforce the same preference consistency as readers.
-    _preferences(parse_document(payload), attrs)
-    attributes = " ".join(f"{key}={quoteattr(value)}" for key, value in attrs.items())
-    encoded = base64.b64encode(payload).decode("ascii")
-    return (
-        f'<metadata><ts:treestamp xmlns:ts="{PAYLOAD_NAMESPACE}" {attributes}>'
-        f"{encoded}</ts:treestamp></metadata>"
+    apply_text_preferences(
+        parse_document(payload), document.settings.style, document.settings.show_counts
     )
+    return PreparedMetadata(
+        base64.b64encode(payload).decode("ascii"),
+        document.settings.style,
+        document.settings.show_counts,
+    )
+
+
+def encode_metadata(document: Document, appearance: SvgAppearance) -> str:
+    """Render only the standard metadata element, usable by every visual style."""
+    return prepare_metadata(document).render(appearance)
 
 
 class _MetadataReader:
