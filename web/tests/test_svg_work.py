@@ -154,33 +154,46 @@ def test_blocked_export_leaves_health_responsive_and_rejects_queue(
         assert pending.result(timeout=5).status_code == 200
 
 
-def test_svg_dirty_comparison_shares_export_worker(repo: Repo, monkeypatch) -> None:
-    from treestamp_web import preview as preview_module
+def test_loaded_svg_edits_succeed_while_export_worker_is_busy(
+    repo: Repo, monkeypatch
+) -> None:
+    from treestamp_web import app as app_module
 
     fake, _ = svg_source(repo)
     entered, release = Event(), Event()
-    original = preview_module.prepare_artifact_content
+    original = app_module.export_svg
 
-    def blocked(*args):
+    def blocked(data):
         entered.set()
         assert release.wait(5)
-        return original(*args)
+        return original(data)
 
-    monkeypatch.setattr(preview_module, "prepare_artifact_content", blocked)
+    monkeypatch.setattr(app_module, "export_svg", blocked)
     with (
         TestClient(create_app(make_config(), transport=transport_for(fake))) as client,
         ThreadPoolExecutor(max_workers=1) as callers,
     ):
-        pending = callers.submit(
-            client.get,
-            "/api/preview",
-            params={"url": "o/r", "document": "assets/tree.svg"},
-        )
+        opened = client.get(
+            "/api/preview", params={"url": "o/r", "document": "assets/tree.svg"}
+        ).json()
+        pending = callers.submit(client.post, "/api/export/svg", json=export_body())
         try:
             assert entered.wait(5)
             assert client.get("/healthz").status_code == 200
-            response = client.post("/api/export/svg", json=export_body())
-            assert response.status_code == 503
+            response = client.post(
+                "/api/op",
+                json={
+                    "owner": "o",
+                    "repo": "r",
+                    "ref": opened["ref"]["commit"],
+                    "root": ".",
+                    "document": "assets/tree.svg",
+                    "state": opened["state"],
+                    "op": {"type": "annotate", "path": "", "text": "Accepted edit"},
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert "Accepted edit" in response.json()["region"]
             assert not pending.done()
         finally:
             release.set()

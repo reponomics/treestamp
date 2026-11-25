@@ -67,7 +67,7 @@ def test_preview_copy_and_download_share_bytes_and_preserve_text_source(
     original_address = page.url
     text = page.locator("#region").text_content()
     assert page.locator("#svg-image").get_attribute("src").startswith("blob:")
-    svg = export_response.value.json()["svg"]
+    svg = export_response.value.json()["variants"]["auto"]
     artifact = parse_svg(svg.encode())
     assert artifact.appearance.theme == "auto"
     assert render_region(artifact.document) == text
@@ -147,6 +147,7 @@ def test_automatic_preview_follows_app_theme_without_changing_artifact(
         page.goto(f"{svg_service}/fixture/repo?document=assets/auto.svg")
         expect(page.locator("#rows .row").first).to_be_visible()
         page.locator("#tab-stamp").click()
+        page.locator("#output-format").select_option("svg")
     else:
         open_svg_export(page, svg_service)
     expect(page.locator("#svg-download")).to_be_enabled()
@@ -191,7 +192,8 @@ def test_failed_generation_removes_stale_image_and_disables_actions(
             status=422, json={"error": {"message": "Image exceeds the size limit."}}
         ),
     )
-    page.locator("#svg-theme").select_option("dark")
+    page.locator("#output-format").select_option("markdown")
+    page.locator("#output-format").select_option("svg")
     expect(page.locator("#svg-status")).to_contain_text("Image exceeds")
     expect(page.locator("#svg-download")).to_be_disabled()
     expect(page.locator("#svg-copy")).to_be_disabled()
@@ -200,6 +202,7 @@ def test_failed_generation_removes_stale_image_and_disables_actions(
     page.unroute("**/api/export/svg")
     page.locator("#tab-editor").click()
     page.locator("#tab-stamp").click()
+    page.locator("#output-format").select_option("svg")
     expect(page.locator("#svg-download")).to_be_enabled()
 
 
@@ -216,6 +219,7 @@ def test_pending_edits_disable_export_until_new_image_is_ready(
     page.wait_for_timeout(50)
     assert pending
     page.locator("#tab-stamp").click()
+    page.locator("#output-format").select_option("svg")
     expect(page.locator("#svg-download")).to_be_disabled()
     expect(page.locator("#svg-copy")).to_be_disabled()
     pending.pop().continue_()
@@ -224,7 +228,7 @@ def test_pending_edits_disable_export_until_new_image_is_ready(
 
 
 @pytest.mark.parametrize("filename", ["tree.svg", "future.svg", "auto.svg"])
-def test_loaded_svg_defaults_to_image_and_retains_appearance_and_filename(
+def test_loaded_svg_starts_with_markdown_and_retains_appearance_and_filename(
     page: Page, svg_service: str, filename: str
 ) -> None:
     expected_theme = "auto" if filename == "auto.svg" else "dark"
@@ -232,9 +236,12 @@ def test_loaded_svg_defaults_to_image_and_retains_appearance_and_filename(
     page.goto(f"{svg_service}/fixture/repo?document=assets/{filename}")
     expect(page.locator("#rows .row").first).to_be_visible()
     page.locator("#tab-stamp").click()
-    expect(page.locator("#output-format")).to_have_value("svg")
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    page.locator("#output-format").select_option("svg")
     expect(page.locator("#svg-theme")).to_have_value(expected_theme)
-    expect(page.locator("#svg-source-notice")).to_contain_text("regenerated")
+    expect(page.locator("#svg-source-notice")).to_contain_text(
+        "loaded from SVG metadata"
+    )
     if filename == "future.svg":
         expect(page.locator("#svg-source-notice")).to_contain_text("using continuous")
     expect(page.locator("#svg-download")).to_be_enabled()
@@ -244,8 +251,10 @@ def test_loaded_svg_defaults_to_image_and_retains_appearance_and_filename(
     address = page.url
     page.locator("#svg-theme").select_option("light")
     expect(page.locator("#svg-download")).to_be_enabled()
-    assert page.url != address
-    expect(page.locator("#svg-source-notice")).to_contain_text("regenerated")
+    assert page.url == address
+    expect(page.locator("#svg-source-notice")).to_contain_text(
+        "loaded from SVG metadata"
+    )
     if filename == "future.svg":
         expect(page.locator("#svg-source-notice")).to_contain_text("using continuous")
     page.locator("#output-format").select_option("markdown")
@@ -258,7 +267,9 @@ def test_loaded_svg_defaults_to_image_and_retains_appearance_and_filename(
     page.locator("#tab-stamp").click()
     page.locator("#output-format").select_option("svg")
     expect(page.locator("#svg-theme")).to_have_value(expected_theme)
-    expect(page.locator("#svg-source-notice")).to_contain_text("regenerated")
+    expect(page.locator("#svg-source-notice")).to_contain_text(
+        "loaded from SVG metadata"
+    )
 
 
 def test_clipboard_failure_keeps_download_available(page: Page, service: str) -> None:
@@ -303,7 +314,8 @@ def test_transfer_into_svg_preserves_source_and_exports_transferred_notes(
     page.locator("#placement-finish").click()
     expect(page.locator("#placement-dialog")).to_be_hidden()
     page.locator("#tab-stamp").click()
-    expect(page.locator("#output-format")).to_have_value("svg")
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    page.locator("#output-format").select_option("svg")
     expect(page.locator("#svg-theme")).to_have_value("dark")
     expect(page.locator("#svg-source-notice")).to_contain_text("using continuous")
     expect(page.locator("#svg-download")).to_be_enabled()
@@ -350,7 +362,9 @@ def test_failed_transfer_restores_previous_svg_export(
     expect(page.locator("#entry-error")).to_be_visible()
     expect(page.locator("#placement-dialog")).to_be_hidden()
     page.locator("#entry-return-welcome").click()
-    expect(page.locator("#output-format")).to_have_value("svg")
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    page.locator("#output-format").select_option("svg")
+    page.locator("#svg-theme").select_option("dark")
     expect(page.locator("#svg-theme")).to_have_value("dark")
     expect(page.locator("#svg-download")).to_be_enabled()
     with page.expect_download() as after_info:
@@ -359,3 +373,236 @@ def test_failed_transfer_restores_previous_svg_export(
     expect(page.locator("#region")).to_have_text(region)
     assert page.url == address
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == saved
+
+
+def bundle_for_request(route: Route) -> dict[str, object]:
+    body = route.request.post_data_json
+    document = parse_document(body["region"].encode())
+    return {
+        "variants": {
+            theme: render_svg(document, SvgAppearance(theme=theme))
+            for theme in ("auto", "light", "dark")
+        }
+    }
+
+
+@pytest.mark.parametrize("loaded", [False, True])
+def test_appearance_switches_use_one_bundle_without_changing_editor(
+    page: Page, svg_service: str, loaded: bool
+) -> None:
+    calls: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            calls.append(request.url)
+            if "/api/export/svg" in request.url or "/api/op" in request.url
+            else None
+        ),
+    )
+    page.add_init_script(
+        "Object.defineProperty(navigator, 'clipboard', "
+        "{value: {writeText: async text => {window.copiedSVG = text}}})"
+    )
+    source = "?document=assets/tree.svg" if loaded else "?root=."
+    page.goto(f"{svg_service}/fixture/repo{source}")
+    expect(page.locator("#rows .row").first).to_be_visible()
+    page.locator("#tab-stamp").click()
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    assert not calls
+    page.locator("#output-format").select_option("svg")
+    expect(page.locator("#svg-download")).to_be_enabled()
+    assert len(calls) == 1
+    address = page.url
+    cached = page.evaluate("localStorage.getItem('treestamp.current-draft')")
+    urls = set()
+    for theme in ("light", "dark", "auto", "dark", "light"):
+        page.locator("#svg-theme").select_option(theme)
+        expect(page.locator("#svg-preview")).to_have_attribute("aria-busy", "false")
+        expect(page.locator("#svg-download")).to_be_enabled()
+        page.locator("#svg-copy").click()
+        expect(page.locator("#svg-status")).to_have_text("SVG source copied.")
+        assert (
+            parse_svg(page.evaluate("window.copiedSVG").encode()).appearance.theme
+            == theme
+        )
+        urls.add(page.locator("#svg-image").get_attribute("src"))
+    assert len(urls) == 3 and len(calls) == 1
+    assert page.url == address
+    assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == cached
+
+    page.locator("#svg-size").click()
+    page.locator("#tab-editor").click()
+    page.locator("#tab-stamp").click()
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    expect(page.locator("#svg-image")).to_be_hidden()
+    expect(page.locator("#svg-theme")).to_have_value("dark" if loaded else "auto")
+    expect(page.locator("#svg-size")).to_have_text("Actual size")
+    assert len(calls) == 1
+    page.locator("#output-format").select_option("svg")
+    expect(page.locator("#svg-download")).to_be_enabled()
+    assert len(calls) == 2
+
+
+def test_busy_and_rate_limited_exports_retry_then_deliver(
+    page: Page, service: str
+) -> None:
+    page.clock.install()
+    attempts: list[int] = []
+
+    def respond(route: Route) -> None:
+        attempts.append(len(attempts) + 1)
+        if len(attempts) == 1:
+            route.fulfill(
+                status=503,
+                headers={"Retry-After": "1"},
+                json={"error": {"code": "svg_busy", "message": "busy"}},
+            )
+        elif len(attempts) == 2:
+            route.fulfill(
+                status=429,
+                headers={"Retry-After": "2"},
+                json={"error": {"code": "rate_limited", "message": "rate"}},
+            )
+        else:
+            route.fulfill(json=bundle_for_request(route))
+
+    page.route("**/api/export/svg", respond)
+    open_svg_export(page, service)
+    expect(page.locator("#svg-status")).to_contain_text("Waiting to try again")
+    expect(page.locator("#svg-retry")).to_be_hidden()
+    page.clock.fast_forward(1500)
+    expect(page.locator("#svg-status")).to_contain_text("Waiting to try again")
+    assert len(attempts) == 2
+    page.clock.fast_forward(1000)
+    assert len(attempts) == 2
+    page.clock.fast_forward(1500)
+    expect(page.locator("#svg-download")).to_be_enabled()
+    expect(page.locator("#svg-status")).to_be_empty()
+    assert len(attempts) == 3
+
+
+@pytest.mark.parametrize("failure", ["busy", "pending", "decoding"])
+def test_generation_deadline_offers_explicit_retry(
+    page: Page, service: str, failure: str
+) -> None:
+    page.clock.install()
+    if failure == "decoding":
+        page.add_init_script(
+            "window.decodeSVG = HTMLImageElement.prototype.decode; "
+            "HTMLImageElement.prototype.decode = () => new Promise(() => {})"
+        )
+    attempts: list[Route] = []
+
+    def respond(route: Route) -> None:
+        attempts.append(route)
+        if failure == "busy":
+            route.fulfill(
+                status=503,
+                headers={"Retry-After": "60"},
+                json={"error": {"code": "svg_busy"}},
+            )
+        elif failure == "decoding":
+            route.fulfill(json=bundle_for_request(route))
+
+    page.route("**/api/export/svg", respond)
+    open_svg_export(page, service)
+    expect(page.locator("#svg-preview")).to_have_attribute("aria-busy", "true")
+    page.wait_for_timeout(50)
+    assert attempts
+    page.clock.fast_forward(30_001)
+    expect(page.locator("#svg-status")).to_contain_text("Try again")
+    expect(page.locator("#svg-retry")).to_be_visible()
+    expect(page.locator("#svg-preview")).to_have_attribute("aria-busy", "false")
+    expect(page.locator("#svg-download")).to_be_disabled()
+    assert len(attempts) == 1
+    page.unroute("**/api/export/svg")
+    if failure == "decoding":
+        page.evaluate("() => { HTMLImageElement.prototype.decode = window.decodeSVG; }")
+    page.locator("#svg-retry").click()
+    expect(page.locator("#svg-download")).to_be_enabled()
+    expect(page.locator("#svg-retry")).to_be_hidden()
+
+
+def test_leaving_export_cancels_retry_and_late_results_while_editing(
+    page: Page, service: str
+) -> None:
+    pending: list[Route] = []
+    page.route("**/api/export/svg", lambda route: pending.append(route))
+    open_svg_export(page, service)
+    expect(page.locator("#svg-preview")).to_have_attribute("aria-busy", "true")
+    page.wait_for_timeout(50)
+    assert pending
+    late = pending.pop()
+    bundle = bundle_for_request(late)
+    page.locator("#tab-editor").click()
+    with page.expect_response("**/api/op") as edited:
+        page.locator('.row[data-path="docs"] .name').click()
+    assert edited.value.ok
+    late.fulfill(json=bundle)
+    page.locator("#tab-stamp").click()
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    expect(page.locator("#svg-preview")).to_have_attribute("aria-busy", "false")
+    expect(page.locator("#svg-download")).to_be_disabled()
+    expect(page.locator("#svg-image")).to_be_hidden()
+    assert not pending
+
+
+def test_leaving_export_stops_scheduled_retry(page: Page, service: str) -> None:
+    page.clock.install()
+    attempts: list[int] = []
+
+    def busy(route: Route) -> None:
+        attempts.append(1)
+        route.fulfill(
+            status=503,
+            headers={"Retry-After": "2"},
+            json={"error": {"code": "svg_busy"}},
+        )
+
+    page.route("**/api/export/svg", busy)
+    open_svg_export(page, service)
+    expect(page.locator("#svg-status")).to_contain_text("Waiting")
+    page.locator("#tab-editor").click()
+    page.clock.fast_forward(35_000)
+    assert len(attempts) == 1
+    page.locator("#tab-stamp").click()
+    expect(page.locator("#output-format")).to_have_value("markdown")
+    expect(page.locator("#svg-retry")).to_be_hidden()
+
+
+def test_invalid_export_does_not_retry_automatically(page: Page, service: str) -> None:
+    page.clock.install()
+    attempts: list[int] = []
+
+    def invalid(route: Route) -> None:
+        attempts.append(1)
+        route.fulfill(status=422, json={"error": {"message": "Image is too large."}})
+
+    page.route("**/api/export/svg", invalid)
+    open_svg_export(page, service)
+    expect(page.locator("#svg-status")).to_contain_text("Image is too large")
+    expect(page.locator("#svg-retry")).to_be_visible()
+    page.clock.fast_forward(35_000)
+    assert len(attempts) == 1
+
+
+@pytest.mark.parametrize("leave", [False, True])
+def test_late_clipboard_failure_cannot_replace_current_export_status(
+    page: Page, service: str, leave: bool
+) -> None:
+    page.add_init_script(
+        "Object.defineProperty(navigator, 'clipboard', "
+        "{value: {writeText: () => new Promise((resolve, reject) => {window.rejectCopy = reject})}})"
+    )
+    open_svg_export(page, service)
+    expect(page.locator("#svg-copy")).to_be_enabled()
+    page.locator("#svg-copy").click()
+    page.wait_for_function("typeof window.rejectCopy === 'function'")
+    if leave:
+        page.locator("#tab-editor").click()
+        page.locator("#tab-stamp").click()
+    else:
+        page.locator("#svg-theme").select_option("dark")
+    page.evaluate("window.rejectCopy(new Error('late denial'))")
+    expect(page.locator("#svg-status")).to_be_empty()
+    expect(page.locator("#svg-copy")).to_have_text("Copy SVG")

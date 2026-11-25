@@ -551,8 +551,8 @@ def test_noncanonical_and_crlf_baselines_survive_restore(
     path.write_bytes(data.replace(b"```sh\r\n", b"```text\r\n"))
     repo.commit("cosmetic drift")
     result = preview(service)
-    assert result.dirty and result.notice == OPEN_NOTICE
-    assert op(service, result, "restore").dirty
+    assert not result.dirty and result.notice is None
+    assert not op(service, result, "restore").dirty
 
 
 @pytest.mark.parametrize("eol", [b"\n", b"\r\n"])

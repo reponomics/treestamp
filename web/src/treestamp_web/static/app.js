@@ -78,7 +78,6 @@ const placement = new NotePlacement();
 const exportView = new ExportView({
   getEditor: () => editor,
   waitForEdits,
-  setAppearance: (appearance) => enqueueEdit(() => sendOperation("present", undefined, undefined, appearance)),
 });
 
 let controller = null;
@@ -391,7 +390,7 @@ function render(data, opening = false) {
     sourceFormat: data.source_format || "markdown",
     svgAppearance: data.svg_appearance || { style: "continuous", theme: "light" },
     sourceNotice: data.source_format === "svg"
-      ? ((!opening && previous?.sourceNotice) || [data.notice || "Preview regenerated from embedded treestamp data. The exported SVG replaces the original drawing.", ...(data.warnings || [])].join(" ")) : "",
+      ? ((!opening && previous?.sourceNotice) || [data.notice || "Treestamp loaded from SVG metadata.", ...(data.warnings || [])].join(" ")) : "",
   };
   if (opening) {
     editingSession += 1;
@@ -610,10 +609,9 @@ function enqueueEdit(action) {
   return queue;
 }
 
-async function sendOperation(type, path, text, appearance) {
+async function sendOperation(type, path, text) {
   const accepted = editor;
   const body = opBody(editor, settingsFromForm(editor.state.curation.settings), reveal.checked, type, path, text);
-  if (appearance) body.state.svg_appearance = appearance;
   const saved = await call("/api/op", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { abortable: false });
   if (!saved && editor === accepted) {
     fields.style.value = accepted.state.curation.settings.style;
@@ -819,6 +817,7 @@ function browseRepository(repo) {
 
 function openWelcome() {
   if (entryFlow.busy) return;
+  exportView.setVisible(false);
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
   repoTooltip.hidden = true;
   const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
@@ -828,6 +827,7 @@ function openWelcome() {
 async function resumeSession() {
   if (editor?.rows.length) {
     entryFlow.hide();
+    exportView.setVisible(stage.dataset.view === "stamp");
     fields.url.value = `${editor.owner}/${editor.repo}`;
     errorPanel.hidden = true;
     tabs[stage.dataset.view || "editor"].focus({ preventScroll: true });

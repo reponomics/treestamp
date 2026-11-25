@@ -20,6 +20,7 @@
 .svg-preview[data-actual-size="true"] img { max-width: none; }
 @media (max-width: 47.999rem) {
   .svg-actions { margin-left: 0; }
+  #svg-status { flex-basis: 100%; }
   .svg-controls .output-toolbar select { min-width: 7rem; }
   .svg-preview { max-height: 55dvh; }
 }

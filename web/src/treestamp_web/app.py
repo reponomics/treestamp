@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from treestamp.errors import MarkerError
 from treestamp_web import __version__
 from treestamp_web.config import Config
-from treestamp_web.export import EXPORT_BODY_CAP, export_svg
+from treestamp_web.export import EXPORT_BODY_CAP, EXPORT_RESPONSE_CAP, export_svg
 from treestamp_web.github import (
     GitHubClient,
     GitHubError,
@@ -129,9 +129,7 @@ def create_app(
         await client.seed_budget()
         app.state.client = client
         app.state.svg_work = SvgWorkPool()
-        app.state.service = PreviewService(
-            client, settings, clock, svg_work=app.state.svg_work
-        )
+        app.state.service = PreviewService(client, settings, clock)
         try:
             yield
         finally:
@@ -386,10 +384,20 @@ async def svg_export(request: Request) -> JSONResponse:
             ) from None
         raise
     try:
-        svg = await request.app.state.svg_work.run(partial(export_svg, data))
+        pool: SvgWorkPool = request.app.state.svg_work
+        return await pool.run(partial(_svg_export_response, data))
     except MarkerError as exc:
         raise PreviewError(422, "invalid_export", str(exc)) from None
-    return JSONResponse({"svg": svg}, headers={"Cache-Control": "no-store"})
+
+
+def _svg_export_response(data: object) -> JSONResponse:
+    """Serialize the bounded bundle on the renderer thread as part of its budget."""
+    response = JSONResponse(
+        {"variants": export_svg(data)}, headers={"Cache-Control": "no-store"}
+    )
+    if len(response.body) > EXPORT_RESPONSE_CAP:
+        raise MarkerError("SVG export response exceeds the size limit")
+    return response
 
 
 async def _routing_response(

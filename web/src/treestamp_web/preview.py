@@ -11,12 +11,11 @@ import time
 import uuid
 from collections import Counter
 from dataclasses import asdict, dataclass, replace
-from functools import partial
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
-from treestamp.artifacts import Artifact, parse_artifact, prepare_artifact_content
+from treestamp.artifacts import Artifact, parse_artifact
 from treestamp.codec import format_counts, render_tree
 from treestamp.document import (
     Document,
@@ -45,7 +44,6 @@ from treestamp_web.examples import bundled_default_branch, bundled_tree
 from treestamp_web.export import parse_appearance
 from treestamp_web.github import BODY_CAP, TooLargeError
 from treestamp_web.links import LinkError, Repository, parse_link, repository
-from treestamp_web.svg_work import SvgWorkPool
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -58,10 +56,7 @@ if TYPE_CHECKING:
 DEFAULT_DOCUMENT = "README.md"
 DOCUMENT_CAP = 1024 * 1024
 OPEN_NOTICE = "Treestamp updated"
-SVG_NOTICE = (
-    "Preview regenerated from embedded treestamp data. "
-    "The exported SVG replaces the original drawing."
-)
+SVG_NOTICE = "Treestamp loaded from SVG metadata."
 OPERATIONS = (
     "restore",
     "reset",
@@ -586,11 +581,7 @@ class PreviewService:
         client: GitHubClient,
         config: Config,
         clock: Callable[[], float] = time.time,
-        *,
-        svg_work: SvgWorkPool | None = None,
     ) -> None:
-        self._svg_work = svg_work or SvgWorkPool()
-        self._owns_svg_work = svg_work is None
         self._client, self._config = client, config
         self._snapshots = SnapshotCache(config, clock)
 
@@ -599,8 +590,6 @@ class PreviewService:
 
     def close(self) -> None:
         self._snapshots.close()
-        if self._owns_svg_work:
-            self._svg_work.close()
 
     async def browse(self, repo: Repository) -> dict[str, object]:
         snapshot, acquired = await self._preview_snapshot(repo)
@@ -647,13 +636,12 @@ class PreviewService:
                 else None
             ),
         )
-        result = await self._compose(
+        result = self._compose(
             repo,
             target,
             session,
             request.document,
             envelope,
-            snapshot,
             opening=True,
             warnings=([request.notice] if request.notice else [])
             + (list(loaded[0].warnings) if loaded is not None else []),
@@ -695,13 +683,12 @@ class PreviewService:
             initial_curation=initial,
             svg_appearance=appearance,
         )
-        result = await self._compose(
+        result = self._compose(
             request.repository,
             target,
             session,
             request.document,
             envelope,
-            snapshot,
             reveal=request.reveal,
         )
         if request.op.type != "restore":
@@ -724,8 +711,8 @@ class PreviewService:
             revision=len(request.decisions),
             initial_curation=session.state(),
         )
-        result = await self._compose(
-            opening.repository, target, session, opening.document, envelope, snapshot
+        result = self._compose(
+            opening.repository, target, session, opening.document, envelope
         )
         placement = summary(
             review, session, expanded=request.expanded, reveal=opening.reveal
@@ -844,43 +831,13 @@ class PreviewService:
             raise PreviewError(422, "curation", str(exc)) from None
         return _Target(snapshot.resolved, root, node, snapshot.default_branch)
 
-    async def _compose(
+    def _compose(
         self,
         repo: Repository,
         target: _Target,
         session: TreeSession,
         document: str,
         envelope: Envelope,
-        snapshot: Snapshot,
-        *,
-        reveal: bool = False,
-        opening: bool = False,
-        warnings: list[str] | None = None,
-    ) -> Preview:
-        compose = partial(
-            self._compose_sync,
-            repo,
-            target,
-            session,
-            document,
-            envelope,
-            snapshot,
-            reveal=reveal,
-            opening=opening,
-            warnings=warnings,
-        )
-        if envelope.svg_appearance is not None:
-            return await self._svg_work.run(compose)
-        return compose()
-
-    def _compose_sync(
-        self,
-        repo: Repository,
-        target: _Target,
-        session: TreeSession,
-        document: str,
-        envelope: Envelope,
-        snapshot: Snapshot,
         *,
         reveal: bool = False,
         opening: bool = False,
@@ -892,20 +849,20 @@ class PreviewService:
         )
         printed = Document(tree, session.settings, hidden)
         try:
-            if envelope.svg_appearance is not None:
-                region = render_region(printed)
-                original = _original_svg(snapshot, document)
-                candidate = prepare_artifact_content(
-                    Artifact(printed, "svg", envelope.svg_appearance), original
-                )
-                dirty = candidate != original
-            elif envelope.baseline is None:
-                region = render_region(printed)
-                dirty = True
-            else:
+            baseline = (
+                parse_artifact(envelope.baseline)
+                if envelope.baseline is not None
+                else None
+            )
+            dirty = baseline is None or printed != baseline.document
+            if baseline is not None and baseline.format == "markdown":
+                # Preserve authored Markdown formatting for copying, independently
+                # of the decoded model comparison used by the hosted editor.
+                assert envelope.baseline is not None
                 content = prepare_content(printed, target.root, envelope.baseline)
                 region = extract_region(content).decode("utf-8-sig", "surrogateescape")
-                dirty = content != envelope.baseline
+            else:
+                region = render_region(printed)
             rendered_tree = render_tree(printed.tree, printed.settings)
         except MarkerError as exc:
             raise PreviewError(422, "curation", str(exc)) from None
@@ -984,15 +941,6 @@ class PreviewService:
                 f"the service limit is {self._config.symlink_expanded_max_bytes}",
             )
         return dict(zip(wanted, bodies, strict=True))
-
-
-def _original_svg(snapshot: Snapshot, document: str) -> bytes:
-    """The captured source stays in the existing cache, never in session transport."""
-    record = next((row for row in snapshot.records if row.path == document), None)
-    content = snapshot.blobs.get(record.object_id) if record is not None else None
-    if content is None:
-        raise _snapshot_unavailable()
-    return content
 
 
 def _snapshot_unavailable() -> PreviewError:

@@ -73,7 +73,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 | `cache.py` | Temporary in-memory snapshot retention (one hour, renewed by successful edits) |
 | `preview.py` | Opens and edits a document against one snapshot |
 | `export.py` | Stateless bounded SVG generation from a complete textual region and validated preferences |
-| `svg_work.py` | Shared SVG worker, admission, and render-time budget |
+| `svg_work.py` | Export rendering thread, admission, and render-time budget |
 | `limits.py` | Per-client token-bucket rate limits, held in process memory |
 | `proxy.py` | Accepts a visitor address from `CF-Connecting-IP` only when the peer is a configured Cloudflare range |
 | `routing.py` | Fly.io session affinity, so a session's requests reach the Machine holding its snapshot |
@@ -85,9 +85,11 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 2. The service fetches the blobs it needs: symlink targets in the selected subtree, up to a configured limit, and the selected document, up to 1 MiB.
 3. The service returns the rendered tree, display rows, and a session state envelope to the browser. The browser holds the curation state; the server keeps only the cached snapshot.
 4. Each edit sends the state envelope and one operation to the service, which validates both, applies the operation, and returns the new state. Requests for a snapshot that is no longer cached fail with `410` rather than reading a newer commit.
-5. The visitor copies Markdown or requests a generated SVG for image preview, download, or source copying. The export endpoint validates a complete textual region and appearance independently of the session envelope; it does not fetch repositories or write files.
+5. The visitor copies Markdown or selects SVG to request an appearance bundle for preview, download, or source copying. The export endpoint prepares one validated document and layout, then serializes all supported appearances. The browser selects complete variants locally.
 
 In production, the service authenticates to GitHub as a GitHub App, using the App's private key to obtain installation tokens; [web/README.md](../web/README.md) lists the options for local development. It logs structured events containing the repository name, commit, result, and request budget, not document contents.
+
+Hosted change detection compares decoded document semantics for both source formats. Editing, reconciliation, and Discard operate independently of export rendering; source appearance initializes export preferences.
 
 The browser's **Resume session** action is an ephemeral convenience for brief return visits, with no recovery guarantee. State-bearing URLs and local records do not constitute durable saved sessions. See [Web UI flow](ui-flow.md#returning-to-recent-work). Exported document formats are independent of this convenience.
 
@@ -111,7 +113,7 @@ The optional config comment holds TOML with three keys, each generated only when
 
 New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
 
-`prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference. [ADR 0002](adr/0002-formatter-compatible-documents.md) records the formatting rationale and alternatives.
+`prepare_content` applies these preservation rules before the complete byte comparison used by local `check` and terminal-editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference. [ADR 0002](adr/0002-formatter-compatible-documents.md) records the formatting rationale and alternatives.
 
 The optional attribution footer is disabled by default. When present, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 
@@ -123,7 +125,7 @@ SVG contains the complete textual treestamp as base64 in a `{urn:treestamp:svg:1
 
 The `continuous` visual style draws connected branches and inline annotations on a transparent background. Appearance is separate from text notation: `auto` selects black or white ink through `prefers-color-scheme`; `light` and `dark` fix the ink color. New exports default to `auto`; loaded SVGs retain supported appearance settings. Unknown visual styles use a reported fallback; unsupported envelope or codec versions fail on load.
 
-The embedded document is authoritative. Loading regenerates the drawing; writing replaces the complete SVG. Dirty-state and `check` comparisons use the original file bytes, so external drawing edits or renderer changes can make a loaded artifact differ immediately. Layout styles share one metadata codec and serializer. Parsing and rendering bounds are defined in [svg_metadata.py](../src/treestamp/svg_metadata.py) and [svg_layout.py](../src/treestamp/svg_layout.py); import safety is described in the [security assessment](security-assessment.md).
+The embedded document is authoritative. Export generates the drawing; local writes replace the complete SVG. Local dirty-state and `check` comparisons use original file bytes, while hosted editing compares decoded document state. Layout styles share one metadata codec and serializer. Parsing and rendering bounds are defined in [svg_metadata.py](../src/treestamp/svg_metadata.py) and [svg_layout.py](../src/treestamp/svg_layout.py); import safety is described in the [security assessment](security-assessment.md).
 
 ### Pre-commit hooks
 
@@ -131,7 +133,7 @@ The embedded document is authoritative. Loading regenerates the drawing; writing
 
 ### Hosted HTTP API
 
-`POST /api/export/svg` accepts exactly `region`, `text_style`, `show_counts`, and `appearance` (`style`, `theme`). It returns `{ "svg": "…" }` generated from validated complete textual data. The request cap is 2 MiB to allow JSON escaping of a 256 KiB payload; generated SVG is capped at 1 MiB. SVG export has its own per-client rate limit. Export rendering and loaded-SVG change detection share one worker and a measured render-time budget; excess work receives `503 svg_busy` with `Retry-After`. This stateless route does not acquire repositories or use session affinity; responses are not cached. SVG loads retain original bytes in the snapshot cache and metadata only in the client baseline. `present` accepts appearance only for SVG sources; Reset restores baseline appearance.
+`POST /api/export/svg` accepts exactly `region`, `text_style`, `show_counts`, and graphical `style`. It returns `variants`, mapping `auto`, `light`, and `dark` to complete SVG strings. The request cap is 2 MiB for a textual payload capped at 256 KiB; each SVG is capped at 1 MiB, with at most 3 MiB of SVG data per bundle and a separate JSON transport bound. Export has a dedicated per-client rate limit and a background thread with a shared render-time budget. Excess work receives `503 svg_busy` with `Retry-After`. The browser retries transient capacity responses within a 30-second deadline. Generated output is retained only in the active browser export view; the endpoint has no server-side output cache.
 
 The browser application uses these endpoints. They exist to serve that application and are not a supported public API.
 
@@ -144,7 +146,7 @@ The browser application uses these endpoints. They exist to serve that applicati
 | `POST /api/preview` | The same fields as a JSON object | The same as `GET` |
 | `POST /api/op` | JSON with `owner`, `repo`, `ref` (a 40-character commit id), `root`, `document`, `state` (the envelope), `op` (`type` plus `path` or `text`), and `reveal` | An updated preview |
 | `POST /api/placement` | Captured source and opening `state`, bounded `decisions`, browsing `expanded` paths, and `reveal` | Provisional placement state and destination rows |
-| `POST /api/export/svg` | Complete textual `region`, `text_style`, `show_counts`, and SVG `appearance` | Generated SVG source, independent of the session cache |
+| `POST /api/export/svg` | Complete textual `region`, `text_style`, `show_counts`, and graphical `style` | Complete Automatic/Light/Dark SVG variants |
 | `GET /healthz` | None | Liveness, versions, build commit, credential type, last observed GitHub budget, and cache statistics |
 
 The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, a document baseline (the text region for Markdown or metadata-only SVG), optional SVG appearance, an optional `initial_curation` baseline, and a revision counter. The browser sends the latest envelope with current presentation settings and the requested operation. Operation types:

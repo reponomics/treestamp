@@ -14,7 +14,7 @@ from treestamp.document import Document, parse_document, render_region
 from treestamp.gitio import capture_snapshot
 from treestamp.model import Node, Settings
 from treestamp.session import TreeSession
-from treestamp.svg import SvgAppearance, parse_svg, render_svg
+from treestamp.svg import SvgAppearance, parse_svg, render_svg, render_svg_variants
 from treestamp_web.app import create_app
 from treestamp_web.export import EXPORT_BODY_CAP
 from treestamp_web.localgit import FakeGitHub, LocalRepository
@@ -53,7 +53,7 @@ def export_body(region: str | None = None, **overrides: object) -> dict[str, obj
         "region": region or render_region(Document(Node(".", "", "dir"))),
         "text_style": "unicode",
         "show_counts": True,
-        "appearance": {"style": "continuous", "theme": "auto"},
+        "style": "continuous",
     }
     data.update(overrides)
     return data
@@ -95,7 +95,9 @@ def test_svg_baseline_is_normalized_and_appearance_can_be_recovered(repo: Repo) 
     assert restored.baseline == base64.b64decode(opened.state["baseline"])
 
 
-def test_svg_dirty_comparison_requires_cached_original(repo: Repo) -> None:
+def test_svg_dirty_comparison_uses_decoded_baseline_without_original(
+    repo: Repo,
+) -> None:
     fake, _ = svg_source(repo)
     service, client = service_for(fake)
     opened = preview(service, document="assets/tree.svg")
@@ -103,9 +105,9 @@ def test_svg_dirty_comparison_requires_cached_original(repo: Repo) -> None:
     assert snapshot is not None
     snapshot.blobs.clear()
     calls = client.calls
-    with pytest.raises(PreviewError) as error:
-        op(service, opened, "restore")
-    assert error.value.code == "snapshot_unavailable"
+    restored = op(service, opened, "restore")
+    assert not restored.dirty
+    assert op(service, restored, "annotate", "", "edited").dirty
     assert client.calls == calls
 
 
@@ -128,7 +130,7 @@ def test_svg_annotation_and_appearance_reset_keep_source_baseline(
     assert (repo.path / "assets/tree.svg").read_bytes() == original
 
 
-def test_svg_manual_drawing_is_dirty_and_regenerated_download_is_clean(
+def test_svg_manual_drawing_does_not_change_editor_state(
     repo: Repo,
 ) -> None:
     _, original = svg_source(repo)
@@ -138,7 +140,7 @@ def test_svg_manual_drawing_is_dirty_and_regenerated_download_is_clean(
     fake = FakeGitHub(LocalRepository(repo.path))
     service, _ = service_for(fake)
     opened = preview(service, document="assets/tree.svg")
-    assert opened.dirty and "Manual drawing title" not in opened.region
+    assert not opened.dirty and "Manual drawing title" not in opened.region
     # Hosted export never writes; model the user replacing the downloaded file.
     downloaded = render_svg(
         parse_document(opened.region.encode()), opened.svg_appearance
@@ -157,15 +159,24 @@ def test_unknown_svg_style_reports_fallback(repo: Repo) -> None:
     repo.commit("future style")
     service, _ = service_for(FakeGitHub(LocalRepository(repo.path)))
     opened = preview(service, document="assets/tree.svg")
-    assert opened.dirty and opened.svg_appearance.style == "continuous"
+    assert not opened.dirty and opened.svg_appearance.style == "continuous"
     assert "unavailable" in opened.warnings[0]
 
 
-def test_svg_subtree_and_placement_use_embedded_document(repo: Repo) -> None:
+def test_svg_subtree_and_placement_use_embedded_document(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fake = stale(repo)
     text = (repo.path / "README.md").read_bytes()
     repo.write("assets/tree.svg", render_svg(parse_document(text)))
     repo.commit("SVG source")
+
+    def no_layout(*args: object) -> None:
+        pytest.fail("note transfer must not render SVG")
+
+    from treestamp.svg_layout import LAYOUT_STYLES
+
+    monkeypatch.setitem(LAYOUT_STYLES, "continuous", no_layout)
     service, _ = service_for(fake)
     opened = preview(service, document="assets/tree.svg")
     assert opened.placement["remaining"] == 3
@@ -173,6 +184,10 @@ def test_svg_subtree_and_placement_use_embedded_document(repo: Repo) -> None:
     assert transferred.placement["remaining"] == 1
     assert "First note" in transferred.region
     assert transferred.source_format == "svg"
+    edited = op(service, transferred, "annotate", "", "temporary")
+    discarded = op(service, edited, "reset")
+    assert discarded.tree == transferred.tree and discarded.dirty
+    assert discarded.state["baseline"] == opened.state["baseline"]
 
 
 def test_svg_subtree_root_is_not_source_directory(repo: Repo) -> None:
@@ -248,8 +263,8 @@ def test_export_matches_core_without_session_or_source_change(
     body = export_body(opened["region"])
     response = client.post("/api/export/svg", json=body)
     assert response.status_code == 200, response.text
-    expected = render_svg(parse_document(opened["region"].encode()))
-    assert response.json() == {"svg": expected}
+    expected = render_svg_variants(parse_document(opened["region"].encode()))
+    assert response.json() == {"variants": expected}
     assert response.headers["cache-control"] == "no-store"
     assert opened == before
 
@@ -269,9 +284,9 @@ def test_examples_export_without_acquiring_a_repository(
         ),
     )
     assert response.status_code == 200, response.text
-    assert parse_svg(response.json()["svg"].encode()).document == parse_document(
-        example["region"].encode()
-    )
+    assert parse_svg(
+        response.json()["variants"]["auto"].encode()
+    ).document == parse_document(example["region"].encode())
     assert client.app.state.client.calls == calls
 
 
@@ -280,6 +295,9 @@ def test_examples_export_without_acquiring_a_repository(
     [
         {"unexpected": True},
         {"appearance": None},
+        {"style": None},
+        {"style": "unknown"},
+        {"style": ["continuous"]},
         {"region": 5},
         {"text_style": "list"},
         {"show_counts": 1},
@@ -314,7 +332,7 @@ def test_export_preserves_unobservable_text_preferences(client: TestClient) -> N
     response = client.post(
         "/api/export/svg", json=export_body(text_style="ascii", show_counts=False)
     )
-    artifact = parse_svg(response.json()["svg"].encode())
+    artifact = parse_svg(response.json()["variants"]["auto"].encode())
     assert artifact.document.settings.style == "ascii"
     assert not artifact.document.settings.show_counts
 
@@ -363,3 +381,33 @@ def test_export_rejects_excessively_nested_metadata(client: TestClient) -> None:
     response = client.post("/api/export/svg", json=export_body(region))
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_export"
+
+
+def test_bundle_failure_returns_no_partial_artifacts(client, monkeypatch) -> None:
+    from treestamp import svg
+    from treestamp.svg_metadata import MAX_SVG_BYTES
+
+    drawing = svg._drawing
+
+    def oversized_dark(layout, appearance):
+        return (
+            " " * MAX_SVG_BYTES
+            if appearance.theme == "dark"
+            else drawing(layout, appearance)
+        )
+
+    monkeypatch.setattr(svg, "_drawing", oversized_dark)
+    response = client.post("/api/export/svg", json=export_body())
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_export"
+    assert "variants" not in response.json()
+
+
+def test_bundle_json_response_is_bounded(client, monkeypatch) -> None:
+    from treestamp_web import app as app_module
+
+    monkeypatch.setattr(app_module, "EXPORT_RESPONSE_CAP", 1)
+    response = client.post("/api/export/svg", json=export_body())
+    assert response.status_code == 422
+    assert "response exceeds" in response.json()["error"]["message"]
+    assert "variants" not in response.json()
