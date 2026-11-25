@@ -15,9 +15,9 @@ treestamp --help
 
 The CLI is designed such that when it is invoked with implicit arguments or commands, it applies default assumptions about what behavior is most likely to serve the most common use case, which is considered to be: creating a treestamp whose root is the current working directory (`cwd`), or loading a treestamp from the file that's most likely to have one, `./README.md`. `treestamp new` is equivalent to `treestamp new .`; `treestamp load` is equivalent to `treestamp load ./README.md`; and `treestamp` on its own does the following: if `./README.md` contains treestamp markers, it tries `treestamp load ./README.md`, and fails if the loaded treestamp is malformed; else, it does `treestamp new .`; if invoked outside of a git repo altogether, it also fails.
 
-Explicit source and document paths can select another checkout even when cwd is outside Git. A new-tree path must be an existing directory; files are rejected. To create a tree for a file’s parent, pass that directory explicitly. To load a treestamp from a file, use `load`. Paths may include `..`, but symlinks are refused, including traversed components before parent normalization. An initialized nested repository or submodule owns sources selected within it; uninitialized submodules remain boundaries. Stored root, hidden-path, and special-path identities remain repository-relative regardless of the caller's cwd.
+Paths can be absolute or relative to cwd and can select another checkout. `new` requires an existing directory; use `load` for a document. Paths may include `..` but cannot pass through symlinks. To work inside a nested repository or initialized submodule, select it directly; a parent repository's tree cannot extend into it.
 
-New trees and interactive or automatic updates use a captured staged Git index. Stage additions, deletions, and renames before these operations. Untracked files are absent, and unstaged changes are not incorporated. Subsequent interactive edits use the captured snapshot. Documents themselves are read from disk. Treestamp does not stage or commit files or fetch remote history.
+New trees and updates use a snapshot of the Git index. Stage additions, deletions, and renames before creating or updating a treestamp. The editor keeps that snapshot for the session; reopen it to pick up later staged changes.
 
 ## Interactive editor
 
@@ -28,7 +28,7 @@ treestamp load docs/structure.md
 treestamp load /path/to/another/checkout/README.md
 ```
 
-New treestamps start with the selected root's immediate children and collapsed directories. Loading reads an existing treestamp and updates an in-memory draft against the captured index while preserving supported curation. Invalid sources or documents report an error before opening the editor. The editor identifies the selected root; an empty staged tree explains that files need to be staged.
+New treestamps show the selected directory's immediate children, with subdirectories collapsed. Loading updates a draft of the saved tree while retaining its annotations, hidden entries, and expanded directories where possible.
 
 | Keys | Action |
 | --- | --- |
@@ -40,15 +40,15 @@ New treestamps start with the selected root's immediate children and collapsed d
 | `v`, `y`, `p` | Preview, copy the draft, print it and exit |
 | `?`, `q` / Escape | Help, quit |
 
-When an interactive load leaves notes without their original rows, a **Transfer notes?** modal offers to move them to the updated tree or continue without them. Enter starts transfer; Escape continues without those notes. New trees and loads without unmatched notes open the editor directly. No document changes until you choose Write.
+If a loaded tree has notes whose original paths are gone or have changed kind, a **Transfer notes?** dialog offers to move them to the updated tree. Enter starts transfer; Escape continues without those notes. Otherwise, the editor opens directly. The document is unchanged until you choose Write.
 
 The transfer view presents one source note at a time above the destination tree. Navigate with the arrow keys, press Enter to transfer the note to the selected row, or `s` to skip it. A directory belongs on a directory; other notes belong on files or other leaf entries. Opening folders only changes browsing. Transferring reveals the destination in the saved draft so its annotation is included. `H` reveals hidden destinations for browsing. Replacing an existing annotation requires confirmation. `?` shows full paths and notes when a line is truncated.
 
-Transferring a directory also carries its pending annotated descendants recursively when their full relative paths and entry kinds match. An unannotated removed directory can stand for its annotated descendants. Missing paths, kind changes, conflicting notes, and destinations already holding another transferred note remain for individual decisions. Skipping a directory leaves its descendants available individually. Matching never uses just a basename and does not guess renamed paths.
+Transferring a directory also carries its pending annotated descendants recursively when their full relative paths and entry kinds match. An unannotated removed directory can stand for its annotated descendants. Missing paths, kind changes, conflicting notes, and destinations already holding another transferred note remain for individual decisions. Skipping a directory leaves its descendants available individually.
 
 `u` undoes the last decision, including every note carried by a directory transfer. Resolving the queue opens the editor automatically. Escape skips remaining items and starts editing. Transfer is a one-time step for each document load; skipped notes are omitted when writing.
 
-Copy and Print export the current draft, including your edits, markers, and configuration. For a new treestamp, paste this complete block into your document. Loaded sessions can Write directly back to the original document while preserving surrounding bytes. New-tree sessions have no write destination. To start another session, exit and invoke the desired command. Unwritten changes require confirmation before quitting.
+Copy and Print export the current draft, including your edits, markers, and configuration. For a new treestamp, paste this complete block into your document. Loaded sessions can Write back to the original document without changing surrounding content. Quitting with unwritten changes requires confirmation.
 
 ## Print without opening the editor
 
@@ -79,7 +79,7 @@ Both commands read an existing, valid treestamp from disk and compare it with th
 
 `update` retains notes at matching paths with the same entry kind; it does not infer renames. If any notes would be omitted, it exits nonzero without writing. Use `treestamp load DOCUMENT` to transfer those notes interactively, or `--skip-notes-transfer` to omit them while retaining matched notes. A successful update replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
 
-Supported formatting differences are preserved before comparison: zero or one blank line after the start marker, between configuration and tree, and before the end marker, plus equivalent TOML formatting when validated configuration values are unchanged. These differences alone do not fail `check`. Changed configuration is regenerated with compact array wrapping at an 80-character target and loses its comments; oversized individual entries stay intact. See the [document format](design.md#document-format).
+`check` accepts the [supported blank-line and TOML formatting variations](design.md#document-format). If configuration values change, the configuration is regenerated and its comments are lost.
 
 ## Output and exit status
 
