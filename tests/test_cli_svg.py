@@ -11,7 +11,7 @@ from treestamp.svg import SvgAppearance, parse_svg, render_svg
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii"])
-@pytest.mark.parametrize("theme", ["auto", "light", "dark"])
+@pytest.mark.parametrize("theme", ["adaptive", "light", "dark"])
 def test_text_to_svg_to_text_and_source_update(repo, style, theme):
     source = stamp(repo)
     document = parse_document(source.read_bytes())
@@ -59,7 +59,7 @@ def test_export_file_requires_explicit_replacement_and_leaves_source(repo):
     args = ("export", "--load", "README.md", "--format", "svg", "--output", "tree.svg")
     assert run_cli(*args)[0] == 0
     exported = repo.read_bytes("tree.svg")
-    assert parse_svg(exported).appearance.theme == "auto"
+    assert parse_svg(exported).appearance.theme == "adaptive"
     assert run_cli(*args)[0] == 2
     assert repo.read_bytes("tree.svg") == exported
     repo.write("tree.svg", "foreign SVG bytes")
@@ -120,7 +120,7 @@ def test_new_tree_export_and_malformed_source(repo):
     code, output, error = run_cli("export", "--format", "svg", "--stdout")
     assert code == 0 and not error
     assert parse_svg(output.encode()).document.tree.children[0].name == "code.py"
-    assert parse_svg(output.encode()).appearance.theme == "auto"
+    assert parse_svg(output.encode()).appearance.theme == "adaptive"
     bad = repo.write("bad.svg", "not SVG")
     assert (
         run_cli("export", "--load", "bad.svg", "--format", "markdown", "--stdout")[0]
@@ -296,8 +296,8 @@ def test_export_requires_note_transfer_before_emitting_or_writing(
         assert not destination.exists()
 
 
-@pytest.mark.parametrize("theme", ["auto", "light", "dark"])
-def test_svg_export_retains_loaded_appearance_and_can_choose_automatic(repo, theme):
+@pytest.mark.parametrize("theme", ["adaptive", "light", "dark"])
+def test_svg_export_retains_loaded_appearance_and_can_choose_adaptive(repo, theme):
     source = stamp(repo)
     document = parse_document(source.read_bytes())
     svg = repo.write("tree.svg", render_svg(document, SvgAppearance(theme=theme)))
@@ -306,8 +306,8 @@ def test_svg_export_retains_loaded_appearance_and_can_choose_automatic(repo, the
     code, output, error = run_cli(*args)
     assert code == 0 and not error
     assert parse_svg(output.encode()).appearance.theme == theme
-    code, output, error = run_cli(*args, "--theme", "auto")
+    code, output, error = run_cli(*args, "--theme", "adaptive")
     assert code == 0 and not error
-    assert parse_svg(output.encode()).appearance.theme == "auto"
+    assert parse_svg(output.encode()).appearance.theme == "adaptive"
     assert "@media (prefers-color-scheme: dark)" in output
     assert svg.read_bytes() == original

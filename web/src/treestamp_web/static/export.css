@@ -12,7 +12,7 @@
 #svg-status { flex: 1; min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
 #svg-status[data-error="true"] { color: var(--error-ink); }
 .svg-preview { flex: 1; overflow: auto; min-height: 6rem; border: 1px solid var(--rule); border-radius: var(--r); background: var(--document-surface); }
-/* Automatic inherits the app's color-scheme, including inside the SVG image.
+/* Adaptive inherits the app's color-scheme, including inside the SVG image.
    Fixed overrides use their own preview context; every export stays transparent. */
 .svg-preview[data-theme="light"] { color-scheme: light; background: #fff; }
 .svg-preview[data-theme="dark"] { color-scheme: dark; background: #0d1117; }

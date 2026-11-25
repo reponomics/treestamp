@@ -22,7 +22,7 @@ Browsing candidates preserves the accepted treestamp, its cached record, and its
 
 **Tree** contains editing controls and Settings. **Export** offers Markdown source or an SVG image independently of the loaded format. Markdown uses Unicode or ASCII branches; SVG can be downloaded or copied as complete, editable source. Export starts with Markdown selected. Selecting SVG prepares its preview; leaving Export resets the view and cancels pending preparation while preserving edits.
 
-New SVG exports use **Automatic** appearance, adapting one transparent image to light and dark color schemes. **Light** and **Dark** provide fixed overrides; loaded SVGs retain their saved appearance. One request prepares all three appearances, so switching between them is immediate. Temporary server contention keeps preparation pending for up to 30 seconds, then offers Try again. Users save the SVG in their repository and reference it from their README. Loading that file reopens its embedded treestamp for editing. See [Document format](design.md#svg-artifacts) for the metadata and regeneration contract.
+New SVG exports use **Adaptive** appearance, adapting one transparent image to light and dark color schemes. **Light** and **Dark** provide fixed overrides; loaded SVGs retain their saved appearance. One request prepares all three appearances, so switching between them is immediate. Temporary server contention keeps preparation pending for up to 30 seconds, then offers Try again. Users save the SVG in their repository and reference it from their README. Loading that file reopens its embedded treestamp for editing. See [Document format](design.md#svg-artifacts) for the metadata and regeneration contract.
 
 ## Source selection
 

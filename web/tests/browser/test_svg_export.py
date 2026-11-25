@@ -36,8 +36,8 @@ def svg_service(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     (fixture.path / "assets/tree.svg").write_text(
         render_svg(document, SvgAppearance(theme="dark")), encoding="utf-8"
     )
-    (fixture.path / "assets/auto.svg").write_text(
-        render_svg(document, SvgAppearance(theme="auto")), encoding="utf-8"
+    (fixture.path / "assets/adaptive.svg").write_text(
+        render_svg(document, SvgAppearance(theme="adaptive")), encoding="utf-8"
     )
     (fixture.path / "assets/future.svg").write_text(
         render_svg(document, SvgAppearance(theme="dark")).replace(
@@ -67,9 +67,9 @@ def test_preview_copy_and_download_share_bytes_and_preserve_text_source(
     original_address = page.url
     text = page.locator("#region").text_content()
     assert page.locator("#svg-image").get_attribute("src").startswith("blob:")
-    svg = export_response.value.json()["variants"]["auto"]
+    svg = export_response.value.json()["variants"]["adaptive"]
     artifact = parse_svg(svg.encode())
-    assert artifact.appearance.theme == "auto"
+    assert artifact.appearance.theme == "adaptive"
     assert render_region(artifact.document) == text
 
     page.locator("#svg-copy").click()
@@ -104,7 +104,7 @@ def test_fixed_appearance_is_independent_of_app_theme_for_text_export(
     open_svg_export(page, service)
     expect(page.locator("#svg-download")).to_be_enabled()
     address = page.url
-    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "auto")
+    expect(page.locator("#svg-preview")).to_have_attribute("data-theme", "adaptive")
     page.locator("#svg-theme").select_option(theme)
     expect(page.locator("#svg-download")).to_be_enabled()
     page.wait_for_function(_IMAGE_USES_INK, arg=ink)
@@ -138,20 +138,20 @@ _IMAGE_USES_INK = """expected => {
 
 
 @pytest.mark.parametrize("loaded", [False, True])
-def test_automatic_preview_follows_app_theme_without_changing_artifact(
+def test_adaptive_preview_follows_app_theme_without_changing_artifact(
     page: Page, svg_service: str, loaded: bool
 ) -> None:
     page.emulate_media(color_scheme="light")
     page.add_init_script("localStorage.setItem('treestamp-theme', 'dark')")
     if loaded:
-        page.goto(f"{svg_service}/fixture/repo?document=assets/auto.svg")
+        page.goto(f"{svg_service}/fixture/repo?document=assets/adaptive.svg")
         expect(page.locator("#rows .row").first).to_be_visible()
         page.locator("#tab-stamp").click()
         page.locator("#output-format").select_option("svg")
     else:
         open_svg_export(page, svg_service)
     expect(page.locator("#svg-download")).to_be_enabled()
-    expect(page.locator("#svg-theme")).to_have_value("auto")
+    expect(page.locator("#svg-theme")).to_have_value("adaptive")
     expect(page.locator("#svg-image")).to_have_css("color-scheme", "dark")
     page.wait_for_function(_IMAGE_USES_INK, arg=255)
     address = page.url
@@ -160,14 +160,14 @@ def test_automatic_preview_follows_app_theme_without_changing_artifact(
     with page.expect_download() as before:
         page.locator("#svg-download").click()
     original = before.value.path().read_bytes()
-    assert parse_svg(original).appearance.theme == "auto"
+    assert parse_svg(original).appearance.theme == "adaptive"
 
     page.locator("#theme-toggle").click()
     expect(page.locator("#svg-image")).to_have_css("color-scheme", "light")
     page.wait_for_function(_IMAGE_USES_INK, arg=0)
     page.emulate_media(color_scheme="dark")
     page.wait_for_function(_IMAGE_USES_INK, arg=0)
-    expect(page.locator("#svg-theme")).to_have_value("auto")
+    expect(page.locator("#svg-theme")).to_have_value("adaptive")
     assert page.locator("#svg-image").get_attribute("src") == image_url
     with page.expect_download() as after:
         page.locator("#svg-download").click()
@@ -227,11 +227,11 @@ def test_pending_edits_disable_export_until_new_image_is_ready(
     assert page.locator("#svg-image").get_attribute("src") != old_url
 
 
-@pytest.mark.parametrize("filename", ["tree.svg", "future.svg", "auto.svg"])
+@pytest.mark.parametrize("filename", ["tree.svg", "future.svg", "adaptive.svg"])
 def test_loaded_svg_starts_with_markdown_and_retains_appearance_and_filename(
     page: Page, svg_service: str, filename: str
 ) -> None:
-    expected_theme = "auto" if filename == "auto.svg" else "dark"
+    expected_theme = "adaptive" if filename == "adaptive.svg" else "dark"
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{svg_service}/fixture/repo?document=assets/{filename}")
     expect(page.locator("#rows .row").first).to_be_visible()
@@ -381,7 +381,7 @@ def bundle_for_request(route: Route) -> dict[str, object]:
     return {
         "variants": {
             theme: render_svg(document, SvgAppearance(theme=theme))
-            for theme in ("auto", "light", "dark")
+            for theme in ("adaptive", "light", "dark")
         }
     }
 
@@ -415,7 +415,7 @@ def test_appearance_switches_use_one_bundle_without_changing_editor(
     address = page.url
     cached = page.evaluate("localStorage.getItem('treestamp.current-draft')")
     urls = set()
-    for theme in ("light", "dark", "auto", "dark", "light"):
+    for theme in ("light", "dark", "adaptive", "dark", "light"):
         page.locator("#svg-theme").select_option(theme)
         expect(page.locator("#svg-preview")).to_have_attribute("aria-busy", "false")
         expect(page.locator("#svg-download")).to_be_enabled()
@@ -435,7 +435,7 @@ def test_appearance_switches_use_one_bundle_without_changing_editor(
     page.locator("#tab-stamp").click()
     expect(page.locator("#output-format")).to_have_value("markdown")
     expect(page.locator("#svg-image")).to_be_hidden()
-    expect(page.locator("#svg-theme")).to_have_value("dark" if loaded else "auto")
+    expect(page.locator("#svg-theme")).to_have_value("dark" if loaded else "adaptive")
     expect(page.locator("#svg-size")).to_have_text("Actual size")
     assert len(calls) == 1
     page.locator("#output-format").select_option("svg")

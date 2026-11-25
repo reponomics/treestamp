@@ -33,10 +33,10 @@ __all__ = [
 _DEFAULT_APPEARANCE = SvgAppearance()
 
 # The image has no background. Appearance chooses only its foreground ink.
-_INK = {"auto": "#000000", "light": "#000000", "dark": "#ffffff"}
+_INK = {"adaptive": "#000000", "light": "#000000", "dark": "#ffffff"}
 # Fixed author-controlled CSS only; labels and imported markup cannot supply rules.
 # No color-scheme override here: the embedding image supplies the preferred scheme.
-_AUTO_STYLE = """<style>
+_ADAPTIVE_STYLE = """<style>
   text { fill: #000000; }
   g[stroke] { stroke: #000000; }
   @media (prefers-color-scheme: dark) {
@@ -118,7 +118,7 @@ def _serialize_svg(metadata: str, layout: Layout, appearance: SvgAppearance) -> 
 
 def _drawing(layout: Layout, appearance: SvgAppearance) -> str:
     foreground = _INK[appearance.theme]
-    parts = [_AUTO_STYLE] if appearance.theme == "auto" else []
+    parts = [_ADAPTIVE_STYLE] if appearance.theme == "adaptive" else []
     parts.append(
         f'<g fill="none" stroke="{foreground}" stroke-opacity="0.4" '
         'stroke-width="1.25">'

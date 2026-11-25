@@ -61,9 +61,7 @@ class SvgExportScreen(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="svg-export-panel"):
             appearance = self.editor.state.svg_appearance
-            theme = (
-                "Automatic" if appearance.theme == "auto" else appearance.theme.title()
-            )
+            theme = appearance.theme.title()
             yield Static(f"Export SVG — {theme}, {appearance.style}", markup=False)
             yield Static(
                 "Graphical preview is unavailable here. "

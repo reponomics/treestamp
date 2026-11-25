@@ -14,7 +14,7 @@ Source SVG drawing bytes are irrelevant to hosted change detection. Loading read
 
 Export starts with Markdown selected, including for an SVG source. Selecting SVG initiates generation after pending edits settle. Leaving Export resets the view and cancels pending browser work. Returning starts at Markdown again.
 
-One request produces complete Automatic, Light, and Dark SVG variants. The renderer shares document preparation and layout across them. The browser retains the bundle for the active export view and selects complete outputs without modifying their markup. Appearance switches are immediate and make no server request. Copy and Download use the selected variant, including its saved appearance metadata. Loaded appearance initializes the selector; other inputs start with Automatic.
+One request produces complete Adaptive, Light, and Dark SVG variants. The renderer shares document preparation and layout across them. The browser retains the bundle for the active export view and selects complete outputs without modifying their markup. Appearance switches are immediate and make no server request. Copy and Download use the selected variant, including its saved appearance metadata. Loaded appearance initializes the selector; other inputs start with Automatic.
 
 | State | Experience |
 | --- | --- |

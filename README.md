@@ -119,7 +119,7 @@ Paste the whole block, including the markers, anywhere in your project's documen
 
 #### SVG instead of a text block
 
-The web **Export** tab also offers SVG preview, Download SVG, and Copy SVG. In the terminal, press `e` to save or copy SVG; `w` updates a loaded SVG. New SVG exports default to **Automatic** appearance: one transparent image switches between black and white ink to match the embedding page’s light or dark color scheme. Fixed Light and Dark overrides remain available in the web export controls. Existing SVGs retain their saved appearance. The image carries an editable treestamp in its metadata, so it can be loaded again. Save it in your repository and add a README image reference yourself, using Markdown image syntax. See [SVG export](https://github.com/reponomics/treestamp/blob/main/docs/cli-reference.md#svg-export) for the CLI and file-safety rules.
+The web **Export** tab also offers SVG preview, Download SVG, and Copy SVG. In the terminal, press `e` to save or copy SVG; `w` updates a loaded SVG. New SVG exports default to **Adaptive** appearance: one transparent image switches between black and white ink to match the embedding page’s light or dark color scheme. Fixed Light and Dark overrides remain available in the web export controls. Existing SVGs retain their saved appearance. The image carries an editable treestamp in its metadata, so it can be loaded again. Save it in your repository and add a README image reference yourself, using Markdown image syntax. See [SVG export](https://github.com/reponomics/treestamp/blob/main/docs/cli-reference.md#svg-export) for the CLI and file-safety rules.
 
 #### The config block
 

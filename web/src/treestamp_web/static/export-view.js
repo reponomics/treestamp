@@ -1,7 +1,7 @@
 // Export keeps complete renderer-produced variants; the browser never edits SVG.
 import { displayPath } from "./logic.js";
 
-const THEMES = ["auto", "light", "dark"];
+const THEMES = ["adaptive", "light", "dark"];
 const PREPARE_TIMEOUT = 30_000;
 
 function abortable(promise, signal) {
@@ -110,7 +110,7 @@ export class ExportView {
   accept(editor, opening) {
     if (opening || this.source !== editor.state.generation) {
       this.source = editor.state.generation;
-      this.initialAppearance = editor.sourceFormat === "svg" ? editor.svgAppearance : { style: "continuous", theme: "auto" };
+      this.initialAppearance = editor.sourceFormat === "svg" ? editor.svgAppearance : { style: "continuous", theme: "adaptive" };
       this.reset();
     } else if (!this.operation?.waitingForEdits) {
       this.invalidate();
@@ -130,7 +130,7 @@ export class ExportView {
   reset() {
     this.invalidate();
     this.output.value = "markdown";
-    this.theme.value = this.initialAppearance?.theme || "auto";
+    this.theme.value = this.initialAppearance?.theme || "adaptive";
     this.preview.dataset.theme = this.theme.value;
     this.setActualSize(false);
   }

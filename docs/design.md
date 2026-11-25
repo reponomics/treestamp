@@ -123,7 +123,7 @@ The optional attribution footer is disabled by default. When present, the exact 
 
 SVG contains the complete textual treestamp as base64 in a `{urn:treestamp:svg:1}treestamp` element inside the root SVG’s `metadata`. Required attributes are `version="1"`, `codec="treestamp-text-v1"`, `encoding="base64"`, `text_style`, `show_counts`, `style`, and `theme`. The shared text codec validates the decoded document, preserving exact paths, annotations, and curation across Markdown/SVG conversion.
 
-The `continuous` visual style draws connected branches and inline annotations on a transparent background. Appearance is separate from text notation: `auto` selects black or white ink through `prefers-color-scheme`; `light` and `dark` fix the ink color. New exports default to `auto`; loaded SVGs retain supported appearance settings. Unknown visual styles use a reported fallback; unsupported envelope or codec versions fail on load.
+The `continuous` visual style draws connected branches and inline annotations on a transparent background. Appearance is separate from text notation: `adaptive` selects black or white ink through `prefers-color-scheme`; `light` and `dark` fix the ink color. New exports default to `adaptive`; loaded SVGs retain supported appearance settings. Unknown visual styles use a reported fallback; unsupported envelope or codec versions fail on load.
 
 The embedded document is authoritative. Export generates the drawing; local writes replace the complete SVG. Local dirty-state and `check` comparisons use original file bytes, while hosted editing compares decoded document state. Layout styles share one metadata codec and serializer. Parsing and rendering bounds are defined in [svg_metadata.py](../src/treestamp/svg_metadata.py) and [svg_layout.py](../src/treestamp/svg_layout.py); import safety is described in the [security assessment](security-assessment.md).
 
@@ -133,7 +133,7 @@ The embedded document is authoritative. Export generates the drawing; local writ
 
 ### Hosted HTTP API
 
-`POST /api/export/svg` accepts exactly `region`, `text_style`, `show_counts`, and graphical `style`. It returns `variants`, mapping `auto`, `light`, and `dark` to complete SVG strings. The request cap is 2 MiB for a textual payload capped at 256 KiB; each SVG is capped at 1 MiB, with at most 3 MiB of SVG data per bundle and a separate JSON transport bound. Export has a dedicated per-client rate limit and a background thread with a shared render-time budget. Excess work receives `503 svg_busy` with `Retry-After`. The browser retries transient capacity responses within a 30-second deadline. Generated output is retained only in the active browser export view; the endpoint has no server-side output cache.
+`POST /api/export/svg` accepts exactly `region`, `text_style`, `show_counts`, and graphical `style`. It returns `variants`, mapping `adaptive`, `light`, and `dark` to complete SVG strings. The request cap is 2 MiB for a textual payload capped at 256 KiB; each SVG is capped at 1 MiB, with at most 3 MiB of SVG data per bundle and a separate JSON transport bound. Export has a dedicated per-client rate limit and a background thread with a shared render-time budget. Excess work receives `503 svg_busy` with `Retry-After`. The browser retries transient capacity responses within a 30-second deadline. Generated output is retained only in the active browser export view; the endpoint has no server-side output cache.
 
 The browser application uses these endpoints. They exist to serve that application and are not a supported public API.
 
@@ -146,7 +146,7 @@ The browser application uses these endpoints. They exist to serve that applicati
 | `POST /api/preview` | The same fields as a JSON object | The same as `GET` |
 | `POST /api/op` | JSON with `owner`, `repo`, `ref` (a 40-character commit id), `root`, `document`, `state` (the envelope), `op` (`type` plus `path` or `text`), and `reveal` | An updated preview |
 | `POST /api/placement` | Captured source and opening `state`, bounded `decisions`, browsing `expanded` paths, and `reveal` | Provisional placement state and destination rows |
-| `POST /api/export/svg` | Complete textual `region`, `text_style`, `show_counts`, and graphical `style` | Complete Automatic/Light/Dark SVG variants |
+| `POST /api/export/svg` | Complete textual `region`, `text_style`, `show_counts`, and graphical `style` | Complete Adaptive/Light/Dark SVG variants |
 | `GET /healthz` | None | Liveness, versions, build commit, credential type, last observed GitHub budget, and cache statistics |
 
 The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, a document baseline (the text region for Markdown or metadata-only SVG), optional SVG appearance, an optional `initial_curation` baseline, and a revision counter. The browser sends the latest envelope with current presentation settings and the requested operation. Operation types:

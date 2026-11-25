@@ -222,21 +222,21 @@ def test_startup_can_load_svg_and_default_destination_avoids_source(repo: Repo) 
     asyncio.run(journey())
 
 
-def test_new_tree_exports_automatic_svg_without_a_theme_selection(
+def test_new_tree_exports_adaptive_svg_without_a_theme_selection(
     editor: EditorController,
 ) -> None:
     async def journey() -> None:
         app = TreestampApp(editor)
         async with app.run_test() as pilot:
             await press(pilot, "e")
-            assert "Export SVG — Automatic" in " ".join(
+            assert "Export SVG — Adaptive" in " ".join(
                 rendered_text(widget) for widget in app.screen.query(Static)
             )
             await pilot.click("#svg-export-save")
             await pilot.pause()
             source = (editor.state.snapshot.repo / "treestamp.svg").read_bytes()
             artifact = parse_artifact(source)
-            assert artifact.appearance.theme == "auto"
+            assert artifact.appearance.theme == "adaptive"
             assert b"@media (prefers-color-scheme: dark)" in source
             assert editor.state.document_path is None
 

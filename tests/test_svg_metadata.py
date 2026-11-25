@@ -37,7 +37,7 @@ def envelope(payload: bytes = REGION, attrs: str = "", *, encode: bool = True) -
     )
 
 
-@pytest.mark.parametrize("theme", ["auto", "light", "dark"])
+@pytest.mark.parametrize("theme", ["adaptive", "light", "dark"])
 def test_independent_fixture(theme: str) -> None:
     fixture = envelope().replace(b'theme="light"', f'theme="{theme}"'.encode())
     artifact = parse_svg(fixture)

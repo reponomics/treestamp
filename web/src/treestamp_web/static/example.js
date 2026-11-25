@@ -18,7 +18,7 @@ export const EXAMPLES = {
     "document": "",
     "loaded": false,
     "source_format": "markdown",
-    "svg_appearance": {"style": "continuous", "theme": "auto"},
+    "svg_appearance": {"style": "continuous", "theme": "adaptive"},
     "dirty": true,
     "notice": null,
     "settings": {

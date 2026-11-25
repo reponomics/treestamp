@@ -59,7 +59,7 @@ def export_body(region: str | None = None, **overrides: object) -> dict[str, obj
     return data
 
 
-@pytest.mark.parametrize("theme", ["auto", "light", "dark"])
+@pytest.mark.parametrize("theme", ["adaptive", "light", "dark"])
 def test_svg_load_is_clean_and_state_has_metadata_only(repo: Repo, theme: str) -> None:
     fake, original = svg_source(repo, theme=theme)
     service, client = service_for(fake)
@@ -111,7 +111,7 @@ def test_svg_dirty_comparison_uses_decoded_baseline_without_original(
     assert client.calls == calls
 
 
-@pytest.mark.parametrize("theme", ["auto", "dark"])
+@pytest.mark.parametrize("theme", ["adaptive", "dark"])
 def test_svg_annotation_and_appearance_reset_keep_source_baseline(
     repo: Repo, theme: str
 ) -> None:
@@ -285,7 +285,7 @@ def test_examples_export_without_acquiring_a_repository(
     )
     assert response.status_code == 200, response.text
     assert parse_svg(
-        response.json()["variants"]["auto"].encode()
+        response.json()["variants"]["adaptive"].encode()
     ).document == parse_document(example["region"].encode())
     assert client.app.state.client.calls == calls
 
@@ -332,7 +332,7 @@ def test_export_preserves_unobservable_text_preferences(client: TestClient) -> N
     response = client.post(
         "/api/export/svg", json=export_body(text_style="ascii", show_counts=False)
     )
-    artifact = parse_svg(response.json()["variants"]["auto"].encode())
+    artifact = parse_svg(response.json()["variants"]["adaptive"].encode())
     assert artifact.document.settings.style == "ascii"
     assert not artifact.document.settings.show_counts
 

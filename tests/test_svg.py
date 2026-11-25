@@ -51,7 +51,7 @@ def sample(style: str = "unicode") -> Document:
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii"])
-@pytest.mark.parametrize("theme", ["auto", "light", "dark"])
+@pytest.mark.parametrize("theme", ["adaptive", "light", "dark"])
 def test_all_kinds_paths_counts_scope_hiding_round_trip(style: str, theme: str) -> None:
     document = sample(style)
     svg = render_svg(document, SvgAppearance(theme=theme))
@@ -243,7 +243,7 @@ def test_transparent_monochrome_image_keeps_notes_on_the_entry_row(theme, ink):
     assert parse_svg(source.encode()).document == document
 
 
-def test_default_automatic_appearance_uses_only_static_media_css() -> None:
+def test_default_adaptive_appearance_uses_only_static_media_css() -> None:
     svg = render_svg(sample())
     root = ET.fromstring(svg)
     css = root.find(f"{{{SVG_NAMESPACE}}}style")
@@ -254,7 +254,7 @@ def test_default_automatic_appearance_uses_only_static_media_css() -> None:
     assert "text { fill: #000000; }" in css.text
     assert "g[stroke] { stroke: #000000; }" in css.text
     assert "color-scheme:" not in css.text.replace("prefers-color-scheme:", "")
-    assert parse_svg(svg.encode()).appearance.theme == "auto"
+    assert parse_svg(svg.encode()).appearance.theme == "adaptive"
     assert "<style" not in render_svg_metadata(sample())
 
 
@@ -267,11 +267,11 @@ def test_fixed_appearance_stays_fixed_when_reloaded(theme: str) -> None:
     assert render_svg(loaded.document, loaded.appearance) == source
 
 
-def test_imported_css_is_discarded_in_automatic_svg() -> None:
+def test_imported_css_is_discarded_in_adaptive_svg() -> None:
     original = render_svg(sample())
     foreign = original.replace("text { fill: #ffffff; }", "text { fill: red; }")
     artifact = parse_svg(foreign.encode())
-    assert artifact.appearance.theme == "auto"
+    assert artifact.appearance.theme == "adaptive"
     assert render_svg(artifact.document, artifact.appearance) == original
 
 
@@ -282,7 +282,7 @@ def test_variant_bundle_matches_individual_artifacts(text_style: str) -> None:
 
     document = sample(text_style)
     variants = render_svg_variants(document)
-    assert set(variants) == {"auto", "light", "dark"}
+    assert set(variants) == {"adaptive", "light", "dark"}
     for theme, content in variants.items():
         appearance = SvgAppearance(theme=theme)
         assert content == render_svg(document, appearance)

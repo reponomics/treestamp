@@ -40,7 +40,7 @@ def export_svg(data: object) -> dict[str, str]:
         raise MarkerError(
             "SVG export requires region, text_style, show_counts, and style"
         )
-    appearance = parse_appearance({"style": data["style"], "theme": "auto"})
+    appearance = parse_appearance({"style": data["style"], "theme": "adaptive"})
     region, style, counts = data["region"], data["text_style"], data["show_counts"]
     if (
         not isinstance(region, str)
