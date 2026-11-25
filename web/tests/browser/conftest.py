@@ -8,6 +8,7 @@ tests never depend on this checkout.
 
 from __future__ import annotations
 
+import logging
 import os
 import socket
 import subprocess
@@ -21,8 +22,35 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("playwright.sync_api")
+from playwright.sync_api import Page, Request, Response  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[3]
+LOGGER = logging.getLogger("treestamp.browser")
+STATIC_RESOURCE_TYPES = frozenset(("script", "stylesheet", "font"))
+
+
+@pytest.fixture(autouse=True)
+def browser_error_diagnostics(page: Page) -> None:
+    """Include startup failures in pytest's captured logs without hiding assertions."""
+
+    def failed_request(request: Request) -> None:
+        if request.resource_type in STATIC_RESOURCE_TYPES:
+            LOGGER.error(
+                "Resource request failed: %s: %s", request.url, request.failure
+            )
+
+    def failed_response(response: Response) -> None:
+        if (
+            response.status >= 400
+            and response.request.resource_type in STATIC_RESOURCE_TYPES
+        ):
+            LOGGER.error("Resource returned HTTP %s: %s", response.status, response.url)
+
+    page.on(
+        "pageerror", lambda error: LOGGER.error("Browser JavaScript error: %s", error)
+    )
+    page.on("requestfailed", failed_request)
+    page.on("response", failed_response)
 
 
 @dataclass(frozen=True)

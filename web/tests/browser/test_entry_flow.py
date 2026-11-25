@@ -32,7 +32,11 @@ def test_first_visit_waits_for_intent_and_browsing_does_not_create_a_draft(
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("dialog[open]")).to_have_count(0)
     assert requests == []
-    page.get_by_label("Public GitHub repository").fill("fixture/repo")
+    repository = page.get_by_label("Public GitHub repository")
+    expect(repository).to_be_focused()
+    repository.fill("fixture/repo")
+    expect(repository).to_have_value("fixture/repo")
+    expect(page.locator("#entry-browse")).to_be_enabled()
     page.locator("#entry-browse").click()
     choose(page, "src")
     expect(page.locator('.source-row[data-path="src"]')).to_have_attribute(
