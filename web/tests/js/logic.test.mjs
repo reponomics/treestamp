@@ -83,12 +83,14 @@ test("the address keeps path and query on this origin and appends the state", ()
 
 
 test("hints follow the error table", () => {
+  assert.match(hintFor("root_not_found", 404), /Choose a folder/);
+  assert.match(hintFor("document_has_no_treestamp", 422), /Choose another document to load/);
   assert.match(hintFor("invalid_link", 400), /Accepted forms/);
   assert.match(hintFor("state_too_large", 413), /more folds/);
   assert.match(hintFor("not_found", 404), /default branch/);
   assert.match(hintFor("too_large", 413), /locally/);
   assert.match(hintFor("upstream_unavailable", 503), /budget/);
-  assert.match(hintFor("curation", 422), /previous draft is unchanged/);
+  assert.match(hintFor("curation", 422), /previous tree is unchanged/);
   assert.match(hintFor("snapshot_unavailable", 410), /Load the repository URL again/);
   assert.equal(hintFor("unexpected", 500), "");
 });
@@ -228,7 +230,7 @@ test("preview candidates validate before adoption, including bundled examples", 
     ]) {
       const candidate = structuredClone(data);
       mutate(candidate);
-      assert.throws(() => preparePreview(candidate, "https://example.org"), /previous draft is unchanged/);
+      assert.throws(() => preparePreview(candidate, "https://example.org"), /previous tree is unchanged/);
     }
   }
 });
@@ -263,7 +265,7 @@ test("incomplete preview responses cannot replace the accepted draft", async () 
     const data = structuredClone(original);
     const result = invalidate(data);
     const candidate = result === null ? null : data;
-    assert.throws(() => preparePreview(candidate, "https://example.org"), /previous draft is unchanged/);
+    assert.throws(() => preparePreview(candidate, "https://example.org"), /previous tree is unchanged/);
   }
 });
 

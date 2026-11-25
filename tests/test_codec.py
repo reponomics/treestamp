@@ -346,7 +346,6 @@ def test_unencodable_path_fails_explicitly() -> None:
     ],
 )
 def test_list_names_render_as_themselves(name: str) -> None:
-    """A name is data from someone's repository and must read as written."""
     from markdown_it import MarkdownIt
 
     tree = replace(build_tree([Entry(name)]), children=(Node(name, name, "file"),))
@@ -358,7 +357,6 @@ def test_list_names_render_as_themselves(name: str) -> None:
 
 
 def test_list_annotations_are_the_maintainers_markdown() -> None:
-    """The opposite guarantee: an annotation is prose, and renders as prose."""
     from markdown_it import MarkdownIt
 
     annotation = "see [the design](d.md), **note** the `codec`"

@@ -15,9 +15,9 @@ def row(page: Page, path: str) -> Locator:
 
 
 def open_editor(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.locator("#tui-mode").click()
     expect(page.locator("#tui-mode")).to_have_attribute("aria-pressed", "true")
 
@@ -94,7 +94,8 @@ def test_navigation_leaves_note_carets_and_native_button_space_intact(
     expect(row(page, "docs/api.md")).to_have_count(1)
     expect(docs).to_be_focused()
 
-    docs.locator('[data-action="note"]').focus()
+    docs.focus()
+    page.locator("#row-note").focus()
     page.keyboard.press("Space")
     note = page.locator("#note-text")
     expect(note).to_be_focused()
@@ -106,7 +107,7 @@ def test_navigation_leaves_note_carets_and_native_button_space_intact(
         note.press(key)
         expect(note).to_be_focused()
     note.press("Escape")
-    expect(docs.locator('[data-action="note"]')).to_be_focused()
+    expect(page.locator("#row-note")).to_be_focused()
     expect(row(page, "docs/api.md")).to_have_count(1)
     docs.focus()
     for key in [
@@ -126,7 +127,8 @@ def test_navigation_handles_excluded_children_without_jumping_to_a_sibling(
     open_editor(page, service)
     for path in ["docs/api.md", "docs/guide.md"]:
         child = row(page, path)
-        child.locator('[data-action="visibility"]').click()
+        child.focus()
+        page.locator("#row-visibility").click()
         expect(child).to_have_count(0)
     docs = row(page, "docs")
     docs.focus()
@@ -221,7 +223,7 @@ def test_navigation_after_a_failed_edit_keeps_previous_draft_copyable(
     page.keyboard.press("ArrowDown")
     expect(row(page, "docs/api.md")).to_be_focused()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous draft")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
     expect(page.locator("#copy-label")).to_have_text("Copied")
     assert page.evaluate("window.copiedBlocks") == [
         page.locator("#region").text_content()

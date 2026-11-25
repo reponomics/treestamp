@@ -1,0 +1,44 @@
+# Generated testing plan
+
+Status: proposed; implementation paused for design review. Scope is the existing parsers, session transport, and browser input/rendering boundary, before adding restoration onto a newer repository tree.
+
+## Alternatives
+
+| Approach | Strength here | Cost and limitation |
+| --- | --- | --- |
+| Hypothesis in pytest | Generate valid and nearly valid trees and requests; check semantic properties; minimize failing examples | Generators and assertions must encode the intended contract. Does not exercise JavaScript or constitute a browser security scan. |
+| Atheris | Coverage-guided mutation of raw document bytes and parser inputs; useful for unexpected exceptions and pathological syntax | Separate instrumentation, harness, corpus, and process limits. Upstream lists Linux/macOS, while our ordinary test matrix also includes Windows. Random byte input needs representative seeds to reach deeper parsing. |
+| Staged combination | Hypothesis first; add an isolated Atheris parser campaign later if coverage gaps justify it | Wider eventual coverage, but two testing paths to maintain. No second engine in the initial change. |
+
+Recommendation: Hypothesis first, with the staged combination available later. Keep the dependency development-only and locked with the existing uv workflow. Atheris is a credible alternative, not a requirement for the first increment. Scorecard recognition is not an acceptance criterion or a promised result.
+
+Sources: [Atheris](https://github.com/google/atheris), [Hypothesis stateful tests](https://hypothesis.readthedocs.io/en/latest/stateful.html), [Hypothesis external-fuzzer integration](https://hypothesis.readthedocs.io/en/latest/how-to/external-fuzzers.html).
+
+## Initial implementation
+
+1. **Request validation.** Generate bounded arbitrary JSON and valid operation/placement envelopes with one field mutated. Check schema parsing separately from service execution. Expected malformed input must receive a documented domain rejection; unexpected exceptions fail the test. Accepted requests still must satisfy source and server-tree constraints. A fabricated commit, even when changed consistently in both request and envelope, must not authorize a GitHub fetch. Use controlled snapshots and fake transports, never live GitHub. Rejected edits must preserve the previously accepted state.
+2. **Document serialization.** Generate a supported subset of small trees, then vary styles, line endings, annotations, quoted names, Unicode, encoded Git bytes, and symlinks. Require successful serialization and parsing with the intended semantic result, plus byte-for-byte preservation outside the managed document region. Separately test unsupported inputs. Do not catch rendering errors and call them success for supported inputs: the renderer already checks its own parse roundtrip.
+3. **Session transport.** Generate valid curation over small snapshots and verify JSON serialization/restoration preserves annotations, folding, and hidden state. Compare state and subsequent observable behavior. Keep this separate from document roundtrips: documents intentionally omit some transient session state. Account for specified normalization and intentionally allowed hidden paths that are no longer tracked.
+4. **Browser input and rendering.** Include this in the initial increment. Use bounded Hypothesis-generated JSON/text cases in batches against the actual `logic.js` and `draft.js` modules through the existing Node runner, without reimplementing their decoders in Python or adding a second generation library. Exercise URL path/query/fragment, base64/UTF-8 decoding, nested saved settings, and localStorage records. Supported states must preserve identity; invalid states must lead to a controlled error or ignored draft, not an uncaught startup exception or unintended navigation. Include explicit length/depth boundaries; a server request-size limit does not protect browser decoding before a request.
+
+Use a small browser regression corpus through the existing local service and fake GitHub to exercise successful restore and server rejection. Include HTML/SVG/event-handler payloads in notes, paths, query errors, and transfer conflict messages, plus crafted external or script-scheme URLs. Assert literal text and absence of attacker-created elements/attributes, executable sentinels, unexpected requests, and navigation; checking only for an alert is insufficient. Cover editor, source browser, Markdown output, and placement/error surfaces. Retain normal Content Security Policy checks, and repeat selected rendering cases with CSP bypassed only in the test browser to verify safe rendering independently of CSP. Do not weaken production headers. Supplement real server flows with explicitly labeled synthetic-response tests for URL-sink defense; those tests do not establish that a forged server response is attacker-reachable.
+
+Read-only inspection found text sinks throughout these surfaces, static HTML page responses, JSON API responses, and a repository link constructed server-side from validated GitHub identifiers. No working XSS exploit was identified. A malformed captured state with `curation.settings.root = null` passes the browser's shallow startup guard and throws in `valuesFromSettings`/`displayPath` before server validation; a Node reproduction confirms the exception. Add a regression and correct this startup handling during implementation. Check the analogous localStorage journey as well. This is a robustness finding, not demonstrated script execution.
+
+Construct expected path/kind/annotation facts from the generated source model before rendering, and compare parsed semantics to those facts. Include representative CRLF and BOM cases in the independent prefix/suffix assertions. Cross actual JSON encoding/decoding in session transport tests and preserve exact byte-path identities. Do not build expected results by calling the same transformation being tested. Each generated example gets fresh mutable session/cache state; pytest fixture reuse must not leak edits between examples. Rejected service requests must not alter accepted session state or cached snapshot contents.
+
+## Execution and failure handling
+
+- Integrate short runs into ordinary core and hosted pytest checks; add documented Makefile targets for focused and extended local runs. Start with roughly 100 examples per property and measure runtime before choosing final budgets. Bound tree size, JSON depth/width, text length, and operation count.
+- Use process/CI timeouts for runaway execution. Small generated inputs do not establish resistance to resource exhaustion: retain explicit request-size boundaries and add focused depth/length boundary cases where missing. Avoid fragile per-example wall-clock assertions.
+- Keep Hypothesis's local example database (already ignored), report reproducible failures, and turn minimized discoveries into committed regression examples. CI must not depend on an existing local database or a single fixed seed. Do not upload generated payloads from real user sessions.
+- Catch only the expected rejection types at the relevant boundary. Unexpected exceptions, hangs, or invariant violations fail the run. Do not suppress findings by narrowing generators without establishing that the rejected input is outside the supported contract.
+- Verify at least one property detects a temporary intentional defect, then remove the defect. Run focused properties, relevant regression suites, lint, type checks, lock validation, and documentation checks. Record example budgets and measured runtime.
+
+## Explicit follow-ups and limits
+
+Browser coverage is deliberately bounded: generated pure JavaScript decoding cases plus a small real-browser injection corpus, not a general browser fuzzer or automated penetration test. Live infrastructure and distributed resource exhaustion remain outside this initial increment. The fragment is initially browser-only, but the app subsequently posts decoded state to the API; both direct DOM handling and JSON responses rendered into the DOM must be exercised. See [OWASP DOM XSS guidance](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet) and [MDN fragments](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Fragment).
+
+Placement action-sequence testing is the next candidate: place/skip/undo, recursive directory moves, and explicit replacement conflicts. Define note-preservation rules that allow intentional skipping and replacement before writing those properties. Existing placement regression tests remain in force.
+
+Restoration onto a newer commit remains unimplemented and is not certified by these tests. A future implementation needs its own source/target transition properties. This work strengthens testing of current contracts; it is not a comprehensive security audit.

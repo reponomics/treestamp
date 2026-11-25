@@ -18,7 +18,7 @@
 
 # treestamp
 
-treestamp is an editor for creating and maintaining directory trees for project documentation. Easily select which files and folders to include, and add brief annotations. The application reloads your treestamp when you want to update it, and automated checks can notify you when there is any drift between treestamp and the repository, making it easy to keep documentation up to date.
+treestamp is an editor for creating and maintaining annotated directory trees—treestamps—for project documentation. Select which files and folders to include, add brief annotations, and reload the treestamp to update it later. Automated checks report when the displayed tree differs from the repository.
 
 
 <p align="center">
@@ -45,7 +45,7 @@ treestamp can be accessed locally in your terminal, or online via the web editor
 
 #### In the browser
 
-[Open the web editor](https://treestamp.reponomics.org/); enter a public GitHub repository URL (or `OWNER/REPONAME` form); and choose **Load repo → Create treestamp**. The server will fetch the directory structure of the repository at the HEAD of the default branch, and render a basic tree as a starting point.
+[Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL (or `OWNER/REPONAME`), and choose **Create treestamp** for a new tree at its root or **Load treestamp** for its README. **Choose another folder or file…** opens the source picker for a different subtree or document. The server reads the repository's default branch. Failed loads preserve your current work.
 
 #### In your terminal
 
@@ -68,10 +68,10 @@ Invoke it directly from anywhere within a Git repository. You can also run it di
 pipx run treestamp
 ```
 
-Choose **New document** and select the path where you want the root of the repository tree to be located (defaults to the repository root, `.`, but you can generate a treestamp for any sub-tree in the repository) - the treestamp root is a relative path from the repository's root.
+Bare `treestamp` opens the editor immediately: it loads a treestamp from `README.md` in your current directory, or starts a fresh tree at that directory if the README is missing or has no treestamp. Use `treestamp new docs` to create a subtree explicitly, or `treestamp load docs/README.md` to edit an existing treestamp. An unreadable or malformed document reports an error instead of starting over.
 
 > [!NOTE]
-> Tree-root and document paths entered in the editor, and paths stored in its configuration, are relative to the _repository root_. Entries in the rendered tree are relative to the selected subtree.
+> CLI paths and implicit README selection follow your current working directory. Stored configuration paths remain relative to the _repository root_, and entries in the rendered tree are relative to the selected subtree. Loading respects the tree root saved in the document.
 
 > [!TIP]
 > The terminal editor captures the Git index, so stage additions, deletions, and renames before opening it; untracked files and unstaged changes are not included. The web editor reads the pushed state of the repository's default branch.
@@ -129,34 +129,21 @@ hidden = ["tests"]
 
 The `hidden` array records paths that the user has elected to hide, so that when the treestamp is reloaded, the application can remember: "don't render these in the output." These hidden paths can always be viewed and unhidden in the editor interface.
 
-<details>
-<summary>Alternate bootstrapping method</summary>
 
-Another way to write the initial treestamp is to simply place the boundary markers into the target document, like so:
-
-
-```html
-<!-- treestamp:start -->
-<!-- treestamp:end -->
-```
-
-In the terminal editor, choose **New document**, select the tree root, and edit the tree. When you are ready, choose **Write to existing** and enter the path to the document containing those markers. The application fills the marked region by writing to that file and preserves the surrounding content.
-
-</details>
 
 ### 4. Update an existing treestamp
 
-To load an existing treestamp for editing, enter the path to its document in the editor interface, or run `treestamp --load docs/structure.md` to open it directly. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the draft when loaded into the editor:
+To load an existing treestamp for editing, run `treestamp load docs/structure.md`, or `treestamp load` for the README in your current directory. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will find the boundary markers and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the tree when loaded into the editor:
 
-(i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the draft;
+(i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the tree;
 
 (ii) new tracked entries (files and folders) will be added if they appear beneath already-expanded directories, including the tree root. Entries beneath collapsed directories remain unexpanded, and newly added directories start collapsed.
 
-The application is designed to help keep documentation up to date by removing stale paths, which positively misrepresent the state of the repository; add new paths when they appear, but in a conservative manner; and preserve the user's previous edits and decisions, as best as possible.
+The editor preserves supported curation while updating the displayed paths. If notes lose their original paths, it offers to transfer them before editing continues. The document remains unchanged until you write it or replace its treestamp with copied output.
 
 ### Include a treestamp footer (optional)
 
-treestamp is a very cool software, and you will probably want to let other people know that you're using it. Of course, you don't have to (we understand that sometimes it's cooler to keep things a secret), but if you want to include a small recognition in the footer of your treestamp, you can opt in to doing so by selecting **Add “Maintained with treestamp” footer** (or press <kbd>t</kbd> in the terminal). This will simply print the following line below the rendered tree, and before the closing boundary marker:
+To include an attribution footer, select **Add “Maintained with treestamp” footer** (or press <kbd>t</kbd> in the terminal). It is off by default. When enabled, the following line appears below the rendered tree and before the closing boundary marker:
 
 ```markdown
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
@@ -164,7 +151,7 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 ## Check your README automatically
 
-treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index), or the revision selected with `--target REF`, and exits 1 when an update would change the document. With no document argument, it checks the repository-root README; an explicit document path is relative to your current directory. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
+treestamp can help you keep your documentation up to date. `treestamp check` compares the treestamp with the staged directory structure (the Git index) and exits 1 when an update would change the document. With no document argument, it checks `README.md` in your current directory; an explicit document path is also relative to that directory, or absolute. Add it as a pre-commit hook, and you can be notified whenever the treestamp has drifted from the state of the repo. treestamp can automatically update the tree, but we recommend that if you wish to follow this method, use the automation as a drift checker, and then open the editor to update the treestamp according to your preferences.
 
 **GitHub Actions:** after checking out your repository and setting up Python 3.11+, add this step:
 
@@ -201,9 +188,9 @@ Use a terminal and font that display Unicode tree characters, or choose ASCII ou
 
 The editor has to define a reserved sequence to be the delimiter between a filename and the annotation that follows it. In this case, it's `  # ` (space-space-hash-space). The problem is: this sequence is legal within a filename. This creates the potential for ambiguity for the parser. To avoid this, and maintain support for these uncommon filenames, pathnames that end in a segment that contains that sequence are stored in the config block in a `special_paths` array (see [special-path-resolution](https://github.com/reponomics/treestamp/blob/main/docs/special-path-resolution.md)).
 
-Currently, there is also the potential for a treestamp to be corrupted if it contains filenames that have trailing whitespace, and this whitespace is truncated or edited by some automation such as a linter.
+Trailing whitespace in filenames and symlink targets is emitted as visible escape sequences so a formatter does not trim it away. Preserve those sequences when editing a document. Some filenames still cannot be represented in every style: for example, Unicode and ASCII output reject a regular filename containing ` -> ` or ending in ` [gitlink]` when it would be read as a symlink or submodule. Rendering fails if parsing the result would change the tree's identity or facts.
 
-The TUI and web editor do not currently detect moves or renames, so annotations on moved entries may be dropped when a document is loaded. The CLI's `check` and `update` commands can preserve annotations for supported Git-detected file moves when supplied with `--compare REF`; this does not transfer directory annotations.
+When a loaded treestamp has notes whose rows disappeared, the terminal and web editors offer to transfer them before ordinary editing. One source stays at the top while you navigate the updated tree: Enter places it, <kbd>s</kbd> skips it, and <kbd>u</kbd> undoes the last decision. Placing a directory also carries annotations at matching relative paths inside it, recursively; unmatched or conflicting descendants remain in the queue. Declining placement or skipping annotations leaves them out of the written tree. Placement is a one-time preparation step; restoring a saved web draft opens the editor directly. The CLI's `check` and `update` commands retain annotations at matching paths with the same entry kind; renamed paths require manual transfer. `update` refuses to write if notes would still be omitted; use `--skip-notes-transfer` only when you explicitly want to leave those notes out. `check` reports the proposed changes and unmatched notes without writing. `treestamp load DOCUMENT --print` extracts the saved treestamp without updating it or checking for note transfer.
 
 treestamp's ability to track changes when updating a document and comparing it to a new checkout depends on preserving the generated tree and configuration between its boundary markers. Manual edits to annotations are supported. Other changes to the tree or configuration should be made through the editor so treestamp can reliably reload the document.
 
@@ -211,7 +198,7 @@ New output includes a blank line after the start marker, between the configurati
 
 Configuration arrays use compact wrapping with an 80-character target: short arrays stay inline, and longer arrays fit several entries per line where possible. Individual entries are never split, so a long path or record may exceed the target. Existing TOML formatting, including comments and multiline arrays, is preserved while the configuration values remain unchanged and does not cause `check` to fail. When those values change, the configuration is regenerated using the default layout; comments within that configuration are not retained. The configuration must still use supported settings and valid values inside the `treestamp:config` comment wrapper.
 
-[ADR 0002](https://github.com/reponomics/treestamp/blob/main/docs/adr/0002-formatter-compatible-documents.md) explains the formatting decisions, alternatives, and implementation.
+The [document format reference](https://github.com/reponomics/treestamp/blob/main/docs/design.md#document-format) describes the current formatting rules. [ADR 0002](https://github.com/reponomics/treestamp/blob/main/docs/adr/0002-formatter-compatible-documents.md) records the rationale and alternatives.
 
 ## Project Structure
 
@@ -223,11 +210,13 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 ./
 ├── .github/ (9 files, 2 folders)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (10 files, 1 folder)
-├── scripts/ (9 files)  # Installed-package acceptance
+├── docs/ (13 files, 1 folder)
+├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/  # Shared model and terminal editor
 │       ├── cli.py
+│       ├── cli_inputs.py
+│       ├── cli_maintenance.py
 │       ├── codec.py
 │       ├── document.py
 │       ├── editor.py
@@ -235,15 +224,18 @@ hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".
 │       ├── gitio.py
 │       ├── maintenance.py
 │       ├── model.py
+│       ├── reconcile.py
 │       ├── session.py
 │       ├── sources.py
 │       ├── tui.py
-│       └── tui_dialogs.py
-├── tests/ (18 files)  # Contract and integration tests
+│       ├── tui_dialogs.py
+│       ├── tui_reconcile.py
+│       └── tui_rows.py
+├── tests/ (31 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
-│   ├── scripts/ (3 files)
+│   ├── scripts/ (4 files)
 │   ├── src/ (1 folder)
-│   ├── tests/ (14 files, 2 folders)
+│   ├── tests/ (18 files, 2 folders)
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── fly.preview.toml
@@ -266,11 +258,13 @@ The alternate styles below are generated from the same tree and checked for fres
 ./
 |-- .github/ (9 files, 2 folders)
 |-- assets/ (2 files, 1 folder)
-|-- docs/ (10 files, 1 folder)
-|-- scripts/ (9 files)  # Installed-package acceptance
+|-- docs/ (13 files, 1 folder)
+|-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/  # Shared model and terminal editor
 |       |-- cli.py
+|       |-- cli_inputs.py
+|       |-- cli_maintenance.py
 |       |-- codec.py
 |       |-- document.py
 |       |-- editor.py
@@ -278,15 +272,18 @@ The alternate styles below are generated from the same tree and checked for fres
 |       |-- gitio.py
 |       |-- maintenance.py
 |       |-- model.py
+|       |-- reconcile.py
 |       |-- session.py
 |       |-- sources.py
 |       |-- tui.py
-|       `-- tui_dialogs.py
-|-- tests/ (18 files)  # Contract and integration tests
+|       |-- tui_dialogs.py
+|       |-- tui_reconcile.py
+|       `-- tui_rows.py
+|-- tests/ (31 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
-|   |-- scripts/ (3 files)
+|   |-- scripts/ (4 files)
 |   |-- src/ (1 folder)
-|   |-- tests/ (14 files, 2 folders)
+|   |-- tests/ (18 files, 2 folders)
 |   |-- Dockerfile
 |   |-- README.md
 |   |-- fly.preview.toml
@@ -307,11 +304,13 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 - .github/ (9 files, 2 folders)
 - assets/ (2 files, 1 folder)
-- docs/ (10 files, 1 folder)
-- scripts/ (9 files)  # Installed-package acceptance
+- docs/ (13 files, 1 folder)
+- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 - src/
   - treestamp/  # Shared model and terminal editor
     - cli.py
+    - cli_inputs.py
+    - cli_maintenance.py
     - codec.py
     - document.py
     - editor.py
@@ -319,15 +318,18 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
     - gitio.py
     - maintenance.py
     - model.py
+    - reconcile.py
     - session.py
     - sources.py
     - tui.py
     - tui_dialogs.py
-- tests/ (18 files)  # Contract and integration tests
+    - tui_reconcile.py
+    - tui_rows.py
+- tests/ (31 files)  # Contract and integration tests
 - web/  # Hosted editor: a FastAPI adapter over the same package
-  - scripts/ (3 files)
+  - scripts/ (4 files)
   - src/ (1 folder)
-  - tests/ (14 files, 2 folders)
+  - tests/ (18 files, 2 folders)
   - Dockerfile
   - README.md
   - fly.preview.toml

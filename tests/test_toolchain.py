@@ -18,15 +18,16 @@ def run_check(root: Path) -> subprocess.CompletedProcess[str]:
         [sys.executable, str(SCRIPT), "--root", str(root)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 
 
 @pytest.fixture
 def checkout(tmp_path: Path) -> Path:
-    (tmp_path / ".tool-versions").write_text("uv 0.13.7\n")
+    (tmp_path / ".tool-versions").write_text("uv 0.13.7\n", encoding="utf-8")
     (tmp_path / "web").mkdir()
-    (tmp_path / "web/Dockerfile").write_text(IMAGE)
+    (tmp_path / "web/Dockerfile").write_text(IMAGE, encoding="utf-8")
     return tmp_path
 
 
@@ -37,7 +38,8 @@ def test_matching_pins_with_comments_whitespace_and_other_tools(checkout: Path) 
     (checkout / "web/Dockerfile").write_text(
         "# FROM ghcr.io/astral-sh/uv:old AS uv\n"
         + IMAGE.replace("FROM ", "  FROM --platform=linux/arm64 ").rstrip()
-        + " # pinned\nFROM python:3.11-slim AS base\n"
+        + " # pinned\nFROM python:3.11-slim AS base\n",
+        encoding="utf-8",
     )
     result = run_check(checkout)
     assert result.returncode == 0, result.stderr
@@ -49,7 +51,9 @@ def test_updating_only_one_pin_fails_with_both_versions(
     checkout: Path, changed_file: str
 ) -> None:
     path = checkout / changed_file
-    path.write_text(path.read_text().replace("0.13.7", "0.13.8"))
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("0.13.7", "0.13.8"), encoding="utf-8"
+    )
     result = run_check(checkout)
     assert result.returncode == 1
     assert "uv pins differ" in result.stderr
@@ -74,7 +78,7 @@ def test_updating_only_one_pin_fails_with_both_versions(
 def test_missing_ambiguous_or_floating_tool_pin_fails(
     checkout: Path, tools: str
 ) -> None:
-    (checkout / ".tool-versions").write_text(tools)
+    (checkout / ".tool-versions").write_text(tools, encoding="utf-8")
     result = run_check(checkout)
     assert result.returncode == 1
     assert ".tool-versions" in result.stderr
@@ -96,7 +100,7 @@ def test_missing_ambiguous_or_floating_tool_pin_fails(
 def test_missing_ambiguous_or_unpinned_image_fails(
     checkout: Path, dockerfile: str
 ) -> None:
-    (checkout / "web/Dockerfile").write_text(dockerfile)
+    (checkout / "web/Dockerfile").write_text(dockerfile, encoding="utf-8")
     result = run_check(checkout)
     assert result.returncode == 1
     assert "Dockerfile" in result.stderr

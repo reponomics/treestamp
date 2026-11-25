@@ -1,4 +1,4 @@
-"""Curated examples open locally and replace the previous editing session."""
+"""The opt-in example and retained captured example links stay offline."""
 
 from __future__ import annotations
 
@@ -9,90 +9,19 @@ from playwright.sync_api import Page, expect  # noqa: E402
 
 pytestmark = pytest.mark.browser
 
-EXAMPLES = [
-    ("reponomics-dashboard", ".", "Choose repositories and publishing options"),
-    ("reponomics-dashboard-action", ".", "GitHub Action entry point"),
-    ("PolicyChecks", "src", "Start the badge service"),
-]
+EXAMPLES = [("treestamp", ".", "Package metadata and dependencies")]
 
 
-def test_mobile_examples_reveal_choices_without_replacing_work(
-    page: Page, service: str
-) -> None:
-    page.set_viewport_size({"width": 390, "height": 844})
-    page.goto(service + "/")
-    choices = page.locator(".example-options")
-    expect(choices).to_be_hidden()
-    config = page.locator('.row[data-path="config.yaml"]')
-    config.get_by_role("button", name="Note", exact=True).click()
-    page.locator("#note-text").fill("Keep this note")
-    page.locator("#note-text").press("Enter")
-    expect(page.locator("#region")).to_contain_text("Keep this note")
-    original_region = page.locator("#region").text_content()
-    original_url = page.url
-    requests: list[str] = []
-    page.on("request", lambda request: requests.append(request.url))
-
-    page.get_by_text("Show examples", exact=True).click()
-    expect(choices).to_be_visible()
-    page.get_by_text("Hide examples", exact=True).click()
-    expect(choices).to_be_hidden()
-    expect(page.locator("#region")).to_have_text(original_region)
-    assert page.url == original_url
-    assert requests == []
-
-    summary = page.locator("#examples > summary")
-    summary.focus()
-    summary.press("Enter")
-    page.locator('button[data-example="PolicyChecks"]').click()
-    expect(page.locator("#url")).to_have_value("reponomics/PolicyChecks")
-    expect(choices).to_be_visible()
-    page.get_by_text("Hide examples", exact=True).click()
-    page.set_viewport_size({"width": 1280, "height": 844})
-    expect(choices).to_be_visible()
-    expect(summary).to_be_hidden()
-    page.set_viewport_size({"width": 390, "height": 844})
-    expect(choices).to_be_hidden()
-    expect(page.get_by_text("Show examples", exact=True)).to_be_visible()
+def explore_from_editor(page: Page) -> None:
+    page.locator(".wordmark").click()
+    page.locator("#explore-example").click()
 
 
 @pytest.mark.parametrize("width", [390, 1280])
-def test_markdown_format_keeps_the_curated_tree_editable(
+def test_example_is_a_direct_offline_opt_in(
     page: Page, service: str, width: int
 ) -> None:
     page.set_viewport_size({"width": width, "height": 844})
-    page.goto(service + "/")
-    config = page.locator('.row[data-path="config.yaml"]')
-    workflows = page.locator('.row[data-path=".github/workflows"]')
-    note = "Choose repositories and publishing options"
-    expect(config.locator(".note")).to_have_text(f"# {note}")
-    expect(page.get_by_label("Format", exact=True)).to_be_hidden()
-
-    for style, connector in [("ascii", "|-- "), ("list", "- ")]:
-        page.locator("#tab-stamp").click()
-        page.get_by_label("Format", exact=True).select_option(style)
-        expect(page.locator("#region")).not_to_contain_text("style =")
-        expect(page.locator("#region")).to_contain_text(connector + ".github/")
-        expect(page.locator("#region")).to_contain_text(note)
-        expect(page.locator("#tab-stamp")).to_have_attribute("aria-selected", "true")
-
-        page.locator("#tab-editor").click()
-        expect(page.get_by_label("Format", exact=True)).to_be_hidden()
-        expect(config.locator(".note")).to_have_text(f"# {note}")
-        expect(page.locator('.row[data-path="README.md"]')).to_have_count(0)
-        expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(0)
-
-    workflows.locator(".fold").click()
-    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
-    expect(config.locator(".note")).to_have_text(f"# {note}")
-    page.locator("#tab-stamp").click()
-    expect(page.get_by_label("Format", exact=True)).to_have_value("list")
-
-
-@pytest.mark.parametrize("name,root,note", EXAMPLES)
-def test_example_opens_without_requests_and_replaces_pending_source(
-    page: Page, service: str, name: str, root: str, note: str
-) -> None:
     requests: list[str] = []
     page.on(
         "request",
@@ -101,132 +30,155 @@ def test_example_opens_without_requests_and_replaces_pending_source(
         ),
     )
     page.goto(service + "/")
-    expect(page.locator("#rows .row").first).to_be_visible()
-    page.locator("#submit").click()
-    page.locator("#load-tab-new").click()
-    page.locator("#root").fill("pending-folder")
-    page.locator("#load-tab-document").click()
-    page.locator("#document").fill("PENDING.md")
-    page.keyboard.press("Escape")
-    page.locator(f'button[data-example="{name}"]').click()
-    expect(page.locator("#url")).to_have_value(f"reponomics/{name}")
-    assert f"/reponomics/{name}@" in page.url
-    expect(page.locator("#root")).to_have_value(root)
-    expect(page.locator("#document")).to_have_value("")
-    expect(page.locator("#rows .row").first).to_be_visible()
-    expect(page.locator("#region")).to_contain_text("<!-- treestamp:start -->")
-    expect(page.locator("#rows")).to_contain_text(note)
-    expect(page.locator("#region")).to_contain_text(note)
-    expect(page.locator("#copy")).to_be_enabled()
-    expect(page.locator("#stage-status")).to_be_hidden()
-    expect(page.locator("#status")).to_have_text("")
-    original_region = page.locator("#region").text_content()
-    page.reload()
-    expect(page.locator("#region")).to_have_text(original_region)
-    expect(page.locator("#url")).to_have_value(f"reponomics/{name}")
+    expect(page.locator("#entry-welcome")).to_be_visible()
+    expect(page.locator("#workspace")).to_be_hidden()
+    page.locator("#explore-example").click()
+    expect(page.locator("#url")).to_have_value("reponomics/treestamp")
+    expect(page.locator("#example-context")).to_have_count(0)
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#reload-settings")).to_be_hidden()
     assert requests == []
 
 
-def test_reselecting_an_example_restores_its_curated_notes(
+@pytest.mark.parametrize("width", [390, 1280])
+def test_markdown_format_keeps_the_curated_tree_editable(
+    page: Page, service: str, width: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": 844})
+    page.goto(service + "/")
+    page.locator("#explore-example").click()
+    config = page.locator('.row[data-path="pyproject.toml"]')
+    workflows = page.locator('.row[data-path="src/treestamp"]')
+    note = "Package metadata and dependencies"
+    expect(config.locator(".note")).to_have_text(f"# {note}")
+    expect(page.get_by_label("Format", exact=True)).to_be_hidden()
+
+    for style, connector in [("ascii", "|-- "), ("list", "- ")]:
+        page.locator("#tab-stamp").click()
+        page.get_by_label("Format", exact=True).select_option(style)
+        expect(page.locator("#region")).not_to_contain_text("style =")
+        expect(page.locator("#region")).to_contain_text(connector + "src/")
+        expect(page.locator("#region")).to_contain_text(note)
+        expect(page.locator("#tab-stamp")).to_have_attribute("aria-selected", "true")
+
+        page.locator("#tab-editor").click()
+        expect(page.get_by_label("Format", exact=True)).to_be_hidden()
+        expect(config.locator(".note")).to_have_text(f"# {note}")
+        expect(page.locator('.row[data-path="README.md"]')).to_have_count(0)
+        expect(page.locator('.row[data-path^="src/treestamp/"]')).to_have_count(0)
+
+    workflows.locator(".fold").click()
+    expect(page.locator('.row[data-path^="src/treestamp/"]')).not_to_have_count(0)
+    expect(config.locator(".note")).to_have_text(f"# {note}")
+    page.locator("#tab-stamp").click()
+    expect(page.get_by_label("Format", exact=True)).to_have_value("list")
+
+
+@pytest.mark.parametrize("name,root,note", EXAMPLES)
+def test_existing_example_links_still_open_without_api_requests(
+    page: Page, service: str, name: str, root: str, note: str
+) -> None:
+    page.goto(service + "/")
+    address = page.evaluate(
+        """async name => {
+        const { EXAMPLES } = await import('/static/example.js');
+        const { addressFor } = await import('/static/logic.js');
+        const data = EXAMPLES[name];
+        return addressFor(data.permalink, data.state, location.origin);
+    }""",
+        name,
+    )
+    requests: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            requests.append(request.url) if "/api/" in request.url else None
+        ),
+    )
+    page.goto(service + address)
+    expect(page.locator("#url")).to_have_value(f"reponomics/{name}")
+    expect(page.locator("#root")).to_have_value(root)
+    expect(page.locator("#region")).to_contain_text(note)
+    original = page.locator("#region").text_content()
+    page.reload()
+    expect(page.locator("#region")).to_have_text(original)
+    assert requests == []
+
+
+def test_reselecting_example_replaces_notes_with_its_original_curation(
     page: Page, service: str
 ) -> None:
     page.goto(service + "/")
-    expect(page.locator("#rows .row").first).to_be_visible()
-    original_region = page.locator("#region").text_content()
-    row = page.locator('.row[data-path="config.yaml"]')
-    row.locator('[data-action="note"]').click()
+    page.locator("#explore-example").click()
+    original = page.locator("#region").text_content()
+    row = page.locator('.row[data-path="pyproject.toml"]')
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("My custom note")
     page.locator("#note-text").press("Enter")
     expect(row.locator(".note")).to_have_text("# My custom note")
-    expect(page.locator("#region")).to_contain_text("My custom note")
-    workflows = page.locator('.row[data-path=".github/workflows"]')
-    workflows.locator(".fold").click()
-    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(7)
-    expect(row.locator(".note")).to_have_text("# My custom note")
-
-    page.locator('button[data-example="reponomics-dashboard"]').click()
-    expect(page.locator("#region")).to_have_text(original_region)
-    expect(page.locator('.row[data-path^=".github/workflows/"]')).to_have_count(0)
-    expect(row.locator(".note")).to_have_text(
-        "# Choose repositories and publishing options"
-    )
+    explore_from_editor(page)
+    expect(page.locator("#region")).to_have_text(original)
 
 
-@pytest.mark.parametrize("endpoint", ["op", "preview"])
-def test_example_replaces_pending_requests_and_queued_edits(
-    page: Page, service: str, endpoint: str
+def test_example_replaces_queued_edits_without_accepting_late_responses(
+    page: Page, service: str
 ) -> None:
     with page.expect_response("**/api/preview*") as opening:
-        page.goto(f"{service}/fixture/repo")
+        page.goto(f"{service}/fixture/repo?root=.")
     old_response = opening.value.json()
     expect(page.locator("#rows .row")).to_have_count(9)
-    # Ignore abort signals deliberately: even an already-arriving response must
-    # not overwrite the newly selected example, and queued edits must be dropped.
-    delay_script = """
-        const originalFetch = window.fetch;
+    page.evaluate("""() => {
+        const fetch = window.fetch;
         window.delayedCalls = 0;
         window.fetch = (url, init) => {
-            if (!url.startsWith('/api/ENDPOINT')) return originalFetch(url, init);
-            window.delayedCalls += 1;
+            if (url !== '/api/op') return fetch(url, init);
+            window.delayedCalls++;
             return new Promise(resolve => { window.releaseResponse = resolve; });
         };
-    """.replace("ENDPOINT", endpoint)
-    if endpoint == "op":
-        page.evaluate("() => {" + delay_script + "}")
-        page.locator("#tab-stamp").click()
-        page.locator("#style").select_option("ascii")
-        page.locator("#style").select_option("unicode")
-    else:
-        # A pending initial load can be superseded by an example. Explicit
-        # Load/Reload confirmations remain modal until their request settles.
-        page.add_init_script(delay_script)
-        page.goto(f"{service}/fixture/repo")
-    page.wait_for_function("() => window.delayedCalls === 1")
-
-    page.locator('button[data-example="PolicyChecks"]').click()
-    expect(page.locator("#url")).to_have_value("reponomics/PolicyChecks")
+    }""")
+    page.locator("#tab-stamp").click()
+    page.locator("#style").select_option("ascii")
+    page.locator("#style").select_option("unicode")
+    page.wait_for_function("window.delayedCalls === 1")
+    explore_from_editor(page)
+    expect(page.locator("#url")).to_have_value("reponomics/treestamp")
     region = page.locator("#region").text_content()
     address = page.url
     page.evaluate(
         """async body => {
-            window.releaseResponse(new Response(JSON.stringify(body), {status: 200}));
-            await new Promise(requestAnimationFrame);
-        }""",
+        window.releaseResponse(new Response(JSON.stringify(body), {status: 200}));
+        await new Promise(requestAnimationFrame);
+    }""",
         old_response,
     )
     assert page.locator("#region").text_content() == region
     assert page.url == address
     assert page.evaluate("window.delayedCalls") == 1
-    expect(page.locator("#submit")).to_be_enabled()
-    expect(page.locator("#reload")).to_be_enabled()
     expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
 
 
-def test_old_permalink_failure_does_not_reopen_after_selecting_example(
+def test_late_browse_failure_does_not_reopen_after_selecting_example(
     page: Page, service: str
 ) -> None:
-    page.goto(f"{service}/fixture/repo")
-    expect(page.locator("#rows .row")).to_have_count(9)
-    assert "#s=" in page.url
-    page.add_init_script("""
-        const originalFetch = window.fetch;
-        window.unexpectedPreviews = 0;
-        window.fetch = (url, init) => {
-            if (url === '/api/op') {
-                return new Promise(resolve => { window.releaseResponse = resolve; });
-            }
-            if (url.startsWith('/api/preview')) window.unexpectedPreviews += 1;
-            return originalFetch(url, init);
-        };
-    """)
-    page.reload()
-    page.wait_for_function("() => Boolean(window.releaseResponse)")
-    page.locator('button[data-example="PolicyChecks"]').click()
-    original_region = page.locator("#region").text_content()
+    page.goto(service + "/")
+    page.evaluate("""() => {
+        const fetch = window.fetch;
+        window.fetch = (url, init) => url.startsWith('/api/browse')
+            ? new Promise(resolve => { window.releaseResponse = resolve; })
+            : fetch(url, init);
+    }""")
+    page.locator("#entry-url").fill("fixture/repo")
+    page.locator("#entry-browse").click()
+    page.wait_for_function("Boolean(window.releaseResponse)")
+    page.locator("#entry-change-repo").click()
+    page.locator("#explore-example").click()
+    original = page.locator("#region").text_content()
     page.evaluate("""async () => {
         window.releaseResponse(new Response('{}', {status: 503}));
         await new Promise(requestAnimationFrame);
     }""")
-    expect(page.locator("#url")).to_have_value("reponomics/PolicyChecks")
-    assert page.locator("#region").text_content() == original_region
-    assert page.evaluate("window.unexpectedPreviews") == 0
+    expect(page.locator("#workspace")).to_be_visible()
+    expect(page.locator("#entry")).to_be_hidden()
+    expect(page.locator("#error")).to_be_hidden()
+    assert page.locator("#region").text_content() == original

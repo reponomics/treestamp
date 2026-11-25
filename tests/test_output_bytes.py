@@ -55,7 +55,7 @@ def stamped(repo: Repo) -> Repo:
 
 def expected_region(repo: Repo) -> bytes:
     settings = Settings()
-    target = capture_snapshot(repo.path, None)
+    target = capture_snapshot(repo.path)
     tree = initial_tree(target.tree, settings)
     document = Document(tree, settings)
     return render_region(document, ".").encode("utf-8")
@@ -67,9 +67,9 @@ def test_print_writes_the_treestamp_as_line_feeds(repo: Repo) -> None:
     assert output == expected_region(repo)
 
 
-def test_explicit_tui_print_has_identical_bytes(repo: Repo) -> None:
+def test_explicit_new_print_has_identical_bytes(repo: Repo) -> None:
     stamped(repo)
-    assert cli_bytes(repo, "tui", "--print") == cli_bytes(repo, "--print")
+    assert cli_bytes(repo, "new", "--print") == cli_bytes(repo, "--print")
 
 
 def test_redirecting_print_produces_a_document_check_calls_current(
@@ -111,7 +111,7 @@ def test_print_loaded_document_preserves_line_endings_as_bytes(
     repo.add("README.md")
     cli(repo, "update", "README.md")
     before = destination.read_bytes()
-    assert cli_bytes(repo, "--load", "README.md", "--print") == before
+    assert cli_bytes(repo, "load", "README.md", "--print") == before
     assert destination.read_bytes() == before
 
 
@@ -165,7 +165,9 @@ def test_headless_hash_collision_update_and_check_preserve_authored_notes(
     repo.git("rm", "--cached", "notes  # draft.md")
     assert cli(repo, "check", "README.md", check=False).returncode == 1
     assert destination.read_bytes() == after
-    cli(repo, "update", "README.md")
+    refused = cli(repo, "update", "README.md", check=False)
+    assert refused.returncode == 2 and destination.read_bytes() == after
+    cli(repo, "update", "README.md", "--skip-notes-transfer")
     normalized = destination.read_bytes()
     assert b"special_paths" not in normalized
     assert b"src/ (2 files)  # Keep ## this # note too\r\n" in normalized

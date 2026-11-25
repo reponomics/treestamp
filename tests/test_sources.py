@@ -61,6 +61,14 @@ def test_records_map_to_tracked_leaves_with_decoded_targets() -> None:
 
 
 @pytest.mark.parametrize(
+    "path", ['quote "me".txt', "line\nwith\ttab", "back\\slash", "ünicode"]
+)
+def test_records_preserve_names_without_host_filesystem_restrictions(path: str) -> None:
+    tree = tree_from_records([record(path)])
+    assert [(node.path, node.kind) for node in tree.walk()] == [(path, KIND_FILE)]
+
+
+@pytest.mark.parametrize(
     ("bad", "message"),
     [
         (record("x", "100664"), "unsupported tree mode"),
@@ -107,7 +115,7 @@ def layout(repo: Repo) -> None:
     entries = [
         ("040000", "tree", sub, "sub"),
         ("100644", "blob", repo.blob(b"z"), "top.txt"),
-        ("100644", "blob", repo.blob(b"q"), 'quote "me".txt'),
+        ("100644", "blob", repo.blob(b"q"), "quote 'me'.txt"),
         ("120000", "blob", repo.blob(b"sub/deep\n\ttarget"), "link"),
     ]
     head = repo.git("commit-tree", repo.tree(entries), "-m", "checkpoint").strip()
@@ -116,6 +124,7 @@ def layout(repo: Repo) -> None:
         "commit-tree", repo.tree(entries), "-p", head, "-m", "with gitlink"
     ).strip()
     repo.git("update-ref", "HEAD", head)
+    repo.git("read-tree", head)
 
 
 def git_bytes(repo: Repo, *args: str) -> bytes:
@@ -151,10 +160,10 @@ def test_records_match_local_snapshot_including_scoped_roots(repo: Repo) -> None
     records, targets = listing(repo)
     assert {r.mode for r in records} >= {"040000", "100755", "120000", "160000"}
     assert tree_from_records(records, symlink_targets=targets) == (
-        capture_snapshot(repo.path, "HEAD").tree
+        capture_snapshot(repo.path).tree
     )
     assert tree_from_records(records, prefix="sub/", symlink_targets=targets) == (
-        capture_snapshot(repo.path / "sub", "HEAD").tree
+        capture_snapshot(repo.path / "sub").tree
     )
 
 
@@ -166,7 +175,7 @@ def test_region_from_records_is_byte_identical_to_local_write(
     records, targets = listing(repo)
     settings = Settings(style=style)
     hosted = TreeSession(tree_from_records(records, symlink_targets=targets), settings)
-    local = TreeSession(capture_snapshot(repo.path, "HEAD").tree, settings)
+    local = TreeSession(capture_snapshot(repo.path).tree, settings)
     for session in (hosted, local):
         session.hide("top.txt")
         session.collapse("sub/deep")

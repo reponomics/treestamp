@@ -1,4 +1,4 @@
-/* treestamp: an ink-and-paper workspace for a small piece of documentation. */
+/* Shared typography, palette, and application layout. */
 
 @font-face {
   font-family: "Reponomics Inter";
@@ -130,10 +130,12 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   font-family: var(--sans);
   font-size: var(--t-base);
   font-weight: var(--weight-body);
@@ -145,20 +147,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 main { flex: 1; }
-a { color: var(--accent); }
+a { color: var(--accent); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--accent-hover); }
 code { font-family: var(--mono); font-size: inherit; }
 h1, h2, h3 { margin: 0; font-weight: var(--weight-strong); line-height: 1.2; }
 p { margin: 0; }
 
 /* One measure for the header and the workspace. */
-.masthead-inner, .workspace {
+.masthead-inner, .workspace, .entry {
   width: 100%;
   max-width: var(--frame);
   margin: 0 auto;
   padding-inline: var(--s4);
 }
 @media (min-width: 40rem) {
-  .masthead-inner, .workspace { padding-inline: var(--s6); }
+  .masthead-inner, .workspace, .entry { padding-inline: var(--s6); }
 }
 
 /* ---------- masthead */
@@ -173,22 +176,46 @@ p { margin: 0; }
   color: var(--ink);
   text-decoration: none;
 }
-.wordmark h1 { font-size: var(--t-lg); letter-spacing: -0.035em; }
+.brand-wordmark { font-family: var(--sans); font-weight: var(--weight-strong); letter-spacing: -0.035em; }
+.wordmark h1 { font-size: var(--t-lg); }
+.masthead button, .masthead .button-link { min-height: 2.75rem; }
 .wordmark .mark { width: 36px; height: 36px; flex: none; align-self: center; color: var(--accent); }
 .attribution { display: none; color: var(--ink-secondary); white-space: nowrap; }
 .reponomics-wordmark { font-family: "Reponomics Inter", var(--sans); font-weight: 900; letter-spacing: -0.055em; font-feature-settings: "ss01"; }
 .brand-period { color: var(--accent); }
-@media (min-width: 64rem) { .attribution { display: inline; } }
+@media (min-width: 40rem) { .attribution { display: inline; } }
 .control-icon { width: 1.125rem; height: 1.125rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.2em; }
 .github-icon { fill: currentColor; stroke: none; }
 .github-link { display: inline-flex; align-items: center; gap: var(--s2); vertical-align: middle; }
 @media (max-width: 47.999rem) {
   .masthead-inner { flex-wrap: wrap; gap: var(--s1); padding-block: var(--s2); }
-  .masthead .utility { padding-inline: var(--s1); }
   .masthead .docs { padding-inline: var(--s2); }
 }
 
 /* ---------- workspace: stacked on a narrow window; two panes that fill the window from 64rem */
+
+/* The first choice supplies context before the editor appears. Keep instructions
+   at reading size and action widths tied to their labels, not the whole canvas. */
+.entry { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-block: var(--s3); overflow-y: auto; }
+.entry-browser { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: var(--s2); }
+.entry-browser-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s4); }
+.entry-instructions { display: grid; gap: var(--s3); }
+.entry-instructions p { display: grid; gap: var(--s1); }
+.entry-instructions span { color: var(--ink-secondary); }
+.entry-browser-head > button { flex: none; }
+.entry-selection { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.entry-repository { flex: none; padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule); background: var(--controls-surface); }
+.entry-selection .source-browser { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; margin: 0; background: var(--document-surface); }
+.entry-selection .source-tree { flex: 1; min-height: 0; border: 0; border-radius: 0; max-height: none; }
+.entry-selection .source-browser-status { padding: var(--s3); }
+.entry-error { color: var(--error-ink); overflow-wrap: anywhere; }
+#entry-error { margin-top: var(--s4); }
+.entry-browser-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); }
+#source-progress { color: var(--ink-secondary); }
+@media (max-width: 47.999rem) {
+  .entry-browser-head { gap: var(--s2); }
+  .entry-browser-head button { padding-inline: var(--s2); }
+}
 
 .workspace {
   padding-block: var(--s4) var(--s6);
@@ -205,12 +232,11 @@ p { margin: 0; }
 }
 .controls { padding: var(--s4); background: var(--controls-surface, var(--card)); }
 @media (min-width: 64rem) {
-  body { height: 100dvh; }
   .workspace {
     min-height: 0;
     padding-block: var(--s5);
     gap: var(--s5);
-    grid-template-columns: 24rem minmax(0, 1fr);
+    grid-template-columns: 22rem minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
   }
@@ -223,16 +249,33 @@ p { margin: 0; }
 body.no-tree #editor-panel, body.no-tree #stamp-panel,
 body.no-tree #copy, body.no-tree .settings-open { display: none; }
 
-/* ---------- the opener */
+/* ---------- repository context */
 
-.field-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
+#form { position: relative; }
+
+.field-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
 .field-head label { font-size: var(--t-md); font-weight: var(--weight-strong); line-height: 1.2; }
 .field-head .github-link { margin-left: auto; white-space: nowrap; }
-.repo-row { display: flex; flex-direction: column; gap: var(--s2); }
+.repo-row { display: flex; flex-direction: column; gap: var(--s3); }
+.repo-summary { min-width: 0; }
+.repository-context { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.repository-context > .control-icon { color: var(--ink-secondary); }
+.repository-identity { display: flex; align-items: baseline; min-width: 0; font-size: var(--t-base); white-space: nowrap; overflow: hidden; }
+.repository-owner, .repository-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.repository-owner, .repository-separator { color: var(--ink-secondary); }
+.repository-name { font-weight: var(--weight-strong); }
+.repository-separator { padding-inline: 0.25em; flex: none; }
+#form .repository-context { flex: 1; }
+#form .field-head { flex-wrap: nowrap; margin-bottom: var(--s3); }
+#reset-tree { align-self: flex-start; }
 .repo-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--s2); }
-.repo-links { position: relative; display: flex; align-items: center; gap: var(--s1); flex: none; margin-left: auto; }
+.repo-actions button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); }
+.repo-links { position: static; display: flex; align-items: center; gap: var(--s1); flex: none; margin-left: auto; }
 .repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; padding: 0; }
-.repo-tooltip { position: absolute; z-index: 5; top: 100%; right: 0; width: min(22rem, calc(100vw - 4rem)); padding: var(--s3); border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--card); color: var(--ink); box-shadow: var(--lift); overflow-wrap: anywhere; }
+@media (pointer: coarse), (max-width: 47.999rem) {
+  .repo-links .icon-button { width: 2.75rem; }
+}
+.repo-tooltip { position: absolute; z-index: 5; top: 100%; right: 0; width: min(22rem, 100%); padding: var(--s3); border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--card); color: var(--ink); box-shadow: var(--lift); overflow-wrap: anywhere; }
 .repo-tooltip p + p, .repo-info-dialog > p + p { margin-top: var(--s2); }
 .repo-info-dialog { max-width: 30rem; overflow-wrap: anywhere; }
 @media (max-width: 23rem) {
@@ -302,46 +345,6 @@ button:focus-visible, summary:focus-visible, a:focus-visible, .info-sheet:focus-
   outline-offset: 2px;
 }
 
-button, .button-link {
-  font: inherit;
-  font-weight: var(--weight-strong);
-  min-height: 2.25rem;
-  cursor: pointer;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--well);
-  color: var(--ink);
-  padding: var(--s1) var(--s3);
-  white-space: nowrap;
-  text-decoration: none;
-}
-/* Keep touch controls and icon-only actions easy to hit. */
-@media (pointer: coarse), (max-width: 47.999rem) {
-  button, .button-link { min-height: 2.75rem; }
-  .repo-links .icon-button { width: 2.75rem; }
-}
-.docs { min-height: 2.75rem; }
-.button-link { display: inline-flex; align-items: center; gap: var(--s2); }
-button:where(:enabled):hover, .button-link:hover { border-color: var(--accent); color: var(--accent); }
-button.utility { background: transparent; border-color: transparent; color: var(--ink-secondary); }
-button.utility:enabled:hover { background: var(--well); border-color: var(--rule); color: var(--ink); }
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-  font-weight: var(--weight-strong);
-}
-button.primary:enabled:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
-button:disabled { cursor: default; background: var(--well); border-color: var(--rule-strong); color: var(--ink-secondary); }
-button.link {
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--accent);
-  text-decoration: underline;
-  white-space: normal;
-}
-
 .hint { color: inherit; margin-top: var(--s2); }
 .group-note, .counts, .quiet { color: var(--ink-secondary); }
 
@@ -356,10 +359,10 @@ button.link {
 
 /* ---------- settings
 
-   Below 64rem the settings are a sheet opened from the editor's header (a native
-   popover, so nothing is scripted). From 64rem they sit under the repository field. */
+   Below desktop width, settings open from the editor header so the tree keeps
+   the available height. Desktop layouts keep settings beside the repository. */
 
-.settings-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s4); }
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
 .settings h2 { font-size: var(--t-md); }
 @media (min-width: 64rem) {
   .settings {
@@ -382,7 +385,7 @@ button.link {
   .settings:popover-open {
     position: fixed;
     inset: 0;
-    width: min(100% - 2rem, 40rem);
+    width: min(100% - 2rem, 28rem);
     max-height: 85dvh;
     margin: auto;
     padding: var(--s4);
@@ -398,9 +401,10 @@ button.link {
 .settings-body {
   display: grid;
   gap: var(--s5);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
+.settings-reset { border-top: 1px solid var(--rule); padding-top: var(--s3); }
 .dialog {
   width: min(100% - 2rem, 36rem);
   max-height: 85dvh;
@@ -416,8 +420,18 @@ button.link {
 .dialog h2 { font-size: var(--t-md); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s5); }
 .dialog-error { color: var(--error-ink); margin-top: var(--s3); }
-.dialog-path { font-family: var(--mono); overflow-wrap: anywhere; margin-bottom: var(--s3); }
 .dialog-hint { margin-top: var(--s2); }
+.note-heading { display: flex; align-items: baseline; gap: var(--s1) var(--s3); margin-bottom: var(--s4); }
+.note-heading h2 { flex: none; }
+#note-name { min-width: 0; font-family: var(--mono); color: var(--ink-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#note-text { display: block; width: 100%; }
+.note-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--s4); margin-top: var(--s4); }
+.note-shortcuts { display: flex; flex-wrap: wrap; gap: var(--s3); color: var(--ink-secondary); }
+.note-shortcuts span { white-space: nowrap; }
+.note-footer .dialog-actions { margin: 0 0 0 auto; }
+@media (max-width: 47.999rem) {
+  .note-shortcuts { display: none; }
+}
 .keymap-heading { margin-top: var(--s5); font-size: var(--t-base); }
 .keymap { margin: var(--s2) 0 0; }
 .keymap > div { display: grid; grid-template-columns: minmax(9rem, 2fr) 3fr; align-items: baseline; gap: var(--s3); padding-block: var(--s2); border-bottom: 1px solid var(--rule); }
@@ -431,7 +445,7 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
 .settings-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--s3);
+  gap: var(--s2);
   border: 0;
   padding: 0;
   margin: 0;
@@ -444,17 +458,16 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
 .field > label:not(.check), .field > span, .output-toolbar label { font-weight: var(--weight-strong); }
 #reload-settings .field { align-self: end; }
 .check-row { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); }
-.check { display: flex; align-items: center; gap: var(--s2); cursor: pointer; }
-.check input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
-#loaded-note { margin-top: var(--s2); color: var(--ink-secondary); }
-#show-all { align-self: flex-start; margin-top: var(--s1); }
+.check { display: flex; align-items: flex-start; gap: var(--s2); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; flex: none; margin: .2rem 0 0; }
+.settings .check { min-height: 2.25rem; padding-block: var(--s1); }
+#show-all { align-self: flex-start; margin: 0 0 0 calc(1.1rem + var(--s2)); }
 .meta-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s3); }
 
 /* ---------- stage: document views and project information */
 
 .stage { position: relative; background: var(--workspace-surface, var(--card)); box-shadow: var(--lift); }
-/* From tablet width the tabs and the copy button stay at the top of the window while
-   a long tree scrolls; on a phone they would take too much of it. */
+/* View switching and document actions sit above the tree-specific toolbar. */
 .stage-head {
   display: flex;
   align-items: center;
@@ -477,32 +490,31 @@ kbd { font: inherit; font-family: var(--mono); background: var(--well); border: 
   padding: var(--s2) var(--s1);
 }
 .tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs [role="tab"]:enabled:hover { background: var(--well); color: var(--accent); }
 .load-tabs { margin-bottom: var(--s4); border-bottom: 1px solid var(--rule); }
 .load-tabs [role="tab"] { font-weight: var(--weight-body); }
 #copy { min-width: 11rem; display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); }
-#copy:enabled, #submit:enabled { background: var(--accent-soft); color: var(--ink); border-color: var(--rule); }
-#copy:enabled:hover, #submit:enabled:hover { color: var(--accent); border-color: var(--accent); }
 #copy-status { flex-basis: 100%; }
 #copy-status:empty { display: none; }
 /* Confirmation changes the label and edge without a solid color flash. */
 #copy.copied:enabled { color: var(--ok); border-color: var(--ok); }
-.stage-status { padding: var(--s2) var(--s4) 0; color: var(--ink-secondary); }
-.stage-status:empty { display: none; }
 #editor-panel, #stamp-panel, #info-panel { padding: var(--s4); }
 .stage[data-view="info"] #copy,
 .stage[data-view="info"] #copy-status,
-.stage[data-view="info"] .settings-open,
-.stage[data-view="info"] .stage-status { display: none; }
-.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-bottom: var(--s3); }
-.canvas-caption { flex: 1 1 auto; min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.stage[data-view="info"] .settings-open { display: none; }
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); padding: var(--s2) var(--s3); border: 1px solid var(--rule); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; background: var(--controls-surface); }
+.selection-context { color: var(--ink-secondary); }
+.selection-actions { display: flex; gap: var(--s2); padding-left: var(--s2); border-left: 3px solid var(--accent); }
+.editor-toolbar .tree-tools { margin-left: auto; padding-left: var(--s3); border-left: 1px solid var(--rule); }
+.editor-toolbar button { padding-inline: var(--s2); }
+.canvas-caption { min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.tui-short-label { display: none; }
 .tree-tools { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .tree-tools button { padding-inline: var(--s2); }
 #tui-mode[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 #tree-document { font-family: var(--mono); color: var(--ink); }
 .output-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); margin-bottom: var(--s3); }
 .output-toolbar select { width: auto; min-width: 11rem; }
-.notice { padding: var(--s3) var(--s4) 0; }
-.notice .link { white-space: nowrap; }
 
 pre {
   font-family: var(--mono);
@@ -517,17 +529,14 @@ pre {
   white-space: pre;
   tab-size: 4;
 }
-@media (min-width: 48rem) and (max-width: 63.999rem) {
-  .stage-head { position: sticky; top: 0; z-index: 1; }
+@media (max-width: 63.999rem) {
+  .editor-toolbar { position: sticky; top: 0; z-index: 2; }
+  .row { scroll-margin-top: var(--selection-toolbar-height, 0px); }
 }
 @media (max-width: 47.999rem) {
   /* Share rows before reducing type sizes or tap targets. */
   .workspace { padding-top: var(--s3); gap: var(--s3); }
-  #form { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2); }
-  #form .field-head { grid-column: 1 / -1; margin-bottom: 0; }
-  .repo-row { display: contents; }
-  #url { grid-column: 1 / -1; }
-  .repo-actions { grid-column: 1; }
+  #form { min-width: 0; }
   .examples { grid-column: 2; margin-top: 0; align-self: start; }
   .examples[open] { grid-column: 1 / -1; }
   #status { grid-column: 1 / -1; margin-top: 0; }
@@ -554,8 +563,9 @@ pre {
     white-space: nowrap;
   }
   #editor-panel, #stamp-panel, #info-panel { padding: var(--s3); }
-  .editor-toolbar { margin-bottom: var(--s2); }
-  .canvas-caption:not(.no-document) .caption-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .editor-toolbar { padding-inline: var(--s2); gap: var(--s2); }
+  .selection-context { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .editor-toolbar .tree-tools { padding-left: 0; border-left: 0; }
 }
 
 /* ---------- project information: one reading surface, with headings beside the copy
@@ -578,6 +588,9 @@ pre {
 .info-steps li + li { margin-top: var(--s4); }
 .info-steps li::marker { color: var(--accent); font-weight: var(--weight-strong); }
 .info-steps p { margin-top: var(--s1); }
+@media (max-width: 47.999rem) {
+  .info-content { padding: var(--s4); }
+}
 @container (min-width: 40rem) {
   .info-content { padding: var(--s6); }
   .info-section { grid-template-columns: 11rem minmax(0, 1fr); gap: var(--s5); }
@@ -586,11 +599,7 @@ pre {
   .info-sheet { flex: 1; min-height: 0; overflow-y: auto; }
 }
 
-/* ---------- the tree
-
-   The whole tree is on the page; the page scrolls, not a box inside it. The list is as
-   wide as its widest row so every row's actions line up at the right; long rows scroll
-   sideways. */
+/* Tree rows share a width so their actions align; long rows scroll horizontally. */
 .tree-scroll {
   overflow-x: auto;
   container-type: inline-size;
@@ -599,21 +608,47 @@ pre {
   border: 1px solid var(--rule);
   border-radius: var(--r);
 }
-.rows {
+.rows, .source-tree, #placement-rows {
   --tree-step: 4ch;
+  font-family: var(--mono);
+  line-height: 2;
+}
+.rows {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: var(--mono);
-  line-height: 2;
   width: max-content;
   min-width: 100%;
 }
 .tree-attribution { margin: var(--s3) var(--s4) 0; color: var(--ink-secondary); }
-.row { display: flex; align-items: center; gap: var(--s1); padding: 0 var(--s4); white-space: nowrap; }
+.row, .source-row, .placement-row { display: flex; align-items: center; gap: var(--s1); padding: 0 var(--s4); white-space: nowrap; }
 .row.dir:not([data-path=""]) { cursor: pointer; }
-.row:hover, .row:focus-within { background: var(--row-hover); }
+.row:hover:not([data-selected="true"]) { background: var(--well); }
+.row[data-selected="true"] { background: var(--row-hover); box-shadow: inset 3px 0 var(--accent); }
+#editor-panel .tree-scroll { border-top-left-radius: 0; border-top-right-radius: 0; }
 .row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+
+/* Source rows share editor density and branch geometry. Selecting a folder
+   also expands or collapses it; the whole row is the control. */
+.source-browser { margin-top: var(--s3); }
+.source-browser-status:empty { display: none; }
+.source-tree {
+  list-style: none;
+  padding: var(--s3) 0;
+  margin: 0;
+  max-height: min(38dvh, 22rem);
+  overflow: auto;
+  background: var(--document-surface, var(--paper));
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+.source-row { width: max-content; min-width: 100%; cursor: pointer; }
+.source-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+.source-row:hover:not([aria-disabled="true"]):not([aria-selected="true"]) { background: var(--well); }
+.source-row[aria-disabled="true"] { cursor: default; color: var(--ink-secondary); }
+.source-row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+.source-name { white-space: pre; }
+.source-row[data-kind="dir"] .source-name { font-weight: var(--weight-strong); }
 .row.hidden-row .name, .row.hidden-row .counts { text-decoration: line-through; }
 /* Match terminal tree geometry: four character cells per level. The vertical
    stroke sits in the first cell; the horizontal arm ends after the third,
@@ -631,7 +666,7 @@ pre {
   left: 0.5ch;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid var(--tree-guide-ink, var(--ink));
 }
 .indent.branch.last::before { bottom: 50%; }
 .indent.branch::after {
@@ -640,7 +675,7 @@ pre {
   left: 0.5ch;
   right: calc(1ch - var(--s1));
   top: 50%;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--tree-guide-ink, var(--ink));
 }
 .fold {
   min-height: 0;
@@ -658,34 +693,113 @@ pre {
 .name { cursor: default; }
 .row.dir .name { cursor: inherit; font-weight: var(--weight-strong); }
 .row.dir .name:hover { color: var(--ink); }
-/* One ink for the document; weight and geometry carry its hierarchy. */
 .rows .counts, .rows .note { color: var(--ink); }
 .note { margin-left: var(--s1); }
-/* Row actions keep their place but appear only on the row under the pointer or
-   holding focus, so at rest the tree is only the tree. A row takes focus when it is
-   clicked or tapped, which is what offers the actions where there is no pointer to
-   hover; hover is then an enhancement that costs nothing where it does not apply. */
-.row-actions {
-  cursor: default;
-  position: sticky;
-  right: 0;
-  margin-left: auto;
-  display: flex;
-  gap: var(--s2);
-  padding-left: var(--s3);
-  background: var(--document-surface, var(--well));
-  opacity: 0;
-}
-.row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; background: var(--row-hover); }
-.row-actions button {
-  font-family: var(--sans);
-  min-height: 1.75rem;
-  padding: 0 var(--s2);
-  border-radius: var(--r-sm);
-  line-height: 1.7;
-}
-.row-actions button:hover { border-color: var(--accent); color: var(--accent); }
-.row-actions button:disabled { opacity: 0.5; }
-/* A focused row is offering its actions, not asking to be read as a text selection. */
 .row:focus { outline: none; }
 .row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+
+/* Transfer unresolved notes in one modal over the prepared editor. */
+.placement-dialog { position: fixed; inset: 0; margin: auto; max-width: none; width: min(62rem, calc(100vw - 2rem)); height: min(48rem, calc(100dvh - 2rem)); max-height: none; padding: 0; overflow: hidden; }
+#placement-explanation { margin-bottom: var(--s3); flex-shrink: 0; }
+#placement-work { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s4); }
+.placement-main { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
+.placement-main > :not(#placement-rows) { flex-shrink: 0; }
+.placement-head { display: flex; gap: var(--s4); justify-content: space-between; align-items: baseline; margin-bottom: var(--s4); }
+.placement-head h2 { margin: 0; }
+#placement-progress { margin: 0; color: var(--ink-secondary); white-space: nowrap; }
+.placement-eyebrow { color: var(--ink-secondary); font-weight: var(--weight-strong); }
+.placement-source-slot, .placement-target-slot { display: flex; align-items: baseline; gap: var(--s3); min-width: 0; }
+.placement-source-slot { padding-bottom: var(--s3); border-bottom: 1px solid var(--rule-strong); }
+#placement-source { min-width: 0; font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#placement-note { margin-block: var(--s3); max-height: 4.5rem; overflow: auto; white-space: pre-wrap; flex-shrink: 0; }
+#placement-directory-hint { margin-top: 0; margin-bottom: var(--s3); flex-shrink: 0; }
+.placement-tree-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); margin-bottom: var(--s2); flex-wrap: wrap; }
+.placement-tree-head .check { margin: 0; }
+#placement-rows { flex: 1 1 22rem; min-height: 7rem; overflow: auto; margin: 0; padding: var(--s2) 0; list-style: none; border: 1px solid var(--rule); background: var(--paper); font-family: var(--mono); }
+.placement-row { min-width: 100%; width: max-content; cursor: pointer; }
+.placement-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+.placement-row:hover:not([aria-selected="true"]) { background: var(--well); }
+.placement-row:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+.placement-row[data-kind="dir"] .placement-name { font-weight: var(--weight-strong); }
+.placement-counts, .placement-row-note { color: var(--ink-secondary); }
+.placement-row.hidden-row .placement-name { text-decoration: line-through; }
+.placement-target-slot { margin-top: var(--s2); justify-content: flex-end; }
+.placement-target-slot:has(#placement-folder[hidden]) { display: none; }
+#placement-folder { flex-shrink: 0; }
+#placement-target-hint { margin-block: var(--s2); }
+#placement-target-hint:empty { display: none; }
+#placement-error { max-height: 4.5rem; overflow: auto; flex-shrink: 0; }
+.placement-foot { border-top: 1px solid var(--rule); margin-top: var(--s3); padding-top: var(--s3); flex-shrink: 0; }
+.placement-decisions { display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: flex-end; }
+#placement-undo { margin-right: auto; }
+.placement-exit { display: flex; align-items: baseline; gap: var(--s3); justify-content: space-between; margin-top: var(--s3); }
+#placement-key-hint { margin: 0; }
+#placement-finish { flex-shrink: 0; max-width: 100%; white-space: normal; }
+#placement-replace-question { overflow-wrap: anywhere; max-height: 50dvh; overflow: auto; }
+@media (max-width: 40rem) {
+  .placement-dialog { width: calc(100vw - 1rem); height: calc(100dvh - 1rem); }
+  #placement-work { padding: var(--s3); }
+  .placement-head { gap: var(--s2); margin-bottom: var(--s2); }
+  .placement-head h2 { font-size: var(--t-md); }
+  .placement-exit { justify-content: flex-end; margin-top: var(--s2); }
+  .placement-foot { margin-top: var(--s2); padding-top: var(--s2); }
+  .placement-foot button, #placement-folder { min-height: 2.25rem; padding-inline: var(--s2); }
+  .placement-source-slot { padding-bottom: var(--s2); }
+  #placement-note { margin-block: var(--s2); }
+  #placement-directory-hint { margin-bottom: var(--s2); }
+  #placement-key-hint { display: none; }
+  #placement-note { max-height: 3rem; }
+  #placement-folder { padding-inline: var(--s2); }
+}
+
+/* Keep row actions and keyboard controls together on the narrowest phones. */
+@media (max-width: 23rem) {
+  .tui-full-label { display: none; }
+  .tui-short-label { display: inline; }
+}
+
+/* Stacked editors keep compact chrome above a tree that fills the viewport. */
+@media (max-width: 63.999rem) {
+  .masthead { flex-shrink: 0; }
+  .masthead-inner { padding-block: var(--s1); }
+  .wordmark h1 { font-size: 1.5rem; }
+  .wordmark .mark { width: 1.75rem; height: 1.75rem; }
+  .masthead button, .masthead .button-link { min-height: 2.25rem; }
+  .workspace { display: flex; flex-direction: column; align-items: stretch; flex: 1; min-height: 0; gap: var(--s2); padding-block: var(--s2); overflow: hidden; }
+  .controls { flex: none; padding: 0; border: 0; background: none; }
+  #form { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--s1) var(--s2); align-items: center; }
+  #form .field-head, .repo-summary { display: contents; }
+  #form .repository-context { grid-column: 1; grid-row: 1; }
+  #form .repository-context > .control-icon { display: none; }
+  .controls .repository-identity { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .repo-links { grid-column: 3; grid-row: 1; }
+  .repo-actions { grid-column: 2; grid-row: 1; gap: var(--s1); flex-wrap: nowrap; }
+  .repo-actions button, .repo-actions .button-link, .repo-links .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; min-height: 2.25rem; padding: 0; }
+  .canvas-caption, #status { grid-column: 1 / -1; }
+  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .stage-head { flex: none; padding: var(--s1) var(--s2); gap: var(--s1); }
+  .tabs { gap: var(--s1); }
+  .tabs [role="tab"] { min-height: 2.25rem; padding-block: var(--s1); }
+  .stage-head > #copy, .stage-head > .settings-open { min-width: 2.25rem; width: 2.25rem; height: 2.25rem; min-height: 2.25rem; }
+  .stage-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #editor-panel, #stamp-panel, #info-panel { padding: var(--s2); }
+  .editor-toolbar { flex: none; padding-block: var(--s1); gap: var(--s1) var(--s2); }
+  .editor-toolbar button { min-height: 2.25rem; }
+  .tree-scroll, .region, .info-sheet { flex: 1; min-height: 0; overflow: auto; }
+}
+
+@media (max-width: 23rem) {
+  .wordmark .mark { display: none; }
+  .wordmark h1 { font-size: var(--t-md); }
+}
+
+@media (max-width: 47.999rem) {
+  .controls .repository-owner, .controls .repository-separator { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; }
+  .repo-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .repo-actions button, .repo-actions .button-link { width: auto; gap: var(--s2); padding-inline: var(--s2); }
+  .stage-head > #copy, .stage-head > .settings-open { width: auto; padding-inline: var(--s2); }
+  .canvas-caption { display: none; }
+}

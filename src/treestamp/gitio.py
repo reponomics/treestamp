@@ -1,4 +1,4 @@
-"""Git snapshot and comparison adapters; no editor or document dependencies."""
+"""Git index snapshot adapters; no editor or document dependencies."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import shutil
 import stat
 import subprocess
 import tempfile
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 
@@ -26,14 +25,6 @@ class Snapshot:
     repo: Path
     root: Path
     tree: Node
-    tree_id: str
-
-
-@dataclass(frozen=True)
-class Changes:
-    """Supported leaf moves relative to the selected root."""
-
-    moves: dict[str, str]
 
 
 def checked_path(path: Path) -> Path:
@@ -144,11 +135,6 @@ def repo_root(start: Path) -> Path:
     return checked_path(Path(_decode(raw).removesuffix("\n")))
 
 
-def _resolve_tree(repo: Path, ref: str) -> str:
-    raw = _git(repo, "rev-parse", "--verify", "--end-of-options", f"{ref}^{{tree}}")
-    return raw.decode("ascii").strip()
-
-
 def _prefix(repo: Path, root: Path) -> str:
     try:
         relative = root.relative_to(repo)
@@ -167,9 +153,7 @@ def _tree_record(row: bytes) -> tuple[str, str, str]:
     return _decode(path_raw), kind, fields[2].decode("ascii")
 
 
-def _entries(
-    repo: Path, tree_id: str, prefix: str, *, directory_scope: bool = False
-) -> dict[str, Entry]:
+def _entries(repo: Path, tree_id: str, prefix: str) -> dict[str, Entry]:
     raw = _git(repo, "ls-tree", "-r", "-z", "--full-tree", tree_id)
     rows = [row for row in raw.split(b"\0") if row]
     if len(rows) > sources.MAX_ENTRIES:
@@ -178,7 +162,7 @@ def _entries(
     links: dict[str, str] = {}
     for row in rows:
         path, kind, object_id = _tree_record(row)
-        if directory_scope and prefix and path == prefix[:-1]:
+        if prefix and path == prefix[:-1]:
             raise MarkerError(f"selected root is a tracked leaf: {path!r}")
         if not path.startswith(prefix):
             continue
@@ -220,118 +204,12 @@ def _symlink_targets(repo: Path, links: dict[str, str]) -> dict[str, str]:
     return targets
 
 
-def capture_snapshot(
-    root: Path, target_ref: str | None = None, *, repository: Path | None = None
-) -> Snapshot:
-    """Capture one tree, retaining a caller's selected repository when provided."""
+def capture_snapshot(root: Path, *, repository: Path | None = None) -> Snapshot:
+    """Capture the staged index, retaining the selected repository when provided."""
     root = checked_path(root)
     repo = repo_root(root) if repository is None else checked_path(repository)
     prefix = _prefix(repo, root)
-    tree_id = (
-        _resolve_tree(repo, target_ref)
-        if target_ref is not None
-        else _git(repo, "write-tree").decode("ascii").strip()
-    )
-    entries = _entries(repo, tree_id, prefix, directory_scope=True)
+    tree_id = _git(repo, "write-tree").decode("ascii").strip()
+    entries = _entries(repo, tree_id, prefix)
     tree = build_tree(entries.values())
-    return Snapshot(repo, root, tree, tree_id)
-
-
-def _kinds(tree: Node) -> dict[str, str]:
-    result: dict[str, str] = {}
-    pending = list(tree.children)
-    while pending:
-        node = pending.pop()
-        result[node.path] = node.kind
-        pending.extend(node.children)
-    return result
-
-
-def _rename_pairs(raw: bytes) -> list[tuple[str, str]]:
-    fields = iter(raw.split(b"\0"))
-    pairs: list[tuple[str, str]] = []
-    for status in fields:
-        if not status:
-            continue
-        try:
-            source = _decode(next(fields))
-            if status[:1] in (b"R", b"C"):
-                destination = _decode(next(fields))
-                if status.startswith(b"R"):
-                    pairs.append((source, destination))
-        except StopIteration as exc:
-            raise GitEnvironmentError("incomplete Git change record") from exc
-    return pairs
-
-
-def _is_leaf_move(
-    source: str,
-    destination: str,
-    before: dict[str, str],
-    after: dict[str, str],
-) -> bool:
-    kind = before.get(source)
-    return (
-        kind is not None
-        and kind != KIND_DIR
-        and after.get(destination) == kind
-        and after.get(source) != kind
-        and before.get(destination) != kind
-    )
-
-
-def _supported_moves(
-    pairs: list[tuple[str, str]],
-    before: dict[str, str],
-    after: dict[str, str],
-    prefix: str,
-) -> dict[str, str]:
-    scoped = [
-        (a[len(prefix) :], b[len(prefix) :])
-        for a, b in pairs
-        if a.startswith(prefix) and b.startswith(prefix)
-    ]
-    return {
-        a: b
-        for a, b in _unique_move_pairs(scoped)
-        if _is_leaf_move(a, b, before, after)
-    }
-
-
-def _unique_move_pairs(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    origins = Counter(a for a, _ in pairs)
-    destinations = Counter(b for _, b in pairs)
-    endpoints = set(origins) & set(destinations)
-    return [
-        (a, b)
-        for a, b in pairs
-        if a not in endpoints
-        and b not in endpoints
-        and origins[a] == 1
-        and destinations[b] == 1
-    ]
-
-
-def changes(snapshot: Snapshot, comparison_ref: str) -> Changes:
-    """Detect supported leaf moves across immutable snapshots."""
-    before_id = _resolve_tree(snapshot.repo, comparison_ref)
-    prefix = _prefix(snapshot.repo, snapshot.root)
-    before_entries = _entries(snapshot.repo, before_id, prefix)
-    before = _kinds(build_tree(before_entries.values()))
-    after = _kinds(snapshot.tree)
-    raw = _git(
-        snapshot.repo,
-        "-c",
-        "diff.renameLimit=1000",
-        "diff",
-        "--no-ext-diff",
-        "--no-textconv",
-        "--name-status",
-        "-z",
-        "--find-renames",
-        before_id,
-        snapshot.tree_id,
-        "--",
-    )
-    moves = _supported_moves(_rename_pairs(raw), before, after, prefix)
-    return Changes(moves)
+    return Snapshot(repo, root, tree)

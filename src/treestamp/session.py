@@ -203,6 +203,10 @@ class TreeSession:
             raise MarkerError(f"not a tracked entry: {path!r}")
         return normalized
 
+    def entry(self, path: str) -> Node | None:
+        """Return a tracked snapshot entry by tree-relative path."""
+        return self._nodes.get(path)
+
     def _directory_path(self, path: str) -> str:
         normalized = self.normalize_entry(path)
         if not self._nodes[normalized].is_dir:

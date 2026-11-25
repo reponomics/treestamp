@@ -133,6 +133,18 @@ def test_new_root_normalizes_input_and_preserves_canonical_state(
     assert edited.root == canonical and "note" in edited.tree
 
 
+@pytest.mark.parametrize("root", ["missing", "sub/nope", "su"])
+def test_new_root_must_exist_without_matching_partial_prefixes(
+    fake: FakeGitHub, root: str
+) -> None:
+    service, _ = service_for(fake)
+    with pytest.raises(PreviewError) as error:
+        preview(service, root=root, document="")
+    assert error.value.status == 404
+    assert error.value.code == "root_not_found"
+    assert service.stats()["trees"] == 0
+
+
 @pytest.mark.parametrize(
     "params",
     [
@@ -151,6 +163,7 @@ def test_new_root_normalizes_input_and_preserves_canonical_state(
         {"url": "o/r", "root": "sub/../sub"},
         {"url": "o/r", "root": "/sub"},
         {"url": "o/r", "document": "../tree.md"},
+        {"url": "o/r", "new_document": "true"},
     ],
 )
 def test_invalid_requests(params: dict[str, str]) -> None:
@@ -192,7 +205,7 @@ def test_open_updates_before_editing_and_keeps_baseline(
     assert updated.dirty and updated.notice == OPEN_NOTICE
     assert "new.txt" in updated.tree and "other.txt" not in updated.tree
     assert "top.txt" not in updated.tree and "repository" in updated.tree
-    assert (repo.path / "README.md").read_text() == original
+    assert (repo.path / "README.md").read_text(encoding="utf-8") == original
     assert updated.state["curation"]["hidden"] == ["top.txt"]
     noted = op(service, updated, "annotate", "sub/new.txt", "new annotation")
     assert noted.state["baseline"] == updated.state["baseline"]
@@ -258,13 +271,56 @@ def test_default_missing_document_and_explicit_document_intent(
     repo.write("README.md", "plain text\n")
     repo.commit("plain README")
     assert not preview(service).loaded
-    with pytest.raises(PreviewError):
+    with pytest.raises(PreviewError) as missing:
         preview(service, document="README.md")
+    assert missing.value.code == "document_has_no_treestamp"
     repo.write("README.md", "<!-- treestamp:start -->\n<!-- treestamp:end -->\n")
     repo.commit("empty region")
-    with pytest.raises(PreviewError):
+    with pytest.raises(PreviewError) as malformed:
         preview(service)
+    assert malformed.value.code == "curation"
     assert not preview(service, document="").loaded
+
+
+def test_previously_created_document_target_survives_edit_and_restore(
+    fake: FakeGitHub, repo: Repo
+) -> None:
+    """Captured sessions from the earlier document-creation flow remain usable."""
+    original = b"\xef\xbb\xbf# Guide\r\n\r\nExisting prose.\r\n"
+    repo.write("docs/guide.md").write_bytes(original)
+    repo.commit()
+    service, _ = service_for(fake)
+    created = preview(service, root="sub", document="")
+    historical = replace(
+        created,
+        document="docs/guide.md",
+        state={
+            **created.state,
+            "source": {**created.state["source"], "document": "docs/guide.md"},
+        },
+    )
+    edited = op(service, historical, "annotate", "other.txt", "a useful file")
+    restored = op(service, edited, "restore")
+    assert restored.document == "docs/guide.md" and not restored.loaded
+    assert restored.state["baseline"] is None
+    assert restored.region == edited.region
+    assert "a useful file" in restored.region
+    assert (repo.path / "docs/guide.md").read_bytes() == original
+
+
+@pytest.mark.parametrize("content", [b"# Guide\n", b"\xef\xbb\xbf# Guide\r\n"])
+def test_plain_document_load_does_not_create_a_tree(
+    fake: FakeGitHub, repo: Repo, content: bytes
+) -> None:
+    repo.write("docs/guide.md").write_bytes(content)
+    repo.commit()
+    service, _ = service_for(fake)
+    with pytest.raises(PreviewError) as error:
+        preview(service, document="docs/guide.md")
+    assert error.value.code == "document_has_no_treestamp"
+    assert str(error.value) == "No treestamp found in docs/guide.md."
+    assert service.stats()["trees"] == 0
+    assert (repo.path / "docs/guide.md").read_bytes() == content
 
 
 def test_bad_and_nonregular_documents_fail(fake: FakeGitHub, repo: Repo) -> None:
@@ -534,7 +590,7 @@ def test_open_rejects_indented_boundaries(
     service, _ = service_for(fake)
     with pytest.raises(PreviewError, match="boundary markers must not be indented"):
         preview(service)
-    assert (repo.path / "README.md").read_text() == original
+    assert (repo.path / "README.md").read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize(

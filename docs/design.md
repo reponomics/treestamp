@@ -5,14 +5,14 @@ Treestamp produces a curated directory tree of a Git repository and maintains it
 - the `treestamp` Python package on PyPI, providing the command-line interface, the terminal editor, and the pre-commit hooks
 - the hosted web editor at <https://treestamp.reponomics.org>, a FastAPI service in `web/` that uses the same package and is deployed as a container on Fly.io
 
-This document describes the actors, the actions each performs, and the external interfaces of both assets. Update it when a change adds or removes an interface, an actor, or a stored or transmitted kind of data. The [security assessment](security-assessment.md) builds on this description.
+This document describes system boundaries, data flow, and interface contracts. The [CLI reference](cli-reference.md) describes terminal usage, [UI flow](ui-flow.md) describes browser interactions, and [UI patterns](ui-patterns.md) defines shared web controls. The [security assessment](security-assessment.md) builds on the boundaries described here.
 
 ## Actors
 
 | Actor | Description |
 | --- | --- |
 | Local user | Runs the CLI or terminal editor against a checkout they control |
-| Git | The local `git` executable, invoked as a subprocess to read the index, trees, and history |
+| Git | The local `git` executable, invoked as a subprocess to read the index and Git objects |
 | Local filesystem | Holds the document Treestamp reads and, for `update` and **Write**, replaces |
 | Clipboard | A native clipboard command (such as `pbcopy`) or the terminal, through OSC 52, receives copied output |
 | Pre-commit and CI | Run `treestamp check` or `treestamp update` without user interaction |
@@ -29,30 +29,30 @@ This document describes the actors, the actions each performs, and the external 
 
 ## Core package
 
-The modules in `src/treestamp/` have narrow responsibilities:
+The core modules are organized as follows:
 
 | Module | Responsibility |
 | --- | --- |
-| `cli.py` | Parses arguments and dispatches to headless maintenance or the editor |
-| `gitio.py` | Runs `git` and captures an immutable snapshot of the index or a ref |
+| `cli.py` | Parses arguments and dispatches to extraction, generation, maintenance, or the editor |
+| `cli_inputs.py` | Resolves cwd-based source paths and prepares loaded or new sessions |
+| `cli_maintenance.py` | Prepares automatic writes and detects notes omitted from their final output |
+| `gitio.py` | Runs `git` and captures an immutable snapshot of the index |
 | `sources.py` | Builds the same tree from GitHub Trees API records, without a checkout |
 | `model.py`, `session.py` | Immutable tree data and the curation state (expanded, hidden, annotated) |
 | `codec.py` | Renders and parses tree rows, and checks that parsing the output reproduces the authored tree |
-| `maintenance.py` | Updates a printed tree against a newer snapshot, preserving curation and applying detected moves |
+| `maintenance.py` | Updates a printed tree against a newer snapshot, preserving curation at matching paths and entry kinds |
 | `document.py` | Finds the marked region, reads its settings, and writes the document atomically |
 | `editor.py`, `tui.py`, `tui_dialogs.py` | The Textual terminal editor |
 
 ### Local actions
 
-- **Snapshot.** Treestamp captures the Git index (or a ref given with `--target`) once. Every later action in that run or editing session uses the same snapshot, so files changing on disk do not alter the tree being edited.
-- **Read a document.** Treestamp locates exactly one `<!-- treestamp:start -->` / `<!-- treestamp:end -->` pair and parses the tree and the optional `treestamp:config` comment between them.
-- **Start or load.** In the terminal editor, **New document** starts a tree for a chosen subtree root. **Load document** reads an existing treestamped document and restores its tree, hidden entries, and settings against the current snapshot.
-- **Curate.** The user expands, collapses, hides, and annotates entries, and chooses the drawing style and whether directory counts are shown. Curation changes only in-memory state until the user writes or copies.
-- **Write.** `update` and the editor's **Write to existing** render the region and replace only its contents, preserving the surrounding text and line endings. The write is prepared against the content read earlier; if the file changed in the meantime, the write is refused. The new content goes to a temporary file in the same directory, which then replaces the document. **Write new file** creates a new document containing only the region and refuses a path that already exists.
-- **Check.** `check` performs the same computation as `update`, prints a unified diff when the document would change, and never writes.
-- **Copy.** The editor sends the complete treestamp to a native clipboard command if one is on `PATH`, otherwise to the terminal through OSC 52.
+Local source acquisition captures an immutable Git index snapshot. The editor derives curation state from that snapshot and an optional loaded document; subsequent edits do not reread the filesystem tree. Stored paths are repository-relative, while displayed paths are relative to the selected subtree. Document operations stay within the selected repository and reject symlink traversal and submodule-boundary crossings.
 
-The core package makes no network requests.
+Document reads locate one marked region and validate its tree and metadata. Loading into an editor applies automatic maintenance against the snapshot and retains unmatched notes for explicit transfer decisions. Extraction reads the stored region without acquiring a source snapshot. The [CLI reference](cli-reference.md) defines how commands choose these operations and handle unmatched notes.
+
+Writes render a replacement region while preserving surrounding bytes and supported document formatting. Preparation records the destination's content; publication refuses the write if that content has changed. A temporary file in the same directory replaces the destination atomically. The terminal editor writes only to its loaded document. Draft edits remain in memory until exported or written.
+
+Clipboard output uses a native clipboard command from `PATH`, falling back to terminal OSC 52. The core package makes no network requests.
 
 ## Hosted editor
 
@@ -63,7 +63,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 | `app.py` | Routes, error mapping, security headers, rate limits, and structured logs |
 | `links.py` | Parses user-entered repository links into a validated owner, name, and ref |
 | `github.py` | GitHub REST client with response-size caps, timeouts, and a shared request budget |
-| `cache.py` | Temporary in-memory snapshot retention (one hour per snapshot) |
+| `cache.py` | Temporary in-memory snapshot retention (one hour, renewed by successful edits) |
 | `preview.py` | Opens and edits a document against one snapshot |
 | `limits.py` | Per-client token-bucket rate limits, held in process memory |
 | `proxy.py` | Accepts a visitor address from `CF-Connecting-IP` only when the peer is a configured Cloudflare range |
@@ -72,7 +72,7 @@ The service in `web/src/treestamp_web/` adapts the core package to HTTP:
 
 ### Hosted actions
 
-1. The visitor enters a repository link. The service confirms through the GitHub API that the repository is public, resolves its default branch to a commit and tree, and fetches the complete recursive tree listing. Private repositories, branches, and tags are refused; only the default-branch HEAD or a pinned commit already in the cache can be opened.
+1. The visitor enters a repository link. The service confirms through the GitHub API that the repository is public, resolves its default branch to a commit and tree, and fetches the complete recursive tree listing. Private repositories, branches, and tags are refused; the service opens the current default-branch HEAD or an available cached commit. An uncached pinned commit can be acquired only if it still matches that HEAD.
 2. The service fetches the blobs it needs: symlink targets in the selected subtree, up to a configured limit, and the selected document, up to 1 MiB.
 3. The service returns the rendered tree, display rows, and a session state envelope to the browser. The browser holds the curation state; the server keeps only the cached snapshot.
 4. Each edit sends the state envelope and one operation to the service, which validates both, applies the operation, and returns the new state. Requests for a snapshot that is no longer cached fail with `410` rather than reading a newer commit.
@@ -90,35 +90,7 @@ The Python modules are not a supported library interface.
 
 ### Command line
 
-[ADR 0001: Coherence of CLI paths and repository selection](adr/0001-cli-path-coherence.md) records the accepted interface below; the [CLI reference](cli-reference.md) documents command usage, path rules, and defaults.
-
-`treestamp [tui] [--load DOCUMENT] [--print]` opens the terminal editor. With `--load`, it resolves the document from cwd (or accepts an absolute path), selects the repository containing that document, and opens it directly. Without `--load`, it selects the repository containing cwd and presents New/Load. `treestamp` with no command is equivalent to `treestamp tui`.
-
-With `--print`, treestamp writes the complete treestamp to standard output and exits without opening the editor or writing a file. Explicit `--load` requires a valid existing treestamp. Without `--load`, it uses the repository-root README, starting a new tree if the README is absent or unmarked; malformed or empty marked regions remain errors.
-
-`treestamp update [DOCUMENT] [--target REF] [--compare REF]` rewrites the marked region of `DOCUMENT` to match the snapshot. An explicit document path resolves from cwd (or is absolute) and selects its containing repository. An omitted document selects the repository-root README in cwd's repository. `--target` selects a Git ref in the document's repository instead of the index; `--compare` names a reference used to detect moved paths, so their annotations follow them.
-
-`treestamp check [DOCUMENT] [--target REF] [--compare REF]` uses the same document and repository selection as `update` and reports whether it would change the document, printing a unified diff if so.
-
-CLI document discovery rejects symlinks, including traversed components before `..` normalization. An explicitly selected document in an initialized nested repository or submodule uses that repository; an uninitialized submodule remains a boundary. Within an editing session, tree roots and document paths remain repository-relative, and document operations cannot cross into another repository.
-
-`treestamp --version` prints the installed version.
-
-Output is UTF-8. Exit codes:
-
-| Code | Meaning |
-| --- | --- |
-| 0 | Success, or the document is current |
-| 1 | `check` found that the document needs updating |
-| 2 | Invalid input or a curation constraint |
-| 3 | Git or the filesystem could not supply the required facts |
-| 130 | Interrupted |
-
-Errors are written to standard error, prefixed with `treestamp:`.
-
-### Terminal editor
-
-The terminal editor is a keyboard-driven Textual application. Arrow keys, Space, Home, End, and Page Up/Down move through the tree and expand or collapse directories. Other keys perform the actions described under [Local actions](#local-actions): `N` New document, `l` Load document, `h` hide or unhide, `H` reveal hidden entries, `S` unhide all, `a` annotate, `c` show or hide counts, `s` drawing style, `t` attribution trailer, `v` preview, `y` copy, `w` Write to existing, `n` Write new file, `p` print the complete treestamp to standard output and exit, `?` help, and `q` or Escape to quit. Document paths entered in its dialogs are relative to the repository root.
+The CLI exposes source creation, document loading and extraction, read-only comparison, and guarded updates. It selects repository context before invoking the shared engine. The [CLI reference](cli-reference.md) owns command syntax, path defaults, exit status, and terminal editor controls.
 
 ### Document format
 
@@ -126,11 +98,11 @@ The [README](../README.md#3-add-it-to-your-readme) shows a complete region and d
 
 The optional config comment holds TOML with three keys, each generated only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains the annotation delimiter. Equivalent authored configuration may include explicit defaults. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
-[ADR 0002: Formatter-compatible documents](adr/0002-formatter-compatible-documents.md) records the formatting contract. New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
+New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
 
-`prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports, while writes to a different existing document preserve that destination's formatting. No formatting preference is added to persisted session state.
+`prepare_content` applies these preservation rules before the complete byte comparison used by `check` and editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference. [ADR 0002](adr/0002-formatter-compatible-documents.md) records the formatting rationale and alternatives.
 
-Both editors offer an attribution toggle, off by default. When enabled, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
+The optional attribution footer is disabled by default. When present, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence or Markdown list, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 
 [Resolve special filenames by row](special-path-resolution.md) specifies the `special_paths` record format, how rows are numbered, and how registrations are validated. Manual tree edits are supported only for annotation text; treestamp owns filenames, structure, and metadata values. Equivalent TOML formatting and the supported boundary spacing may be changed by users or formatters without changing those values.
 
@@ -146,12 +118,14 @@ The browser application uses these endpoints. They exist to serve that applicati
 | --- | --- | --- |
 | `GET /` | None | The browser application |
 | `GET /{owner}/{repo}` | A repository owner and name in the path | The browser application, which then opens that repository |
+| `GET /api/browse` | Repository `url` | Source entries for selecting a root folder or document |
 | `GET /api/preview` | Query parameters `url`, or `owner` and `repo`; optional `ref` (a commit id), `root`, `document` | A preview: repository, resolved commit and tree, settings, rendered tree and region, display rows, warnings, permalink, and state envelope |
 | `POST /api/preview` | The same fields as a JSON object | The same as `GET` |
 | `POST /api/op` | JSON with `owner`, `repo`, `ref` (a 40-character commit id), `root`, `document`, `state` (the envelope), `op` (`type` plus `path` or `text`), and `reveal` | An updated preview |
+| `POST /api/placement` | Captured source and opening `state`, bounded `decisions`, browsing `expanded` paths, and `reveal` | Provisional placement state and destination rows |
 | `GET /healthz` | None | Liveness, versions, build commit, credential type, last observed GitHub budget, and cache statistics |
 
-The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the loaded document's original bytes, and a revision counter; the browser returns it unchanged with each operation. Operation types:
+The state envelope carries the curation (expanded and hidden paths, annotations, and settings), the source it was created from, the original marked treestamp-region bytes, an optional `initial_curation` baseline, and a revision counter. The browser sends the latest envelope with current presentation settings and the requested operation. Operation types:
 
 | Type | Effect |
 | --- | --- |
@@ -160,6 +134,7 @@ The state envelope carries the curation (expanded and hidden paths, annotations,
 | `unhide_all` | Show all hidden entries |
 | `annotate` | Set the annotation of `path` to `text`; empty text removes it |
 | `present` | Re-render with the settings in the state, such as drawing style or counts |
-| `restore` | Re-render the state without counting as an edit, for example after a page reload |
+| `restore` | Re-render a captured session without counting as an edit |
+| `reset` | Restore `initial_curation`, captured after note placement, against the same snapshot |
 
-`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`.
+`reveal` controls whether display rows include hidden entries; it does not change the printed tree. Request bodies are limited to 256 KiB. Errors return a JSON object with a stable `code` and a message, using `400`, `404`, `409`, `410`, `413`, `422`, `429` (with `Retry-After`), `503`, or `504`.

@@ -1,7 +1,11 @@
 // Preview and editor page. Talks to /api/preview and /api/op; renders text as text, never HTML.
 // Decisions that need no DOM live in logic.js and are tested with node --test.
 
+import { treeGuides, appendTreeGuides } from "./tree-view.js";
 import { EXAMPLES } from "./example.js";
+import { EntryFlow, renderRepository } from "./entry-flow.js";
+import { NotePlacement } from "./placement.js";
+import { saveDraft, draftForLocation } from "./draft.js";
 import {
   DEFAULT_DOCUMENT,
   addressFor,
@@ -16,13 +20,11 @@ import {
   rowName,
   rowSuffix,
   settingsFromValues,
-  sourceSelection,
   treeNavigation,
   valuesFromQuery,
   valuesFromSettings,
 } from "./logic.js";
 
-const form = document.getElementById("form");
 const fields = {
   url: document.getElementById("url"),
   style: document.getElementById("style"),
@@ -31,11 +33,6 @@ const fields = {
   attribution: document.getElementById("attribution"),
   document: document.getElementById("document"),
 };
-const submit = document.getElementById("submit");
-const reloadButton = document.getElementById("reload");
-const reloadSettings = document.getElementById("reload-settings");
-const loadTabs = { new: document.getElementById("load-tab-new"), document: document.getElementById("load-tab-document") };
-const loadPanels = { new: document.getElementById("load-panel-new"), document: document.getElementById("load-panel-document") };
 const visitRepo = document.getElementById("visit-repo");
 const status = document.getElementById("status");
 const errorPanel = document.getElementById("error");
@@ -44,31 +41,31 @@ const errorHint = document.getElementById("error-hint");
 document.getElementById("error-dismiss").addEventListener("click", (event) => {
   const restoreFocus = document.activeElement === event.currentTarget;
   errorPanel.hidden = true;
-  if (restoreFocus) fields.url.focus({ preventScroll: true });
+  if (restoreFocus) tabs[stage.dataset.view || "editor"].focus({ preventScroll: true });
 });
 const repoInfo = document.getElementById("repo-info");
 const repoTooltip = document.getElementById("repo-tooltip");
 const repoInfoDialog = document.getElementById("repo-info-dialog");
-const loadedNote = document.getElementById("loaded-note");
 const settingsPanel = document.getElementById("settings");
-const examples = document.getElementById("examples");
+const settingsTrigger = document.querySelector(".settings-open");
 const tabs = { editor: document.getElementById("tab-editor"), stamp: document.getElementById("tab-stamp"), info: document.getElementById("tab-info") };
 const panels = { editor: document.getElementById("editor-panel"), stamp: document.getElementById("stamp-panel"), info: document.getElementById("info-panel") };
 const tabNames = Object.keys(tabs);
 const stage = document.getElementById("result");
 let generation = 0; // responses from an older request generation are ignored
 const rowsList = document.getElementById("rows");
+const treeToolbar = document.querySelector(".editor-toolbar");
+const rowNote = document.getElementById("row-note");
+const rowVisibility = document.getElementById("row-visibility");
+const selectedPathLabel = document.getElementById("selected-path");
+let selectedPath = "";
 const reveal = document.getElementById("reveal");
 const revealLabel = document.getElementById("reveal-label");
 const showAll = document.getElementById("show-all");
-const notice = document.getElementById("notice");
-const noticeText = document.getElementById("notice-text");
-const noticeUndo = document.getElementById("notice-undo");
 const region = document.getElementById("region");
 const copy = document.getElementById("copy");
 const copyLabel = document.getElementById("copy-label");
 const copyStatus = document.getElementById("copy-status");
-const stageStatus = document.getElementById("stage-status");
 const tuiMode = document.getElementById("tui-mode");
 const keymapDialog = document.getElementById("keymap-dialog");
 const noteDialog = document.getElementById("note-dialog");
@@ -76,11 +73,17 @@ const noteText = document.getElementById("note-text");
 const noteSave = document.getElementById("note-save");
 const noteCancel = document.getElementById("note-cancel");
 
+const placement = new NotePlacement();
+
 let controller = null;
 let countdown = null;
 // The editing session: identity of the commit plus the state the server hands back.
 let editor = null;
+// Presentation may temporarily show an incoming tree; only render() adopts it.
+let presented = null;
+let provisional = null;
 let editingSession = 0;
+let pendingDraft = draftForLocation(window.location);
 
 // ---------- settings <-> form
 
@@ -122,16 +125,11 @@ function showSettings(data, preserveSource) {
 function setBusy(busy, opening) {
   rowsList.setAttribute("aria-busy", String(busy));
   if (!opening) return;
-  reloadButton.disabled = busy;
   status.classList.toggle("busy", busy);
   if (busy) {
-    submit.disabled = true;
     status.textContent = "Loading…";
-    stageStatus.textContent = "Loading…";
   } else if (!countdown) {
-    submit.disabled = false;
     status.textContent = "";
-    stageStatus.textContent = "";
   }
 }
 
@@ -140,7 +138,6 @@ function clearCountdown() {
     clearInterval(countdown);
     countdown = null;
     if (!status.classList.contains("busy")) {
-      submit.disabled = false;
       status.textContent = "";
     }
   }
@@ -150,6 +147,7 @@ function showError(message, hint, retryAfter) {
   errorMessage.textContent = message;
   errorHint.textContent = hint || "";
   errorPanel.hidden = false;
+  if (!document.getElementById("entry").hidden) entryFlow.showError(message, hint);
   const dialogError = document.querySelector("dialog[open] .dialog-error");
   if (dialogError) {
     dialogError.textContent = [message, hint].filter(Boolean).join(" ");
@@ -158,12 +156,10 @@ function showError(message, hint, retryAfter) {
   clearCountdown();
   if (retryAfter) {
     let remaining = retryAfter;
-    submit.disabled = true;
     const tick = () => {
       status.textContent = `Retry in ${remaining}s`;
       if (remaining <= 0) {
         clearCountdown();
-        submit.disabled = false;
         status.textContent = "";
       }
       remaining -= 1;
@@ -176,48 +172,30 @@ function showError(message, hint, retryAfter) {
 // ---------- rendering
 
 function treeRowElements(rows) {
-  // Only visible siblings keep a branch open; collapsed/hidden descendants
-  // should not leave dangling guide lines in the editor.
-  const hasNextSibling = rows.map(() => false);
-  const previousAtDepth = [];
-  rows.forEach((row, index) => {
-    previousAtDepth.length = row.depth + 1;
-    const previous = previousAtDepth[row.depth];
-    if (previous !== undefined) hasNextSibling[previous] = true;
-    previousAtDepth[row.depth] = index;
-  });
-  const trail = [];
-  return rows.map((row, index) => {
-    trail.length = row.depth;
-    if (row.depth) trail[row.depth - 1] = hasNextSibling[index];
-    const guides = trail.map((continues, level) => {
-      if (level === row.depth - 1) return continues ? "branch" : "branch last";
-      return continues ? "trunk" : "";
-    });
-    return rowElement(row, guides);
-  });
+  const guides = treeGuides(rows);
+  return rows.map((row, index) => rowElement(row, guides[index]));
 }
 
 function rowElement(row, guides) {
   const item = document.createElement("li");
   item.className = `row ${row.kind === "dir" ? "dir" : "leaf"}${row.hidden ? " hidden-row" : ""}`;
   item.dataset.path = row.path;
-  // Clicking or tapping a row focuses it, which is what reveals its actions where there
-  // is no pointer to hover with. Controls inside the row keep the focus they take.
+  const canFold = row.kind === "dir" && row.path !== "";
+  // Focus selects the row for the shared toolbar; folder controls still fold it.
   item.tabIndex = row.path === "" ? 0 : -1;
   item.addEventListener("click", (event) => {
-    if (event.target.closest("button, input, .row-actions")) return;
+    if (event.target.closest("button, input")) return;
     item.focus({ preventScroll: true });
     if (canFold && window.getSelection().isCollapsed) operate("toggle", row.path);
   });
-  for (const guide of guides) {
-    const indent = document.createElement("span");
-    indent.className = `indent ${guide}`;
-    indent.setAttribute("aria-hidden", "true");
-    item.appendChild(indent);
-  }
+  appendTreeGuides(item, guides);
 
-  const canFold = row.kind === "dir" && row.path !== "";
+  item.appendChild(createRowName(row, canFold));
+  appendRowDetails(item, row);
+  return item;
+}
+
+function createRowName(row, canFold) {
   const name = document.createElement(canFold ? "button" : "span");
   name.className = canFold ? "name fold" : "name";
   name.textContent = rowName(row);
@@ -231,50 +209,70 @@ function rowElement(row, guides) {
       operate("toggle", row.path);
     });
   }
-  item.appendChild(name);
+  return name;
+}
 
+function appendRowDetails(item, row) {
   if (rowSuffix(row)) item.appendChild(Object.assign(document.createElement("span"), { className: "target", textContent: rowSuffix(row) }));
   if (row.kind === "dir" && row.collapsed && row.counts) item.appendChild(Object.assign(document.createElement("span"), { className: "counts", textContent: row.counts }));
   if (row.annotation) item.appendChild(Object.assign(document.createElement("span"), { className: "note", textContent: `# ${row.annotation}` }));
-
-  const actions = document.createElement("span");
-  actions.className = "row-actions";
-  const note = document.createElement("button");
-  note.type = "button";
-  note.dataset.action = "note";
-  note.textContent = "Note";
-  note.addEventListener("click", () => enqueueEdit((saved) => {
-    const current = editor.rows.find((entry) => entry.path === row.path);
-    if (current && !document.querySelector("dialog[open]")) editAnnotation(current, "note");
-    return saved;
-  }));
-  actions.appendChild(note);
-  const hide = document.createElement("button");
-  hide.type = "button";
-  hide.dataset.action = "visibility";
-  hide.textContent = row.hidden ? "Unhide" : "Hide";
-  hide.disabled = row.path === "";
-  if (hide.disabled) hide.title = "The root is always included";
-  hide.addEventListener("click", () => {
-    if (row.hidden) { operate("unhide", row.path); return; }
-    operate("hide", row.path).then((ok) => { if (ok) showNotice(`Hidden ${rowName(row)}`, row.path); });
-  });
-  actions.appendChild(hide);
-  item.appendChild(actions);
-  return item;
 }
+
+function selectRow(path) {
+  const row = presented?.prepared.rows.find((entry) => entry.path === path);
+  selectedPath = row?.path ?? "";
+  for (const item of rowsList.children) {
+    const selected = Boolean(row) && item.dataset.path === selectedPath;
+    item.dataset.selected = String(selected);
+    item.tabIndex = selected ? 0 : -1;
+    if (selected) item.setAttribute("aria-current", "true");
+    else item.removeAttribute("aria-current");
+  }
+  renderSelectionToolbar(row);
+}
+
+function renderSelectionToolbar(row) {
+  const label = row ? (displayPath(row.identity) || ".") + (row.kind === "dir" ? "/" : "") : "No selection";
+  selectedPathLabel.textContent = label;
+  selectedPathLabel.title = label;
+  rowNote.disabled = !row;
+  rowVisibility.disabled = !row || row.path === "";
+  rowVisibility.textContent = row?.hidden ? "Unhide" : "Hide";
+  rowVisibility.title = row?.path === "" ? "The root is always included" : "";
+}
+
+rowsList.addEventListener("focusin", (event) => {
+  const item = event.target.closest(".row");
+  if (item) selectRow(item.dataset.path);
+});
+
+rowNote.addEventListener("click", () => {
+  const path = selectedPath;
+  enqueueEdit((saved) => {
+    const row = editor.rows.find((entry) => entry.path === path);
+    if (row && !document.querySelector("dialog[open]")) editAnnotation(row, "note");
+    return saved;
+  });
+});
+rowVisibility.addEventListener("click", () => {
+  const path = selectedPath;
+  enqueueEdit((saved) => {
+    const row = editor.rows.find((entry) => entry.path === path);
+    return row?.path ? toggleRowVisibility(row) : saved;
+  });
+});
 
 let noteEditing = null;
 
 function restoreTreeFocus(path, action) {
   const row = Array.from(rowsList.children).find((item) => item.dataset.path === path);
-  const control = action && row?.querySelector(`button[data-action="${action}"]:not(:disabled)`);
+  const control = action === "note" ? rowNote : action && row?.querySelector(`button[data-action="${action}"]:not(:disabled)`);
   (control || row)?.focus({ preventScroll: true });
 }
 
 function editAnnotation(row, action) {
   noteEditing = { path: row.path, original: row.annotation || "", action, session: editingSession, saving: false, request: null, savedBefore: undefined };
-  document.getElementById("note-path").textContent = displayPath(row.identity) || "./";
+  document.getElementById("note-name").textContent = row.path ? row.name : "./";
   document.getElementById("note-error").hidden = true;
   noteText.value = noteEditing.original;
   noteText.readOnly = false;
@@ -342,7 +340,11 @@ function renderRows(rows) {
   const path = focusedRow?.dataset.path;
   const action = focused.dataset.action;
   const index = Array.from(rowsList.children).indexOf(focusedRow);
+  const selectedIndex = Array.from(rowsList.children).findIndex((item) => item.dataset.path === selectedPath);
   rowsList.replaceChildren(...treeRowElements(rows));
+  const selected = rows.find((row) => row.path === selectedPath) || rows[Math.max(0, Math.min(selectedIndex, rows.length - 1))];
+  selectRow(selected?.path);
+  if (focused === rowVisibility && rowVisibility.disabled) rowNote.focus({ preventScroll: true });
   if (index >= 0) {
     const replacement = Array.from(rowsList.children).find((row) => row.dataset.path === path)
       || rowsList.children[Math.min(index, rowsList.children.length - 1)];
@@ -364,6 +366,10 @@ function render(data, opening = false) {
   document.querySelectorAll(".dialog-error").forEach((node) => { node.hidden = true; });
   clearCountdown();
   const previous = editor;
+  showSettings(data, !opening && Boolean(previous?.rows.length));
+  if (opening) selectedPath = "";
+  presentPreview(data, prepared);
+  pendingDraft = null;
   editor = {
     owner: data.repository.owner,
     repo: data.repository.name,
@@ -377,35 +383,32 @@ function render(data, opening = false) {
     loaded: data.loaded,
     region: data.region,
   };
-  showSettings(data, !opening && Boolean(previous?.rows.length));
-  document.getElementById("tree-document").textContent = displayPath(data.document);
-  document.querySelector(".caption-label").textContent = data.document ? "treestamp for " : "treestamp";
-  document.querySelector(".canvas-caption").classList.toggle("no-document", !data.document);
-  loadedNote.textContent = data.loaded ? "Document opened" : "";
-  loadedNote.hidden = !data.loaded;
-  stageStatus.textContent = opening && data.loaded
-    ? (data.dirty ? "Treestamp updated" : "Treestamp is up to date") : "";
-  status.textContent = "";
   if (opening) {
     editingSession += 1;
     queue = Promise.resolve(true);
   }
+  history.replaceState(null, "", prepared.address);
+  saveDraft(prepared.address);
+}
+
+// Render validated data without changing the accepted session, URL, or draft.
+function presentPreview(data, prepared) {
+  presented = { data, prepared };
+  document.getElementById("tree-document").textContent = displayPath(data.document);
+  document.querySelector(".canvas-caption").hidden = !data.document;
+  status.textContent = "";
 
   document.querySelectorAll("[data-repo-branch]").forEach((node) => { node.textContent = data.repository.default_branch || "Unavailable"; });
   document.querySelectorAll("[data-repo-commit]").forEach((node) => { node.textContent = data.ref.commit; });
   visitRepo.href = data.repository.url;
   visitRepo.hidden = false;
 
-  const address = prepared.address;
   repoInfo.disabled = false;
-  // A pasted link is long enough to be unreadable in the field; the repository it
-  // resolved to is not. Only a fresh open rewrites it, so typing is never disturbed.
-  if (normalizeField) {
-    fields.url.value = `${data.repository.owner}/${data.repository.name}`;
-    normalizeField = false;
-  }
+  document.getElementById("reset-tree").disabled = false;
+  renderRepository(document.getElementById("active-repository"), `${data.repository.owner}/${data.repository.name}`);
+  fields.url.value = `${data.repository.owner}/${data.repository.name}`;
 
-  renderRows(editor.rows);
+  renderRows(prepared.rows);
   document.getElementById("tree-attribution").hidden = !data.state.curation.settings.attribution;
 
   renderRegion(data.region);
@@ -413,12 +416,10 @@ function render(data, opening = false) {
   copyLabel.textContent = "Copy treestamp";
   setCopyStatus("");
   copy.classList.remove("copied");
-  notice.hidden = true;
   const hiddenCount = data.state.curation.hidden.length;
   revealLabel.textContent = hiddenCount ? `Reveal hidden entries (${hiddenCount})` : "Reveal hidden entries";
   showAll.disabled = hiddenCount === 0;
   document.body.classList.remove("no-tree");
-  history.replaceState(null, "", address);
 }
 
 // The marker and config lines are shown quietly so the tree reads first; the text is unchanged.
@@ -431,45 +432,124 @@ function renderRegion(text) {
   }));
 }
 
-// A one-line confirmation under the tree with a way back, for changes that remove a row.
-let noticePath = null;
-function showNotice(text, undoPath) {
-  noticeText.textContent = text;
-  noticePath = undoPath;
-  noticeUndo.hidden = undoPath === null;
-  notice.hidden = false;
-}
-noticeUndo.addEventListener("click", async () => {
-  if (noticePath === null || noticeUndo.getAttribute("aria-disabled") === "true") return;
-  const path = noticePath;
-  const session = editingSession;
-  let restoreFocus = document.activeElement === noticeUndo;
-  const trackFocus = (event) => { if (event.target !== noticeUndo) restoreFocus = false; };
-  document.addEventListener("focusin", trackFocus);
-  // Keep the focused action present while saving, and available again on failure.
-  noticeUndo.setAttribute("aria-disabled", "true");
-  try {
-    const saved = await operate("unhide", path);
-    if (!saved || session !== editingSession || !restoreFocus) return;
-    const restored = Array.from(rowsList.children).find((row) => row.dataset.path === path);
-    restored?.focus({ preventScroll: true });
-    restored?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  } finally {
-    document.removeEventListener("focusin", trackFocus);
-    noticeUndo.removeAttribute("aria-disabled");
-  }
-});
-
-// A first load failed and there is no tree to keep showing.
-function leaveStage() {
-  stageStatus.textContent = "No tree";
-}
-
 // ---------- requests
 
-// Previews abort whatever is in flight. Operations never abort: each one waits for the
-// previous response so it carries the newest state, which is what keeps notes from being lost.
+function rememberPreviewDOM() {
+  // Keep the actual nodes so cancellation also preserves selection and controls
+  // when there was no accepted tree yet (for example, a saved draft on startup).
+  const containers = [rowsList, region, document.getElementById("active-repository")];
+  const contents = containers.map((node) => [node, [...node.childNodes]]);
+  const nodes = [
+    document.getElementById("tree-document"), document.querySelector(".canvas-caption"),
+    status, visitRepo, repoInfo, errorPanel,
+    document.getElementById("reset-tree"), document.getElementById("tree-attribution"),
+    copy, copyLabel, copyStatus, revealLabel, showAll, rowNote, rowVisibility, selectedPathLabel,
+    ...document.querySelectorAll("[data-repo-branch], [data-repo-commit]"),
+  ];
+  const attributes = nodes.map((node) => [node, [...node.attributes].map(({ name, value }) => [name, value])]);
+  // Only leaf labels have their text replaced; restoring a button's text would
+  // discard its icon and other child elements.
+  const labels = nodes.filter((node) => !node.children.length).map((node) => [node, node.textContent]);
+  return () => {
+    for (const [node, children] of contents) node.replaceChildren(...children);
+    for (const [node, saved] of attributes) {
+      for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
+      for (const [name, value] of saved) node.setAttribute(name, value);
+    }
+    for (const [node, text] of labels) node.textContent = text;
+  };
+}
+
+function presentIncoming(body, prepared, ticket) {
+  const entry = document.getElementById("entry");
+  const workspace = document.getElementById("workspace");
+  const restoreDOM = rememberPreviewDOM();
+  const previous = {
+    presented, selectedPath, values: formValues(), url: fields.url.value,
+    view: stage.dataset.view, entryHidden: entry.hidden, workspaceHidden: workspace.hidden,
+    choosing: document.body.classList.contains("choosing-source"),
+    empty: document.body.classList.contains("no-tree"),
+  };
+  provisional = { ticket, restore() {
+    presented = previous.presented;
+    selectedPath = previous.selectedPath;
+    restoreDOM();
+    setValues(previous.values);
+    fields.url.value = previous.url;
+    selectTab(previous.view || "editor");
+    entry.hidden = previous.entryHidden;
+    workspace.hidden = previous.workspaceHidden;
+    document.body.classList.toggle("choosing-source", previous.choosing);
+    document.body.classList.toggle("no-tree", previous.empty);
+  } };
+  errorPanel.hidden = true;
+  selectedPath = "";
+  showSettings(body, false);
+  presentPreview(body, prepared);
+  selectTab("editor");
+  entry.hidden = true;
+  workspace.hidden = false;
+  document.body.classList.remove("choosing-source");
+  // The request has finished; only acceptance is pending while notes are reviewed.
+  rowsList.setAttribute("aria-busy", "true");
+  status.classList.remove("busy");
+  status.textContent = "Review notes";
+}
+
+function restoreIncoming(ticket = provisional?.ticket) {
+  if (!provisional || provisional.ticket !== ticket) return;
+  const pending = provisional;
+  provisional = null;
+  pending.restore();
+}
+
+function finishIncoming(ticket, opening) {
+  if (ticket === generation && rowsList.getAttribute("aria-busy") === "true") setBusy(false, opening);
+  restoreIncoming(ticket);
+}
+
+async function acceptResponse(body, opening, ticket) {
+  try {
+    const prepared = preparePreview(body, window.location.origin);
+    if (opening && body.placement?.total > 0) {
+      // Validate the transfer tree before exposing either part of the preview.
+      preparePreview({ ...body, rows: body.placement.rows }, window.location.origin);
+      presentIncoming(body, prepared, ticket);
+      body = await placement.run(body);
+    }
+    if (!body || ticket !== generation) return false;
+    setBusy(false, opening);
+    render(body, opening);
+    if (provisional?.ticket === ticket) provisional = null;
+    return true;
+  } catch (err) {
+    if (ticket === generation) setBusy(false, opening);
+    restoreIncoming(ticket);
+    if (ticket !== generation) return false;
+    showError("The page could not display the treestamp.", String(err && err.message), null);
+    return false;
+  } finally {
+    finishIncoming(ticket, opening);
+  }
+}
+
+function rejectResponse(body, responseStatus) {
+  const error = (body && body.error) || {};
+  const message = error.message || `The service returned status ${responseStatus}.`;
+  const hint = error.code === "snapshot_unavailable" && !editor?.rows.length
+    ? document.getElementById("entry").hidden
+      ? "Choose the treestamp wordmark to return to the start page."
+      : "Browse the repository to start a new treestamp."
+    : hintFor(error.code, responseStatus);
+  showError(message, hint, error.retry_after || null);
+  return false;
+}
+
+// Previews cancel earlier previews. Edits run sequentially so each request
+// uses the preceding accepted state.
 async function call(url, init, { abortable }) {
+  restoreIncoming();
+  placement.cancel();
   if (controller) controller.abort();
   const mine = new AbortController();
   if (abortable) controller = mine;
@@ -483,30 +563,19 @@ async function call(url, init, { abortable }) {
   } catch (err) {
     if (mine.signal.aborted || ticket !== generation) return false;
     setBusy(false, abortable);
-    if (!editor?.rows.length) leaveStage();
     showError("Could not reach the service.", "Check your connection and try again.", null);
     return false;
   }
   if (mine.signal.aborted || ticket !== generation) return false;
   setBusy(false, abortable);
-  if (response.ok && body) {
-    try { render(body, abortable); } catch (err) { showError("The page could not display the tree.", String(err && err.message), null); return false; }
-    return true;
-  }
-  if (!editor?.rows.length) leaveStage();
-  const error = (body && body.error) || {};
-  const message = error.message || `The service returned status ${response.status}.`;
-  showError(message, hintFor(error.code, response.status), error.retry_after || null);
-  return false;
+  if (response.ok && body) return acceptResponse(body, abortable, ticket);
+  return rejectResponse(body, response.status);
 }
-
-let normalizeField = false;
 
 async function preview(params) {
   const session = editingSession;
   await queue;
   if (session !== editingSession) return false;
-  normalizeField = true;
   if (params instanceof URLSearchParams) return call(`/api/preview?${params}`, {}, { abortable: true });
   return call("/api/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) }, { abortable: true });
 }
@@ -611,6 +680,7 @@ repoInfo.addEventListener("click", () => {
   repoInfo.focus({ preventScroll: true });
   repoTooltipRestoringFocus = true;
   repoTooltip.hidden = true;
+  renderRepository(document.getElementById("repo-info-name"), fields.url.value);
   repoInfoDialog.showModal();
 });
 repoInfoDialog.addEventListener("close", () => {
@@ -644,12 +714,14 @@ function navigateTree(key, saved) {
   const index = editor.rows.findIndex((row) => row.path === item?.dataset.path);
   if (index < 0) return saved;
   const pane = rowsList.parentElement.getBoundingClientRect();
-  const visibleHeight = Math.min(pane.bottom, window.innerHeight) - Math.max(pane.top, 0);
+  const toolbar = treeToolbar.getBoundingClientRect();
+  const visibleHeight = Math.min(pane.bottom, window.innerHeight) - Math.max(pane.top, toolbar.bottom, 0);
   const pageSize = Math.max(1, Math.floor(visibleHeight / item.getBoundingClientRect().height) - 1);
   const next = treeNavigation(editor.rows, editor.state.curation.expanded.map(pathKey), index, key, pageSize);
   if (next.operation) return sendOperation(next.operation, item.dataset.path);
   const target = rowsList.children[next.index];
   target.focus({ preventScroll: true });
+  rowsList.style.setProperty("--selection-toolbar-height", `${toolbar.height}px`);
   target.scrollIntoView({ block: "nearest", inline: "nearest" });
   // Moving the selection must not clear a failed edit before the next Copy.
   return saved;
@@ -685,10 +757,7 @@ function runTreeCommand(key, saved) {
 }
 
 function toggleRowVisibility(row) {
-  return sendOperation(row.hidden ? "unhide" : "hide", row.path).then((ok) => {
-    if (ok && !row.hidden) showNotice(`Hidden ${rowName(row)}`, row.path);
-    return ok;
-  });
+  return sendOperation(row.hidden ? "unhide" : "hide", row.path);
 }
 
 function cycleCounts() {
@@ -711,119 +780,119 @@ rowsList.addEventListener("keydown", (event) => {
   enqueueEdit((saved) => runTreeCommand(event.key, saved));
 });
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  openLoadDialog();
+const entryFlow = new EntryFlow({
+  onCreate({ url, root }) {
+    return preview({ url, root, document: "" });
+  },
+  onOpen({ url, document }) {
+    return preview({ url, document });
+  },
+  onExample() { loadExample("treestamp"); },
+  onCancel: resumeSession,
 });
 
-let loadTarget = "";
-let confirmingLoad = false;
-let sourceBeforeDialog = null;
-let originalSource = {};
-let loadMode = "new";
+function browseRepository(repo) {
+  if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  repoTooltip.hidden = true;
+  entryFlow.browse(repo, { canReturn: Boolean(editor?.rows.length || pendingDraft) });
+}
 
-function selectLoadTab(mode) {
-  loadMode = mode;
-  for (const key of Object.keys(loadTabs)) {
-    const active = key === mode;
-    loadTabs[key].setAttribute("aria-selected", String(active));
-    loadTabs[key].tabIndex = active ? 0 : -1;
-    loadPanels[key].hidden = !active;
+function openWelcome() {
+  if (entryFlow.busy) return;
+  if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  repoTooltip.hidden = true;
+  const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
+  entryFlow.welcome(repo, Boolean(editor?.rows.length || pendingDraft));
+}
+
+async function resumeSession() {
+  if (editor?.rows.length) {
+    entryFlow.hide();
+    fields.url.value = `${editor.owner}/${editor.repo}`;
+    errorPanel.hidden = true;
+    tabs[stage.dataset.view || "editor"].focus({ preventScroll: true });
+    return;
   }
-  fields.root.disabled = mode !== "new";
-  fields.document.disabled = mode !== "document";
-  reloadButton.textContent = mode === "new" ? "Create treestamp" : "Load document";
-  reloadSettings.querySelector(".dialog-error").hidden = true;
+  if (!pendingDraft || entryFlow.busy) return;
+  const address = new URL(pendingDraft.address, window.location.origin);
+  const example = exampleAt(pendingDraft.address);
+  if (example) { loadExample(example[0]); return; }
+  const { owner, repo, sha, saved } = parseRoute(address.pathname, address.hash);
+  editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };
+  fields.url.value = `${owner}/${repo}`;
+  setValues(valuesFromSettings(saved.curation.settings));
+  entryFlow.clearError();
+  entryFlow.setBusy(true);
+  try {
+    if (await operate("restore")) entryFlow.hide(true);
+  } finally {
+    entryFlow.setBusy(false);
+  }
 }
 
-function openLoadDialog() {
-  loadTarget = fields.url.value.trim();
-  sourceBeforeDialog = {
-    root: fields.root.value,
-    document: fields.document.value,
-  };
-  const sameRepo = editor && loadTarget === `${editor.owner}/${editor.repo}`;
-  originalSource = sameRepo ? { root: editor.root, document: editor.loaded ? editor.document : "" } : {};
-  fields.document.value = sameRepo && editor.loaded ? displayPath(editor.document) : DEFAULT_DOCUMENT;
-  fields.root.value = sameRepo ? displayPath(editor.root) : ".";
-  selectLoadTab(sameRepo && editor.loaded ? "document" : "new");
-  document.getElementById("load-target").textContent = loadTarget;
-  reloadSettings.querySelector(".dialog-error").hidden = true;
-  submit.focus({ preventScroll: true });
-  reloadSettings.showModal();
-  const input = loadMode === "new" ? fields.root : fields.document;
-  input.focus();
-  input.select();
+document.querySelector(".wordmark").addEventListener("click", (event) => {
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  if (entryFlow.busy || (!editor?.rows.length && rowsList.getAttribute("aria-busy") === "true")) return;
+  openWelcome();
+});
+
+const resetDialog = document.getElementById("reset-dialog");
+const resetConfirm = document.getElementById("reset-confirm");
+document.getElementById("reset-tree").addEventListener("click", () => {
+  resetDialog.querySelector(".dialog-error").hidden = true;
+  resetDialog.showModal();
+  document.getElementById("reset-cancel").focus();
+});
+document.getElementById("reset-cancel").addEventListener("click", () => resetDialog.close());
+resetDialog.addEventListener("cancel", (event) => {
+  if (resetConfirm.disabled) event.preventDefault();
+});
+
+async function resetTree() {
+  await waitForEdits();
+  const revealed = reveal.checked;
+  reveal.checked = false;
+  const example = Object.entries(EXAMPLES).find(([, data]) =>
+    data.state.generation === editor.state.generation);
+  if (example) {
+    loadExample(example[0]);
+    return true;
+  }
+  const accepted = await operate("reset");
+  if (!accepted) reveal.checked = revealed;
+  return accepted;
 }
 
-// Display controls apply immediately; source fields wait for Load repo confirmation.
+resetConfirm.addEventListener("click", async () => {
+  resetConfirm.disabled = true;
+  document.getElementById("reset-cancel").disabled = true;
+  try {
+    if (await resetTree()) resetDialog.close();
+  } finally {
+    resetConfirm.disabled = false;
+    document.getElementById("reset-cancel").disabled = false;
+  }
+});
+
+// Presentation changes apply to the current draft; entry choices stay provisional.
 for (const name of ["style", "show_counts", "attribution"]) {
   fields[name].addEventListener("change", () => { if (editor) operate("present"); });
 }
-reloadButton.addEventListener("click", async () => {
-  if (confirmingLoad) return;
-  if (loadMode === "document" && !fields.document.reportValidity()) return;
-  const selection = sourceSelection(formValues(), originalSource);
-  const source = loadMode === "new" ? { root: selection.root, document: "" } : { document: selection.document };
-  const params = { url: loadTarget, ...source };
-  confirmingLoad = true;
-  const cancel = reloadSettings.querySelector('form[method="dialog"] button');
-  cancel.disabled = true;
-  for (const tab of Object.values(loadTabs)) tab.disabled = true;
-  fields.root.disabled = true;
-  fields.document.disabled = true;
-  try {
-    if (await preview(params)) {
-      sourceBeforeDialog = null;
-      reloadSettings.close();
-    }
-  } finally {
-    confirmingLoad = false;
-    cancel.disabled = false;
-    for (const tab of Object.values(loadTabs)) tab.disabled = false;
-    fields.root.disabled = loadMode !== "new";
-    fields.document.disabled = loadMode !== "document";
-  }
-});
-reloadSettings.addEventListener("cancel", (event) => {
-  if (confirmingLoad) event.preventDefault();
-});
-reloadSettings.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.isComposing && event.target.matches("input")) {
-    event.preventDefault();
-    reloadButton.click();
-  }
-});
-Object.entries(loadTabs).forEach(([mode, tab]) => {
-  tab.addEventListener("click", () => selectLoadTab(mode));
-  tab.addEventListener("keydown", (event) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    event.preventDefault();
-    const next = event.key === "Home" ? "new" : event.key === "End" ? "document" : mode === "new" ? "document" : "new";
-    selectLoadTab(next);
-    loadTabs[next].focus();
-  });
-});
-fields.document.addEventListener("input", () => {
-  reloadSettings.querySelector(".dialog-error").hidden = true;
-});
 reveal.addEventListener("change", () => { if (editor) operate("restore"); });
 showAll.addEventListener("click", () => { if (editor) operate("unhide_all"); });
 
-document.querySelectorAll("button[data-example]").forEach((button) => {
-  button.addEventListener("click", () => loadExample(button.dataset.example));
-});
-
 function loadExample(name) {
+  restoreIncoming();
+  placement.cancel();
   if (controller) controller.abort();
   controller = null;
   generation += 1;
   editingSession += 1;
   queue = Promise.resolve(true);
-  normalizeField = true;
   reveal.checked = false;
   render(structuredClone(EXAMPLES[name]), true);
+  entryFlow.hide(true);
   setBusy(false, true);
 }
 
@@ -862,13 +931,13 @@ copy.addEventListener("click", async () => {
       return;
     }
     if (typeof editor.region !== "string") {
-      setCopyStatus("No draft to copy");
+      setCopyStatus("No treestamp to copy");
       return;
     }
     const copied = await copyText(region.textContent, region);
     copyLabel.textContent = copied ? "Copied" : "Copy treestamp";
     copy.classList.toggle("copied", copied);
-    const destination = !saved ? "Copied previous draft" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
+    const destination = !saved ? "Copied previous treestamp" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
     setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Markdown and select the block to copy it manually.");
   } finally {
     copy.disabled = typeof editor?.region !== "string";
@@ -876,6 +945,10 @@ copy.addEventListener("click", async () => {
 });
 
 function selectTab(name) {
+  const editing = name === "editor";
+  if (!editing && settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
+  settingsPanel.hidden = !editing;
+  settingsTrigger.hidden = !editing;
   stage.dataset.view = name;
   for (const key of tabNames) {
     const active = key === name;
@@ -885,17 +958,9 @@ function selectTab(name) {
   }
 }
 
-reloadSettings.addEventListener("close", () => {
-  if (reloadSettings.open) return;
-  if (sourceBeforeDialog) setValues(sourceBeforeDialog);
-  sourceBeforeDialog = null;
-});
-
-// Wide layouts show settings and examples in the sidebar; narrow layouts reveal them on demand.
+// Wide layouts show settings in the sidebar; narrow layouts use a popover.
 const wideLayout = matchMedia("(min-width: 64rem)");
-examples.open = wideLayout.matches;
 wideLayout.addEventListener("change", (event) => {
-  examples.open = event.matches;
   if (event.matches && settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
 });
 
@@ -916,25 +981,48 @@ Object.entries(tabs).forEach(([name, tab]) => {
 });
 
 // Permalinks: /owner/repo or /owner/repo@sha, settings in the query, curation in the fragment.
+function exampleAt(address) {
+  return Object.entries(EXAMPLES).find(([, data]) => addressFor(data.permalink, data.state, window.location.origin) === address);
+}
+
 (function boot() {
+  if (pendingDraft) {
+    const address = new URL(pendingDraft.address, window.location.origin);
+    const { owner, repo } = parseRoute(address.pathname, address.hash);
+    fields.url.value = `${owner}/${repo}`;
+    if (window.location.pathname === "/") entryFlow.welcome(fields.url.value, true);
+    else browseRepository(fields.url.value);
+    return;
+  }
   const route = parseRoute(window.location.pathname, window.location.hash);
   const query = new URLSearchParams(window.location.search);
   try { setValues(valuesFromQuery(query)); }
-  catch (error) { showError(error.message, "", null); leaveStage(); return; }
+  catch (error) { showError(error.message, "", null); return; }
   const address = window.location.pathname + window.location.search + window.location.hash;
-  const example = Object.entries(EXAMPLES).find(([, data]) => addressFor(data.permalink, data.state, window.location.origin) === address);
-  if (!route || example) {
-    // The landing page and unchanged example links open from bundled snapshots.
-    loadExample(example ? example[0] : "reponomics-dashboard");
+  const example = exampleAt(address);
+  if (example) {
+    loadExample(example[0]);
+    return;
+  }
+  if (!route) {
+    entryFlow.welcome();
     return;
   }
   const { owner, repo, sha, saved } = route;
+  fields.url.value = `${owner}/${repo}`;
+  renderRepository(document.getElementById("active-repository"), `${owner}/${repo}`);
   if (window.location.hash.startsWith("#s=") && !saved) {
-    showError("This link contains invalid editing state.", "Open the repository to create a new draft.", null);
+    entryFlow.hide();
+    showError("This link contains invalid editing state.", "Open the repository to create a new treestamp.", null);
     return;
   }
   if (!query.has("document")) fields.document.value = DEFAULT_DOCUMENT;
-  fields.url.value = `${owner}/${repo}`;
+  if (!sha && !saved && !window.location.search && !window.location.hash) {
+    browseRepository(`${owner}/${repo}`);
+    return;
+  }
+  // Captured sessions and explicit source settings open the editor directly.
+  entryFlow.hide();
   const fresh = () => {
     const params = settingsParams();
     params.set("owner", owner);
@@ -945,7 +1033,7 @@ Object.entries(tabs).forEach(([name, tab]) => {
   };
   if (saved) {
     if (!sha || !saved.source || !saved.curation?.settings) {
-      showError("This link does not contain a valid captured editing session.", "Open the repository to create a new draft.", null);
+      showError("This link does not contain a valid captured editing session.", "Open the repository to create a new treestamp.", null);
       return;
     }
     editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };

@@ -16,9 +16,15 @@ pytestmark = pytest.mark.browser
 
 
 def open_editor(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     page.wait_for_selector("#rows .row")
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
+
+
+def browse_other_repository(page: Page, repository: str) -> None:
+    page.locator(".wordmark").click()
+    page.locator("#entry-url").fill(repository)
+    page.locator("#entry-browse").click()
 
 
 @pytest.fixture
@@ -34,15 +40,15 @@ def touch_page(browser: Browser) -> Iterator[Page]:
         context.close()
 
 
-def test_the_page_opens_on_the_bundled_example_without_a_request(
+def test_exploring_the_example_opens_it_without_a_request(
     page: Page, service: str
 ) -> None:
     page.route("**/api/preview*", lambda route: route.abort())
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     expect(page.locator("#rows .row")).not_to_have_count(0)
-    expect(page.locator("#url")).to_have_value("reponomics/reponomics-dashboard")
+    expect(page.locator("#url")).to_have_value("reponomics/treestamp")
     expect(page.locator("#error")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_be_hidden()
     expect(page.locator("#status")).to_have_text("")
 
 
@@ -54,19 +60,19 @@ def test_a_failed_load_keeps_the_open_tree(page: Page, service: str) -> None:
             status=503, json={"error": {"message": "Repository unavailable."}}
         ),
     )
-    page.fill("#url", "fixture/elsewhere")
-    page.click("#submit")
-    expect(page.locator("#reload")).to_have_text("Create treestamp")
-    page.click("#reload")
+    browse_other_repository(page, "fixture/elsewhere")
+    expect(page.locator("#source-create")).to_be_enabled()
+    page.click("#source-create")
     expect(page.locator("#reload-error")).to_contain_text("Repository unavailable.")
     expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#rows .row")).to_have_count(9)
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#copy")).to_be_visible()
 
 
-@pytest.mark.parametrize("close", ["Cancel", "Escape"])
 def test_cancelling_load_preserves_tree_and_restores_source_fields(
-    page: Page, service: str, close: str
+    page: Page, service: str
 ) -> None:
     open_editor(page, service)
     original_region = page.locator("#region").text_content()
@@ -80,20 +86,14 @@ def test_cancelling_load_preserves_tree_and_restores_source_fields(
             previews.append(request.url) if "/api/preview" in request.url else None
         ),
     )
-    page.locator("#url").fill("fixture/another-repository")
-    page.locator("#submit").click()
+    browse_other_repository(page, "fixture/another-repository")
     expect(page.locator("#reload-settings")).to_be_visible()
-    expect(page.locator("#reload")).to_have_text("Create treestamp")
-    page.locator("#load-tab-document").click()
-    page.locator("#document").fill("docs/README.md")
-    if close == "Cancel":
-        page.locator("#reload-settings").get_by_role(
-            "button", name="Cancel", exact=True
-        ).click()
-    else:
-        page.keyboard.press("Escape")
+    expect(page.locator("#source-create")).to_be_enabled()
+    page.locator('.source-row[data-path="src"]').click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
-    expect(page.locator("#submit")).to_be_focused()
+    expect(page.locator("#tab-editor")).to_be_focused()
     expect(page.locator("#document")).to_have_value(initial_document)
     expect(page.locator("#root")).to_have_value(initial_root)
     assert page.locator("#region").text_content() == original_region
@@ -106,7 +106,8 @@ def test_dismissing_error_preserves_draft_and_allows_later_errors(
 ) -> None:
     open_editor(page, service)
     row = page.locator('.row[data-path="src"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("Preserve this annotation")
     page.locator("#note-save").click()
     expect(row.locator(".note")).to_contain_text("Preserve this annotation")
@@ -119,18 +120,20 @@ def test_dismissing_error_preserves_draft_and_allows_later_errors(
         ),
     )
 
-    row.get_by_role("button", name="Hide", exact=True).click()
+    row.focus()
+    page.locator("#row-visibility").click()
     expect(page.locator("#error")).to_contain_text("Could not hide this entry.")
     dismiss = page.get_by_role("button", name="Dismiss error", exact=True)
     dismiss.focus()
     dismiss.press("Enter")
     expect(page.locator("#error")).to_be_hidden()
-    expect(page.locator("#url")).to_be_focused()
+    expect(page.locator("#tab-editor")).to_be_focused()
     expect(row.locator(".note")).to_contain_text("Preserve this annotation")
     assert page.locator("#region").text_content() == original_region
     assert page.url == original_address
 
-    row.get_by_role("button", name="Hide", exact=True).click()
+    row.focus()
+    page.locator("#row-visibility").click()
     expect(page.locator("#error")).to_contain_text("Could not hide this entry.")
     expect(dismiss).to_be_visible()
 
@@ -152,11 +155,12 @@ def test_keyboard_fold_preserves_focus(page: Page, service: str) -> None:
 def test_saving_note_returns_focus_to_its_action(page: Page, service: str) -> None:
     open_editor(page, service)
     row = page.locator('.row[data-path="src"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("application code")
     page.locator("#note-text").press("Enter")
     expect(row.locator(".note")).to_have_text("# application code")
-    expect(row.locator('[data-action="note"]')).to_be_focused()
+    expect(page.locator("#row-note")).to_be_focused()
 
 
 @pytest.mark.parametrize("path", ["", "src"])
@@ -165,7 +169,8 @@ def test_note_action_edits_existing_annotation_without_changing_label(
 ) -> None:
     open_editor(page, service)
     row = page.locator(f'.row[data-path="{path}"]')
-    action = row.get_by_role("button", name="Note", exact=True)
+    row.focus()
+    action = page.get_by_role("button", name="Note", exact=True)
     action.click()
     page.locator("#note-text").fill("first note")
     page.locator("#note-save").click()
@@ -203,7 +208,8 @@ def test_note_dialog_blocks_copy_until_explicit_save_finishes(
         };
     """)
     open_editor(page, service)
-    page.locator('.row[data-path="src"] [data-action="note"]').click()
+    page.locator('.row[data-path="src"]').focus()
+    page.locator("#row-note").click()
     note = page.locator("#note-text")
     note.fill("latest note for document")
     assert page.locator("#note-dialog").evaluate("dialog => dialog.matches(':modal')")
@@ -259,16 +265,14 @@ def test_invalid_candidate_keeps_the_accepted_draft(
         route.fulfill(response=response, json=body)
 
     page.route("**/api/preview*", invalid_candidate)
-    page.locator("#url").fill("fixture/replacement")
-    page.locator("#submit").click()
-    page.locator("#reload").click()
-    expect(page.locator("#reload-error")).to_contain_text("previous draft is unchanged")
+    browse_other_repository(page, "fixture/replacement")
+    page.locator("#source-create").click()
+    expect(page.locator("#reload-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
-    page.locator("#reload-settings").get_by_role(
-        "button", name="Cancel", exact=True
-    ).click()
+    page.locator("#entry-change-repo").click()
+    page.locator("#entry-return-welcome").click()
     expect(page.locator("#copy")).to_be_enabled()
 
 
@@ -279,11 +283,12 @@ def test_note_save_rejects_unprintable_candidate_without_replacing_draft(
     original_region = page.locator("#region").text_content()
     original_address = page.url
     page.route("**/api/op", refuse_export)
-    page.locator('.row[data-path="src"] [data-action="note"]').click()
+    page.locator('.row[data-path="src"]').focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("last edit")
     page.locator("#note-save").click()
     expect(page.locator("#note-dialog")).to_be_visible()
-    expect(page.locator("#note-error")).to_contain_text("previous draft is unchanged")
+    expect(page.locator("#note-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#region")).to_have_text(original_region)
     assert page.url == original_address
     page.locator("#note-cancel").click()
@@ -313,6 +318,7 @@ def test_rejected_presentation_restores_accepted_controls(
     page.locator("#style").select_option("ascii")
     expect(page.locator("#error")).to_be_visible()
     expect(page.locator("#style")).to_have_value("unicode")
+    page.locator("#tab-editor").click()
     page.locator("#show_counts").uncheck()
     expect(page.locator("#show_counts")).to_be_checked()
     page.locator("#attribution").check()
@@ -336,9 +342,7 @@ def test_attribution_toggle_updates_copy_and_survives_reload(
     open_editor(page, service)
     if tui_mode:
         page.locator("#tui-mode").click()
-    attribution = page.get_by_role(
-        "checkbox", name="Add “Maintained with treestamp” footer"
-    )
+    attribution = page.get_by_role("checkbox", name="Add treestamp footer")
     trailer = "Maintained with [treestamp](https://github.com/reponomics/treestamp)"
     expect(attribution).not_to_be_checked()
     visible_trailer = page.locator("#tree-attribution")
@@ -409,7 +413,8 @@ def test_failed_note_stays_modal_and_does_not_copy_stale_output(
             status=503, json={"error": {"message": "Could not save the edit."}}
         ),
     )
-    page.locator('.row[data-path="src"] [data-action="note"]').click()
+    page.locator('.row[data-path="src"]').focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("unsaved note")
     page.locator("#note-save").click()
     expect(page.locator("#note-dialog .dialog-error")).to_contain_text(
@@ -449,14 +454,13 @@ def test_reopening_after_a_failed_edit_allows_copy(
     page.locator('.row[data-path="docs"] .fold').click()
     expect(page.locator("#error")).to_be_visible()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous draft")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
     assert page.evaluate("window.copiedBlocks") == [original_region]
-    page.locator("#url").fill("fixture/reopened")
-    page.locator("#submit").click()
-    page.locator("#reload").click()
+    browse_other_repository(page, "fixture/reopened")
+    page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#url")).to_have_value("fixture/reopened")
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.locator("#copy").click()
     expect(page.locator("#copy-label")).to_have_text("Copied")
     assert len(page.evaluate("window.copiedBlocks")) == 2
@@ -478,7 +482,8 @@ def test_failed_note_can_be_retried_or_cancelled(
     """)
     open_editor(page, service)
     row = page.locator('.row[data-path="src"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     note = page.locator("#note-text")
     note.fill("unsaved note")
     page.route(
@@ -504,7 +509,7 @@ def test_failed_note_can_be_retried_or_cancelled(
             note.press("Escape")
         expect(row.locator(".note")).to_have_count(0)
     expect(page.locator("#note-dialog")).to_be_hidden()
-    expect(row.locator('[data-action="note"]')).to_be_focused()
+    expect(page.locator("#row-note")).to_be_focused()
     page.locator("#copy").click()
     expect(page.locator("#copy-label")).to_have_text("Copied")
     copied = page.evaluate("window.copiedBlocks[0]")
@@ -524,7 +529,8 @@ def test_cancelling_failed_note_preserves_an_earlier_failed_edit(
     )
     page.locator('.row[data-path="docs"] .fold').click()
     expect(page.locator("#error")).to_be_visible()
-    page.locator('.row[data-path="src"] [data-action="note"]').click()
+    page.locator('.row[data-path="src"]').focus()
+    page.locator("#row-note").click()
     note = page.locator("#note-text")
     note.fill("unsaved note")
     with page.expect_response("**/api/op"):
@@ -533,7 +539,7 @@ def test_cancelling_failed_note_preserves_an_earlier_failed_edit(
     note.press("Escape")
     expect(page.locator("#note-dialog")).to_be_hidden()
     page.locator("#copy").click()
-    expect(page.locator("#copy-status")).to_have_text("Copied previous draft")
+    expect(page.locator("#copy-status")).to_have_text("Copied previous treestamp")
 
 
 @pytest.mark.parametrize("close", ["Cancel", "Escape"])
@@ -549,7 +555,8 @@ def test_note_blur_does_not_save_and_cancellation_discards_draft(
         ),
     )
     row = page.locator('.row[data-path="src"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     note = page.locator("#note-text")
     note.fill("unsaved note")
     page.locator("#note-cancel").focus()
@@ -562,8 +569,9 @@ def test_note_blur_does_not_save_and_cancellation_discards_draft(
         page.keyboard.press("Escape")
     expect(page.locator("#note-dialog")).to_be_hidden()
     expect(row.locator(".note")).to_have_count(0)
-    expect(row.locator('[data-action="note"]')).to_be_focused()
-    row.locator('[data-action="note"]').click()
+    expect(page.locator("#row-note")).to_be_focused()
+    row.focus()
+    page.locator("#row-note").click()
     expect(note).to_have_value("")
     assert operations == []
 
@@ -593,7 +601,6 @@ def test_tree_edit_keeps_opener_status_and_settings_position(
     expect(page.locator("html")).to_have_attribute("data-edit-pending", "true")
     expect(page.locator("#rows")).to_have_attribute("aria-busy", "true")
     expect(page.locator("#status")).to_have_text(initial_status)
-    expect(page.locator("#submit")).to_be_enabled()
     pending_box = settings.bounding_box()
     assert pending_box is not None
     assert pending_box["y"] == pytest.approx(initial_box["y"], abs=1)
@@ -605,29 +612,25 @@ def test_tree_edit_keeps_opener_status_and_settings_position(
     assert final_box["y"] == pytest.approx(initial_box["y"], abs=1)
 
 
-def test_tapping_a_row_offers_its_actions_within_the_pane(
+def test_tapping_a_row_identifies_the_toolbar_target(
     touch_page: Page, service: str
 ) -> None:
-    """Without hover the row must still offer its actions, and inside the pane:
-    the actions used to be laid out past the right edge of the horizontal scroll."""
     page = touch_page
     open_editor(page, service)
     row = page.locator('.row[data-path="src/app.py"]')
-    actions = row.locator(".row-actions")
-    expect(actions).to_have_css("opacity", "0")
-
     row.locator(".name").tap()
-    assert page.evaluate("document.activeElement.dataset.path") == "src/app.py"
-    expect(actions).to_have_css("opacity", "1")
-    expect(row.get_by_role("button", name="Hide", exact=True)).to_be_in_viewport(
-        ratio=1
-    )
-    expect(row.get_by_role("button", name="Note", exact=True)).to_be_in_viewport(
-        ratio=1
-    )
+    expect(row).to_have_attribute("data-selected", "true")
+    expect(page.locator("#selected-path")).to_contain_text("src/app.py")
+    for selector in ["#row-note", "#row-visibility"]:
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
+    page.locator("#row-note").focus()
+    expect(row).to_have_attribute("data-selected", "true")
+    expect(page.locator("#selected-path")).to_contain_text("src/app.py")
+    page.locator("#row-note").press("Enter")
+    expect(page.locator("#note-name")).to_have_text("app.py")
 
 
-def test_a_tapped_row_keeps_its_actions_until_another_row_takes_them(
+def test_a_tapped_row_stays_selected_until_another_row_is_selected(
     touch_page: Page, service: str
 ) -> None:
     page = touch_page
@@ -635,23 +638,32 @@ def test_a_tapped_row_keeps_its_actions_until_another_row_takes_them(
     first = page.locator('.row[data-path="src/app.py"]')
     second = page.locator('.row[data-path="src/util.py"]')
     first.locator(".name").tap()
-    expect(first.locator(".row-actions")).to_have_css("opacity", "1")
-
+    expect(first).to_have_attribute("data-selected", "true")
+    page.locator("#row-note").focus()
+    expect(first).to_have_attribute("data-selected", "true")
     second.locator(".name").tap()
-    expect(second.locator(".row-actions")).to_have_css("opacity", "1")
-    expect(first.locator(".row-actions")).to_have_css("opacity", "0")
+    expect(second).to_have_attribute("data-selected", "true")
+    expect(first).not_to_have_attribute("data-selected", "true")
+    expect(page.locator("#selected-path")).to_contain_text("src/util.py")
+    page.locator("#row-note").click()
+    page.locator("#note-text").fill("only the selected row")
+    page.locator("#note-save").click()
+    expect(second.locator(".note")).to_have_text("# only the selected row")
+    expect(first.locator(".note")).to_have_count(0)
 
 
-def test_tapping_a_folder_name_both_folds_it_and_offers_its_actions(
+def test_tapping_a_folder_folds_it_and_selects_it_for_toolbar_actions(
     touch_page: Page, service: str
 ) -> None:
     page = touch_page
     open_editor(page, service)
     docs = page.locator('.row[data-path="docs"]')
+    page.locator('.row[data-path="docs/api.md"]').focus()
     docs.locator(".name").tap()
     expect(page.locator('.row[data-path="docs/api.md"]')).to_have_count(0)
     expect(docs.locator(".name")).to_be_focused()
-    expect(docs.locator(".row-actions")).to_have_css("opacity", "1")
+    expect(docs).to_have_attribute("data-selected", "true")
+    expect(page.locator("#selected-path")).to_contain_text("docs")
 
 
 @pytest.mark.parametrize("key", ["Enter", "Escape"])
@@ -661,7 +673,8 @@ def test_mobile_note_dialog_fits_viewport_and_restores_action_focus(
     page.set_viewport_size({"width": 390, "height": 844})
     open_editor(page, service)
     docs = page.locator('.row[data-path="docs"]')
-    docs.locator('[data-action="note"]').click()
+    docs.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill(
         "A long annotation that makes the tree scroll. " * 3
     )
@@ -672,7 +685,8 @@ def test_mobile_note_dialog_fits_viewport_and_restores_action_focus(
     tree.evaluate("element => { element.scrollLeft = element.scrollWidth; }")
     assert tree.evaluate("element => element.scrollLeft > 0")
     row = page.locator('.row[data-path="src"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     note = page.locator("#note-text")
     note_box = note.bounding_box()
     dialog_box = page.locator("#note-dialog").bounding_box()
@@ -684,7 +698,7 @@ def test_mobile_note_dialog_fits_viewport_and_restores_action_focus(
     note.fill("mobile annotation")
     note.press(key)
     expect(page.locator("#note-dialog")).to_be_hidden()
-    expect(row.locator('[data-action="note"]')).to_be_focused()
+    expect(page.locator("#row-note")).to_be_focused()
     if key == "Enter":
         expect(row.locator(".note")).to_have_text("# mobile annotation")
     else:
@@ -738,9 +752,52 @@ def test_expired_saved_link_does_not_export_an_unvalidated_placeholder(
         ),
     )
     page.reload()
-    expect(page.locator("#error")).to_contain_text("Load the repository URL again")
+    expect(page.locator("#error")).to_contain_text("Snapshot expired.")
+    expect(page.locator("#error")).not_to_contain_text("Copy your current tree")
     expect(page.locator("#rows .row")).to_have_count(0)
     page.locator("#copy").evaluate("button => button.click()")
-    expect(page.locator("#copy-status")).to_have_text("No draft to copy")
+    expect(page.locator("#copy-status")).to_have_text("No treestamp to copy")
     expect(page.locator("#copy")).to_be_disabled()
     assert page.evaluate("window.copiedBlocks") == []
+
+
+@pytest.mark.parametrize("action", ["note", "visibility"])
+def test_queued_toolbar_action_keeps_its_target_when_selection_changes(
+    page: Page, service: str, action: str
+) -> None:
+    open_editor(page, service)
+    page.evaluate("""() => {
+        const fetch = window.fetch.bind(window);
+        let delayed = false;
+        window.fetch = async (...args) => {
+            const response = await fetch(...args);
+            if (args[0] === '/api/op' && !delayed) {
+                delayed = true;
+                await new Promise(resolve => {
+                    window.releaseToolbar = resolve;
+                    document.documentElement.dataset.toolbarPending = 'true';
+                });
+            }
+            return response;
+        };
+    }""")
+    page.locator('.row[data-path="docs"] .fold').click()
+    expect(page.locator("html")).to_have_attribute("data-toolbar-pending", "true")
+    source = page.locator('.row[data-path="src"]')
+    later_selection = page.locator('.row[data-path="scripts"]')
+    source.focus()
+    page.locator(f"#row-{action}").click()
+    later_selection.focus()
+    expect(page.locator("#selected-path")).to_contain_text("scripts")
+    page.evaluate("window.releaseToolbar()")
+    if action == "note":
+        expect(page.locator("#note-dialog")).to_be_visible()
+        expect(page.locator("#note-name")).to_have_text("src")
+        page.locator("#note-text").fill("the original target")
+        page.locator("#note-save").click()
+        expect(source.locator(".note")).to_have_text("# the original target")
+        expect(later_selection.locator(".note")).to_have_count(0)
+    else:
+        expect(source).to_have_count(0)
+        expect(later_selection).to_have_count(1)
+        expect(later_selection).to_have_attribute("data-selected", "true")

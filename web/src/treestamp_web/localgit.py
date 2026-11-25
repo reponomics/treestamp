@@ -1,7 +1,7 @@
 """Answer GitHub API requests from a local Git checkout.
 
-Used by the test suite's mock transport and by ``scripts/fake_github.py``, so
-the fake server and the tests cannot drift apart. Requires a ``git`` binary.
+Shared by the test suite's mock transport and ``web/scripts/fake_github.py``.
+Requires a ``git`` binary.
 """
 
 from __future__ import annotations

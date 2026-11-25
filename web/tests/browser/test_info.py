@@ -13,10 +13,11 @@ pytestmark = pytest.mark.browser
 def test_info_preserves_curated_output_and_the_permalink(
     page: Page, service: str
 ) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     row = page.locator('.row[data-path="src"]')
-    row.locator('[data-action="note"]').click()
+    row.focus()
+    page.locator("#row-note").click()
     page.locator("#note-text").fill("Keep this annotation")
     page.locator("#note-text").press("Enter")
     expect(page.locator("#region")).to_contain_text("Keep this annotation")
@@ -52,12 +53,10 @@ def test_info_stays_selected_through_an_initial_repository_load(
 ) -> None:
     pending: list[Route] = []
     page.route("**/api/preview*", lambda route: pending.append(route))
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows")).to_have_attribute("aria-busy", "true")
-    expect(page.locator("#submit")).to_be_disabled()
     page.get_by_role("tab", name="Info", exact=True).click()
     expect(page.locator("#info-panel")).to_be_visible()
-    expect(page.locator("#stage-status")).to_be_hidden()
     assert len(pending) == 1
     if failed:
         pending[0].fulfill(
@@ -67,11 +66,10 @@ def test_info_stays_selected_through_an_initial_repository_load(
     else:
         pending[0].continue_()
         expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     expect(page.locator("#tab-info")).to_have_attribute("aria-selected", "true")
     expect(page.locator("#info-panel")).to_be_visible()
     expect(page.locator("#editor-panel")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_be_hidden()
     expect(page.locator("#copy")).to_be_hidden()
 
 
@@ -84,6 +82,7 @@ def test_info_fits_and_all_sections_are_reachable(
     page.emulate_media(color_scheme=scheme)
     page.route("**/api/**", lambda route: route.abort())
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     page.get_by_role("tab", name="Info", exact=True).click()
     page.evaluate("document.fonts.ready")
     expect(page.locator("html")).to_have_attribute("data-theme", scheme)
@@ -114,6 +113,7 @@ def test_info_has_release_guidance_and_reporting_links(
     page: Page, service: str
 ) -> None:
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     page.get_by_role("tab", name="Info", exact=True).click()
     info = page.locator("#info-panel")
     expect(info).not_to_contain_text("will appear here")

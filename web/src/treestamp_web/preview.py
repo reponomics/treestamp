@@ -9,7 +9,8 @@ import json
 import posixpath
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from collections import Counter
+from dataclasses import asdict, dataclass, replace
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -34,6 +35,7 @@ from treestamp.model import (
     tree_path,
     validate_path,
 )
+from treestamp.reconcile import Reconciliation
 from treestamp.session import SessionState, TreeSession
 from treestamp.sources import tree_from_records
 from treestamp_web.cache import Snapshot, SnapshotCache
@@ -47,12 +49,14 @@ if TYPE_CHECKING:
     from treestamp.model import Node
     from treestamp_web.config import Config
     from treestamp_web.github import GitHubClient, Resolved
+    from treestamp_web.placement import PlacementRequest
 
 DEFAULT_DOCUMENT = "README.md"
 DOCUMENT_CAP = 1024 * 1024
 OPEN_NOTICE = "Treestamp updated"
 OPERATIONS = (
     "restore",
+    "reset",
     "present",
     "toggle",
     "expand",
@@ -227,6 +231,20 @@ def _baseline(value: object) -> bytes | None:
         raise PreviewError(400, "invalid_state", "invalid document baseline") from None
 
 
+def _session_identity(data: Mapping[str, object]) -> tuple[str, int]:
+    generation, revision = data["generation"], data["revision"]
+    if (
+        not isinstance(generation, str)
+        or not generation
+        or type(revision) is not int
+        or revision < 0
+    ):
+        raise PreviewError(
+            400, "invalid_state", "invalid session generation or revision"
+        )
+    return generation, revision
+
+
 @dataclass(frozen=True)
 class Envelope:
     curation: SessionState
@@ -234,6 +252,7 @@ class Envelope:
     baseline: bytes | None
     generation: str
     revision: int = 0
+    initial_curation: SessionState | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -245,40 +264,37 @@ class Envelope:
             else base64.b64encode(self.baseline).decode("ascii"),
             "generation": self.generation,
             "revision": self.revision,
+            **(
+                {"initial_curation": self.initial_curation.to_dict()}
+                if self.initial_curation is not None
+                else {}
+            ),
         }
 
     @classmethod
     def from_dict(cls, data: object) -> Envelope:
         if (
             not isinstance(data, dict)
-            or set(data)
+            or set(data) - {"initial_curation"}
             != {"version", "curation", "source", "baseline", "generation", "revision"}
             or data["version"] != 1
         ):
             raise PreviewError(400, "invalid_state", "invalid session envelope")
-        generation, revision, baseline = (
-            data["generation"],
-            data["revision"],
-            data["baseline"],
-        )
-        if (
-            not isinstance(generation, str)
-            or not generation
-            or type(revision) is not int
-            or revision < 0
-        ):
-            raise PreviewError(
-                400, "invalid_state", "invalid session generation or revision"
-            )
-        decoded = _baseline(baseline)
+        generation, revision = _session_identity(data)
+        decoded = _baseline(data["baseline"])
         source = data["source"]
         if not isinstance(source, dict):
             raise PreviewError(400, "invalid_state", "invalid session source")
         try:
             state = SessionState.from_dict(data["curation"])
+            initial = (
+                SessionState.from_dict(data["initial_curation"])
+                if "initial_curation" in data
+                else None
+            )
         except MarkerError as exc:
             raise PreviewError(400, "invalid_state", str(exc)) from None
-        return cls(state, source, decoded, generation, revision)
+        return cls(state, source, decoded, generation, revision, initial)
 
 
 @dataclass(frozen=True)
@@ -338,6 +354,10 @@ def parse_op_request(data: object) -> OpRequest:
     if (
         envelope.source != _source(repo, repo.ref, root, document)
         or envelope.curation.settings.root != root
+        or (
+            envelope.initial_curation is not None
+            and envelope.initial_curation.settings.root != root
+        )
     ):
         raise PreviewError(
             400, "invalid_state", "session source does not match the request"
@@ -398,6 +418,7 @@ class Preview:
     dirty: bool
     notice: str | None = None
     default_branch: str | None = None
+    placement: dict[str, object] | None = None
 
     def permalink(self, public_base_url: str | None) -> str:
         root, document = path_value(self.root), path_value(self.document)
@@ -417,7 +438,7 @@ class Preview:
     def to_dict(self, public_base_url: str | None) -> dict[str, object]:
         settings: dict[str, object] = asdict(self.settings)
         settings["root"] = path_value(self.settings.root)
-        return {
+        result: dict[str, object] = {
             "repository": {
                 "owner": self.repository.owner,
                 "name": self.repository.name,
@@ -444,6 +465,9 @@ class Preview:
             "state": self.state,
             "rows": self.rows,
         }
+        if self.placement is not None:
+            result["placement"] = self.placement
+        return result
 
 
 @dataclass
@@ -452,6 +476,69 @@ class _Target:
     root: str
     node: Node
     default_branch: str | None = None
+
+
+def _browse_entries(root: Node) -> list[dict[str, object]]:
+    """Expose source structure without reading document or symlink contents."""
+    entries: list[dict[str, object]] = []
+    pending: list[tuple[Node, str | None]] = [(root, None)]
+    while pending:
+        node, parent = pending.pop()
+        path = node.path or "."
+        kind = "dir" if node.is_dir else "file" if node.kind == "file" else "other"
+        entries.append(
+            {
+                "path": path_value(path),
+                "parent": path_value(parent) if parent is not None else None,
+                "name": path_value(node.name),
+                "kind": kind,
+            }
+        )
+        pending.extend((child, path) for child in reversed(node.children))
+    return entries
+
+
+def _require_new_root(snapshot: Snapshot, root: str) -> None:
+    if root != "." and not any(
+        row.path == root or row.path.startswith(root + "/") for row in snapshot.records
+    ):
+        raise PreviewError(
+            404,
+            "root_not_found",
+            f"Tree root {_display(root)!r} does not exist in this repository snapshot.",
+        )
+
+
+def _check_plain_document(content: bytes, document: str) -> None:
+    try:
+        content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise PreviewError(
+            422, "curation", f"{_display(document)} is not a UTF-8 text document."
+        ) from None
+    if b"\0" in content:
+        raise PreviewError(
+            422, "curation", f"{_display(document)} is not a text document."
+        )
+
+
+def _loaded_document(
+    content: bytes, request: PreviewRequest
+) -> tuple[Document, bytes] | None:
+    try:
+        parsed = parse_document(content, location=request.document, allow_absent=True)
+        if parsed is not None:
+            return parsed, extract_region(content, location=request.document)
+    except MarkerError as exc:
+        raise PreviewError(422, "curation", str(exc)) from None
+    if request.explicit_document:
+        _check_plain_document(content, request.document)
+        raise PreviewError(
+            422,
+            "document_has_no_treestamp",
+            f"No treestamp found in {_display(request.document)}.",
+        )
+    return None
 
 
 class PreviewService:
@@ -470,11 +557,23 @@ class PreviewService:
     def close(self) -> None:
         self._snapshots.close()
 
+    async def browse(self, repo: Repository) -> dict[str, object]:
+        snapshot, acquired = await self._preview_snapshot(repo)
+        entries = _browse_entries(tree_from_records(snapshot.records))
+        if acquired:
+            self._snapshots.put(repo, snapshot)
+        return {
+            "repository": {"owner": repo.owner, "name": repo.name},
+            "entries": entries,
+        }
+
     async def preview(self, request: PreviewRequest) -> Preview:
         repo = request.repository
         snapshot, acquired = await self._preview_snapshot(repo)
         loaded = await self._load_document(snapshot, request, acquired)
         root = request.root if loaded is None else loaded[0].settings.root
+        if loaded is None:
+            _require_new_root(snapshot, root)
         target = await self._target(repo, snapshot, root, acquired)
         settings = Settings(root=root) if loaded is None else loaded[0].settings
         self._preflight(target.node, settings)
@@ -493,6 +592,7 @@ class PreviewService:
             _source(repo, snapshot.resolved.commit, root, request.document),
             baseline,
             str(uuid.uuid4()),
+            initial_curation=session.state(),
         )
         result = self._compose(
             repo,
@@ -503,6 +603,12 @@ class PreviewService:
             opening=True,
             warnings=[request.notice] if request.notice else [],
         )
+        if loaded is not None:
+            from treestamp_web.placement import summary
+
+            review = Reconciliation(loaded[0].tree, session)
+            if review.total:
+                result = replace(result, placement=summary(review, session))
         if acquired:
             self._snapshots.put(repo, snapshot)
         return result
@@ -512,20 +618,24 @@ class PreviewService:
         if snapshot is None:
             raise _snapshot_unavailable()
         target = await self._target(request.repository, snapshot, request.root, False)
+        initial = request.envelope.initial_curation or request.envelope.curation
         self._preflight(target.node, request.envelope.curation.settings)
+        self._preflight(target.node, initial.settings)
         try:
+            initial_session = TreeSession.restore(target.node, initial)
             session = TreeSession.restore(target.node, request.envelope.curation)
         except MarkerError as exc:
             raise PreviewError(400, "invalid_state", str(exc)) from None
+        if request.op.type == "reset":
+            session = initial_session
         request.op.apply(session)
-        envelope = Envelope(
-            session.state(),
-            request.envelope.source,
-            request.envelope.baseline,
-            request.envelope.generation,
-            request.envelope.revision + int(request.op.type != "restore"),
+        envelope = replace(
+            request.envelope,
+            curation=session.state(),
+            revision=request.envelope.revision + int(request.op.type != "restore"),
+            initial_curation=initial,
         )
-        return self._compose(
+        result = self._compose(
             request.repository,
             target,
             session,
@@ -533,6 +643,35 @@ class PreviewService:
             envelope,
             reveal=request.reveal,
         )
+        if request.op.type != "restore":
+            self._snapshots.renew(request.repository)
+        return result
+
+    async def place(self, request: PlacementRequest) -> Preview:
+        from treestamp_web.placement import replay, summary
+
+        opening = request.opening
+        snapshot = self._cached_snapshot(opening.repository)
+        if snapshot is None:
+            raise _snapshot_unavailable()
+        target = await self._target(opening.repository, snapshot, opening.root, False)
+        self._preflight(target.node, opening.envelope.curation.settings)
+        session, review = replay(target.node, request)
+        envelope = replace(
+            opening.envelope,
+            curation=session.state(),
+            revision=len(request.decisions),
+            initial_curation=session.state(),
+        )
+        result = self._compose(
+            opening.repository, target, session, opening.document, envelope
+        )
+        placement = summary(
+            review, session, expanded=request.expanded, reveal=opening.reveal
+        )
+        if request.decisions:
+            self._snapshots.renew(opening.repository)
+        return replace(result, placement=placement)
 
     async def _load_document(
         self, snapshot: Snapshot, request: PreviewRequest, acquired: bool
@@ -564,17 +703,7 @@ class PreviewService:
             raise PreviewError(
                 422, "curation", f"{request.document} is larger than the service reads"
             ) from None
-        try:
-            parsed = parse_document(
-                content,
-                location=request.document,
-                allow_absent=not request.explicit_document,
-            )
-            if parsed is None:
-                return None
-            return parsed, extract_region(content, location=request.document)
-        except MarkerError as exc:
-            raise PreviewError(422, "curation", str(exc)) from None
+        return _loaded_document(content, request)
 
     async def _blob(
         self,
@@ -707,7 +836,7 @@ class PreviewService:
     async def _symlink_targets(
         self, repo: Repository, snapshot: Snapshot, prefix: str, acquired: bool
     ) -> dict[str, bytes]:
-        wanted = dict.fromkeys(
+        wanted = Counter(
             row.object_id
             for row in snapshot.records
             if row.mode == "120000" and row.path.startswith(prefix)
@@ -720,9 +849,38 @@ class PreviewService:
                 f"this subtree needs {len(wanted)} symlink targets; "
                 f"the service limit is {limit}",
             )
-        bodies = await asyncio.gather(
-            *(self._blob(repo, snapshot, oid, acquired) for oid in wanted)
+        try:
+            bodies = await asyncio.gather(
+                *(
+                    self._blob(
+                        repo,
+                        snapshot,
+                        oid,
+                        acquired,
+                        cap=self._config.symlink_target_max_bytes,
+                    )
+                    for oid in wanted
+                )
+            )
+        except TooLargeError:
+            raise PreviewError(
+                422,
+                "source_unavailable",
+                "a symlink target exceeds the service limit of "
+                f"{self._config.symlink_target_max_bytes} bytes",
+            ) from None
+        # Blob fetches are deduplicated, but decoding and rendering repeat each
+        # target per path. Charge every reference before constructing the tree.
+        expanded = sum(
+            wanted[oid] * len(body) for oid, body in zip(wanted, bodies, strict=True)
         )
+        if expanded > self._config.symlink_expanded_max_bytes:
+            raise PreviewError(
+                422,
+                "source_unavailable",
+                f"this subtree needs {expanded} expanded symlink target bytes; "
+                f"the service limit is {self._config.symlink_expanded_max_bytes}",
+            )
         return dict(zip(wanted, bodies, strict=True))
 
 

@@ -1,49 +1,34 @@
 # CLI reference
 
-See [Design](design.md) for the document format and architecture, and [ADR 0001](adr/0001-cli-path-coherence.md) for the rationale behind repository selection.
-
 ## Commands
 
 ```text
-treestamp [tui] [--load DOCUMENT] [--print]
-treestamp check [DOCUMENT] [--target REF] [--compare REF]
-treestamp update [DOCUMENT] [--target REF] [--compare REF]
+treestamp [--print]
+treestamp new [DIRECTORY] [--print]
+treestamp load [DOCUMENT] [--print]
+treestamp check [DOCUMENT]
+treestamp update [DOCUMENT] [--skip-notes-transfer]
 treestamp help [COMMAND]
 treestamp --version
 treestamp --help
 ```
 
-With no command, `treestamp` opens the TUI. `tui` can also be omitted before its options: `treestamp --print` and `treestamp tui --print` are equivalent.
+The CLI is designed such that when it is invoked with implicit arguments or commands, it applies default assumptions about what behavior is most likely to serve the most common use case, which is considered to be: creating a treestamp whose root is the current working directory (`cwd`), or loading a treestamp from the file that's most likely to have one, `./README.md`. `treestamp new` is equivalent to `treestamp new .`; `treestamp load` is equivalent to `treestamp load ./README.md`; and `treestamp` on its own does the following: if `./README.md` contains treestamp markers, it tries `treestamp load ./README.md`, and fails if the loaded treestamp is malformed; else, it does `treestamp new .`; if invoked outside of a git repo altogether, it also fails.
 
-Use `treestamp help` (equivalent to `treestamp --help`) for general help, or `treestamp help <command>` (equivalent to `treestamp <command> --help`) for command-specific help. For example, `treestamp help tui` describes the editor options, and `treestamp help check` describes the drift checker. Help works outside a Git repository and exits without opening the editor. Within the TUI, press `?` for keyboard help.
+Paths can be absolute or relative to cwd and can select another checkout. `new` requires an existing directory; use `load` for a document. Paths may include `..` but cannot pass through symlinks. To work inside a nested repository or initialized submodule, select it directly; a parent repository's tree cannot extend into it.
 
-## Repositories, paths, and snapshots
-
-| Input | Interpretation |
-| --- | --- |
-| `--load DOCUMENT` | A cwd-relative or absolute document path; opens it directly and selects its containing repository |
-| Explicit `check DOCUMENT` / `update DOCUMENT` | A cwd-relative or absolute document path; selects its containing repository |
-| Omitted document for `check`, `update`, or `--print` | The repository-root `README.md` in the repository containing cwd |
-| TUI startup without `--load` | The repository containing cwd; shows New/Load |
-| TUI tree root and document dialogs | Paths relative to the selected repository root |
-
-Explicit CLI document paths follow filesystem conventions. From `docs/`, `treestamp check README.md` checks `docs/README.md`, while `treestamp check ../README.md` checks the repository's top-level README. Bare `treestamp check` selects the top-level README. A document can select another checkout even when cwd is outside any repository.
-
-CLI document paths may include `..`, but symlinks are refused, including traversed components before parent normalization. A document in an initialized nested repository or submodule selects that repository. Paths into an uninitialized submodule are rejected. Within the editor, document paths are repository-root-relative: absolute paths, parent traversal, symlinks, and crossings into other repositories or submodules are rejected.
-
-To open another repository, load a document in it or change directories before starting treestamp. Choose a subtree in the New document dialog; the root dialog accepts spellings such as `./src/` and stores the canonical `src` path.
-
-The default source is a captured Git index, not the working tree. Stage additions, deletions, and renames before opening or checking a treestamp. Untracked files are absent, and unstaged changes are not incorporated. New or Load captures a snapshot; subsequent edits use that snapshot until another New or Load operation. The containing document is read from disk, not from the index. Treestamp does not stage or commit files or fetch remote history.
+New trees and updates use a snapshot of the Git index. Stage additions, deletions, and renames before creating or updating a treestamp. The editor keeps that snapshot for the session; reopen it to pick up later staged changes.
 
 ## Interactive editor
 
 ```bash
 treestamp
-treestamp --load docs/structure.md
-treestamp tui --load /path/to/another/checkout/README.md
+treestamp new docs
+treestamp load docs/structure.md
+treestamp load /path/to/another/checkout/README.md
 ```
 
-Without `--load`, startup offers **New document** or **Load document**. `--load DOCUMENT` opens the document directly, bypassing the opening choice and path-entry dialog. An invalid explicit load reports an error without launching the editor or starting a new document. New document starts with the selected root's immediate children and collapsed directories. Load reads a valid existing treestamp and updates its draft against the captured index while preserving supported curation.
+New treestamps show the selected directory's immediate children, with subdirectories collapsed. Loading updates a draft of the saved tree while retaining its annotations, hidden entries, and expanded directories where possible.
 
 | Keys | Action |
 | --- | --- |
@@ -51,49 +36,61 @@ Without `--load`, startup offers **New document** or **Load document**. `--load 
 | `h`, `H`, `S` | Hide/unhide an entry, reveal hidden entries for browsing, unhide all |
 | `a` | Edit the selected entry's annotation |
 | `c`, `s`, `t` | Toggle counts, cycle Unicode/ASCII/list style, toggle attribution footer |
-| `N`, `l` | Start a new document or load an existing one |
-| `n`, `w` | Write a new file or replace the treestamp in an existing file |
-| `v`, `y`, `p` | Preview, copy the complete treestamp, print it and exit |
+| `w` | Write back to the loaded document (loaded sessions only) |
+| `v`, `y`, `p` | Preview, copy the draft, print it and exit |
 | `?`, `q` / Escape | Help, quit |
 
-Write new file requires a nonexistent destination. Write to existing requires a boundary-marker pair and preserves content outside it. Empty markers are valid as a write destination, but cannot be loaded as a tree: start with New document, then Write to existing. Copy includes markers and any configuration comment. Unwritten changes require confirmation before quitting or replacing the draft.
+If a loaded tree has notes whose original paths are gone or have changed kind, a **Transfer notes?** dialog offers to move them to the updated tree. Enter starts transfer; Escape continues without those notes. Otherwise, the editor opens directly. The document is unchanged until you choose Write.
+
+The transfer view presents one source note at a time above the destination tree. Navigate with the arrow keys, press Enter to transfer the note to the selected row, or `s` to skip it. A directory belongs on a directory; other notes belong on files or other leaf entries. Opening folders only changes browsing. Transferring reveals the destination in the saved draft so its annotation is included. `H` reveals hidden destinations for browsing. Replacing an existing annotation requires confirmation. `?` shows full paths and notes when a line is truncated.
+
+Transferring a directory also carries its pending annotated descendants recursively when their full relative paths and entry kinds match. An unannotated removed directory can stand for its annotated descendants. Missing paths, kind changes, conflicting notes, and destinations already holding another transferred note remain for individual decisions. Skipping a directory leaves its descendants available individually.
+
+`u` undoes the last decision, including every note carried by a directory transfer. Resolving the queue opens the editor automatically. Escape skips remaining items and starts editing. Transfer is a one-time step for each document load; skipped notes are omitted when writing.
+
+Copy and Print export the current draft, including your edits, markers, and configuration. For a new treestamp, paste this complete block into your document. Loaded sessions can Write back to the original document without changing surrounding content. Quitting with unwritten changes requires confirmation.
 
 ## Print without opening the editor
 
 ```bash
 treestamp --print
-treestamp --load docs/structure.md --print
+treestamp new docs --print
+treestamp load docs/structure.md --print
 ```
 
-`--print` writes the complete treestamp to stdout without changing a document. With explicit `--load`, the file must contain a valid treestamp; its updated draft is printed. Without `--load`, a valid treestamp in the repository-root README is loaded, while an absent README or one without markers starts a new tree. Malformed or empty marked regions are errors, not requests to initialize a tree.
+`--print` writes a complete treestamp block to stdout without opening the editor or changing a document:
 
-Printing does not accept `--target` or `--compare`. Shell redirection writes independently of treestamp; do not redirect output over a document the command must read.
+- `load --print` extracts the saved block unchanged, even if its tree is stale. A missing, unmarked, or malformed document fails. To refresh the saved tree first, run `update`.
+- `new --print` generates a tree for the selected directory from the staged Git index.
+- Bare `treestamp --print` loads from cwd's `README.md` if it contains a treestamp, or generates a new tree at cwd if the README is absent or unmarked. A malformed treestamp remains an error.
+
+Do not redirect output over the document being loaded: the shell can truncate it before treestamp reads it.
 
 ## Check and update
 
 ```bash
 treestamp check
-treestamp check docs/structure.md --target HEAD
-treestamp update docs/structure.md --compare HEAD
-treestamp check README.md --target HEAD --compare HEAD~1
+treestamp check docs/structure.md
+treestamp update docs/structure.md
+treestamp update docs/structure.md --skip-notes-transfer
 ```
 
-Both commands require an existing, valid treestamp. `check` computes the same replacement as `update` without writing it. It prints `Current: …` and exits `0` when unchanged, or a unified diff and exits `1` when an update would change the document, including generated formatting. `update` replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
+Both commands read an existing, valid treestamp from disk and compare it with the captured index of its repository. With no document argument, they use `README.md` in cwd. `check` computes the proposed automatic replacement without writing it. It prints `Current: …` and exits `0` when unchanged, or a unified diff and exits `1` when an update would change the document, including generated formatting. If the replacement would omit notes, it reports that separately on stderr.
 
-Supported formatting differences are preserved before that comparison: zero or one blank line after the start marker, between configuration and tree, and before the end marker, plus equivalent TOML configuration formatting when its validated values are unchanged. These differences alone do not fail `check`. When configuration values change, `update` regenerates the configuration with compact array wrapping at an 80-character target and discards its comments. Oversized individual entries stay intact. See [ADR 0002](adr/0002-formatter-compatible-documents.md) for the rationale and limits.
+`update` retains notes at matching paths with the same entry kind; it does not infer renames. If any notes would be omitted, it exits nonzero without writing. Use `treestamp load DOCUMENT` to transfer those notes interactively, or `--skip-notes-transfer` to omit them while retaining matched notes. A successful update replaces only the managed region, preserves surrounding bytes and line endings, and prints `Updated: …` or `Current: …`.
 
-`--target REF` selects a local Git revision in the document's repository instead of its captured index. `--compare REF` supplies the earlier revision for Git rename detection. For example, `--compare HEAD` can preserve annotations across staged renames; after committing a rename, select an appropriate earlier comparison revision.
-
-Annotation transfer is best effort: supported moves must remain within the selected subtree, destination annotations take precedence, and hiding and collapse choices are respected. Directory annotations are not transferred by rename detection. Without `--compare`, annotations are preserved at unchanged paths but do not follow moves. TUI loading and `--print` do not perform rename detection.
+`check` accepts the [supported blank-line and TOML formatting variations](design.md#document-format). If configuration values change, the configuration is regenerated and its comments are lost.
 
 ## Output and exit status
 
-Output uses UTF-8. New regions use LF line endings; printing or copying a loaded region preserves its LF or CRLF convention and supported formatting. Exported snippets omit a file-level UTF-8 BOM. Writing into an existing document preserves its line-ending convention and any original BOM. Diagnostic errors go to stderr.
+When writing directly to a terminal, CLI output escapes control characters from document context and diagnostics; tabs and line breaks retain their layout. Redirected output retains its original bytes and line endings.
+
+Output uses UTF-8, preserving undecodable Git bytes through redirected output. New regions use LF; extraction retains the stored region's LF or CRLF convention. Exported snippets omit a file-level UTF-8 BOM. Writing into an existing document preserves its line-ending convention and any original BOM. Diagnostics go to stderr.
 
 | Exit status | Meaning |
 | --- | --- |
 | `0` | Success, including a current document |
 | `1` | `check` found a change that `update` would make |
-| `2` | Invalid arguments, document, path, settings, or curation constraint |
-| `3` | Git or filesystem operation could not supply the required facts |
+| `2` | Invalid arguments, document, path, settings, or an update requiring a note-transfer decision |
+| `3` | Git or filesystem operation could not supply required facts |
 | `130` | Interrupted |

@@ -10,38 +10,29 @@ from playwright.sync_api import Page, expect  # noqa: E402
 pytestmark = pytest.mark.browser
 
 
-def test_updated_open_shows_compact_completion_without_a_confirmation(
-    page: Page, service: str
+@pytest.mark.parametrize("updated", [False, True])
+def test_open_accepts_updated_or_unchanged_trees_without_a_confirmation(
+    page: Page, service: str, updated: bool
 ) -> None:
     def change_notice(route):
         response = route.fetch()
         data = response.json()
-        data["dirty"] = True
-        data["notice"] = "Treestamp updated"
+        data["dirty"] = updated
+        data["notice"] = "Snapshot comparison completed"
         route.fulfill(response=response, json=data)
 
     page.route("**/api/preview*", change_notice)
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#notice")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_have_text("Treestamp updated")
-    expect(page.locator("#notice-undo")).to_be_hidden()
+    expect(page.locator("#error")).to_be_hidden()
     expect(page.locator("#status")).to_have_text("")
     expect(page.locator("dialog[open]")).to_have_count(0)
-
-
-def test_unchanged_open_has_no_update_notice(page: Page, service: str) -> None:
-    page.goto(f"{service}/fixture/repo")
-    expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#notice")).to_be_hidden()
-    expect(page.locator("#stage-status")).to_have_text("Treestamp is up to date")
-    expect(page.locator("#status")).to_have_text("")
 
 
 def test_unavailable_captured_source_never_falls_back_to_latest_head(
     page: Page, service: str
 ) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     address = page.url
     previews: list[str] = []
@@ -59,7 +50,6 @@ def test_unavailable_captured_source_never_falls_back_to_latest_head(
     )
     page.reload()
     expect(page.locator("#error")).to_contain_text("Captured snapshot unavailable.")
-    expect(page.locator("#stage-status")).to_have_text("No tree")
     assert page.url == address
     assert previews == []
 
@@ -79,7 +69,7 @@ def test_invalid_fragment_is_reported_without_creating_another_draft(
     assert requests == []
 
 
-def test_byte_named_row_undo_preserves_identity_after_hiding(
+def test_byte_named_row_reveal_and_unhide_preserve_identity(
     page: Page, service: str
 ) -> None:
     """Exercise transport with synthetic byte facts, independent of host filenames."""
@@ -102,20 +92,40 @@ def test_byte_named_row_undo_preserves_identity_after_hiding(
         if operation["type"] == "hide":
             data["rows"].remove(retained_row)
             data["state"]["curation"]["hidden"].append(identity)
-        else:
+        elif operation["type"] == "restore":
+            assert route.request.post_data_json["reveal"] is True
+            retained_row["hidden"] = True
             data["rows"].append(retained_row)
+        elif operation["type"] == "unhide":
+            retained_row["hidden"] = False
             data["state"]["curation"]["hidden"].remove(identity)
+        else:
+            pytest.fail(f"unexpected operation: {operation}")
         data["state"]["revision"] += 1
         route.fulfill(json=data)
 
     page.route("**/api/preview*", load)
     page.route("**/api/op", operate)
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     row = page.locator('.row[data-path="/git/7372632fff"]')
     expect(row).to_be_visible()
-    row.get_by_role("button", name="Hide", exact=True).click()
+    row.focus()
+    page.locator("#row-visibility").click()
     expect(row).to_have_count(0)
-    page.locator("#notice-undo").click()
-    expect(row).to_be_visible()
-    assert [operation["type"] for operation in operations] == ["hide", "unhide"]
-    assert all(operation["path"] == identity for operation in operations)
+    expect(page.locator("#notice")).to_have_count(0)
+    page.locator("#reveal").check()
+    row.focus()
+    unhide = page.get_by_role("button", name="Unhide", exact=True)
+    expect(unhide).to_be_visible()
+    unhide.click()
+    expect(page.get_by_role("button", name="Hide", exact=True)).to_be_visible()
+    assert [operation["type"] for operation in operations] == [
+        "hide",
+        "restore",
+        "unhide",
+    ]
+    assert all(
+        operation["path"] == identity
+        for operation in operations
+        if operation["type"] in {"hide", "unhide"}
+    )

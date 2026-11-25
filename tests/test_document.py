@@ -245,7 +245,8 @@ def test_invalid_metadata_fails(tmp_path: Path, payload: str) -> None:
     path.write_text(
         "<!-- treestamp:start -->\n<!-- treestamp:config\n"
         + payload
-        + "\n-->\n.\n<!-- treestamp:end -->\n"
+        + "\n-->\n.\n<!-- treestamp:end -->\n",
+        encoding="utf-8",
     )
     with pytest.raises(MarkerError):
         load_document(path)
@@ -262,7 +263,7 @@ def test_byte_paths_in_metadata_round_trip(document: Document, tmp_path: Path) -
     write_document(source, path, create=True)
     loaded, _ = load_document(path)
     assert loaded == source
-    assert "git_bytes" in path.read_text()
+    assert "git_bytes" in path.read_text(encoding="utf-8")
 
 
 def test_deep_input_fails_explicitly_before_rendering() -> None:

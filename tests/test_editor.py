@@ -11,7 +11,6 @@ from treestamp.document import (
     extract_region,
     load_document,
     parse_document,
-    render_region,
     write_document,
 )
 from treestamp.editor import OPEN_UPDATED_NOTICE, EditorController
@@ -57,7 +56,7 @@ def test_write_collapse_expand_keeps_session_only_curation(repo: Repo) -> None:
     original = session.draft_signature()
     session.collapse("src")
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(repo.path)))
+    write_document(editor.document(), destination, create=True)
     document, _ = load_document(destination)
     assert document is not None and not document.hidden
     assert "remembered" not in destination.read_text(encoding="utf-8")
@@ -92,11 +91,12 @@ def test_open_updates_draft_and_notifies_without_writing(repo: Repo) -> None:
 def test_open_captures_new_index_then_edits_use_fixed_snapshot(repo: Repo) -> None:
     editor = make_editor(repo)
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(repo.path)))
+    write_document(editor.document(), destination, create=True)
     repo.write("src/new")
     repo.add("src/new")
     candidate = editor.prepare_load(str(destination.relative_to(repo.path)))
-    assert candidate.snapshot.tree_id != editor.state.snapshot.tree_id
+    assert "src/new" not in {node.path for node in editor.state.snapshot.tree.walk()}
+    assert "src/new" in {node.path for node in candidate.snapshot.tree.walk()}
     editor.adopt(candidate)
     assert "src/new" in {node.path for node in candidate.session.printed_tree().walk()}
     before = editor.region_text()
@@ -115,7 +115,7 @@ def test_hidden_absent_path_survives_update_and_retracking(repo: Repo) -> None:
     editor = make_editor(repo)
     editor.state.session.hide("src/b")
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(repo.path)))
+    write_document(editor.document(), destination, create=True)
     repo.git("rm", "--cached", "src/b")
     assert run_cli("update", str(destination.relative_to(repo.path)))[0] == 0
     editor.adopt(editor.prepare_load(str(destination.relative_to(repo.path))))
@@ -133,7 +133,8 @@ def test_hidden_absent_path_survives_update_and_retracking(repo: Repo) -> None:
 def test_failed_load_and_conflicting_write_preserve_draft(repo: Repo) -> None:
     editor = make_editor(repo)
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(repo.path)))
+    write_document(editor.document(), destination, create=True)
+    editor.adopt(editor.prepare_load("tree.md"))
     editor.state.session.set_annotation("src", "unwritten")
     state = editor.state
     signature = state.session.draft_signature()
@@ -164,8 +165,6 @@ def test_document_location_does_not_rebase_root_or_hidden(repo: Repo) -> None:
     assert editor.region_text().encode() == extract_region(destination.read_bytes())
     reopened = editor.prepare_load(str(destination.relative_to(repo.path)))
     assert reopened.root == repo.path / "src"
-    with pytest.raises(MarkerError):
-        editor.create(str(destination.relative_to(repo.path)))
     with pytest.raises(MarkerError):
         editor.prepare_new("../outside")
 
@@ -237,7 +236,7 @@ def test_root_selection_cannot_enter_initialized_submodule(
 def test_noncanonical_open_is_dirty_even_when_semantics_unchanged(repo: Repo) -> None:
     editor = make_editor(repo)
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(repo.path)))
+    write_document(editor.document(), destination, create=True)
     destination.write_bytes(
         destination.read_bytes().replace(
             b"<!-- treestamp:start -->\n", b"<!-- treestamp:start -->\n\n"
@@ -325,7 +324,7 @@ def test_new_editor_preflights_and_expands_more_than_100_special_entries(
     assert region_metadata(editor.region_text())["special_paths"] == [
         {"row": row, "path": path} for row, path in enumerate(names, 2)
     ]
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     loaded, _ = load_document(repo.path / "tree.md")
     assert loaded == editor.document()
 
@@ -336,7 +335,7 @@ def test_load_reindexes_special_rows_after_new_source_entries(repo: Repo) -> Non
     editor = EditorController(capture_snapshot(repo.path), Settings())
     with editor.edit():
         editor.state.session.set_annotation("z  # draft.md", "retain  # this")
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     original = repo.read("tree.md")
     assert region_metadata(original)["special_paths"] == [
         {"row": 1, "path": "z  # draft.md"}
@@ -366,7 +365,7 @@ def test_counts_and_symlink_changes_are_noticed(repo: Repo, changed: str) -> Non
     tree = build_tree(
         [Entry("src/a"), Entry("src/b"), Entry("shortcut", "symlink", "new")]
     )
-    snapshot = Snapshot(repo.path, repo.path, tree, "fixed")
+    snapshot = Snapshot(repo.path, repo.path, tree)
     original = EditorController(snapshot, Settings()).document()
     src, shortcut = original.tree.children
     if changed == "count":
@@ -386,7 +385,8 @@ def test_dirty_uses_output_for_count_and_root_only_style_choices(repo: Repo) -> 
     editor.state.session.show_counts = False
     assert not editor.dirty, "counts have no printed effect when no folder is collapsed"
     destination = repo.path / "tree.md"
-    editor.create(str(destination.relative_to(repo.path)))
+    write_document(editor.document(), destination, create=True)
+    editor.adopt(editor.prepare_load("tree.md"))
     editor.state.session.show_counts = True
     assert not editor.dirty
     assert editor.state.baseline is editor.state.document_snapshot
@@ -410,7 +410,7 @@ def test_dirty_tracks_restoring_original_bytes_after_a_changed_open(repo: Repo) 
     snapshot = capture_snapshot(repo.path)
     original_editor = EditorController(snapshot, Settings(show_counts=False))
     destination = repo.path / "tree.md"
-    original_editor.create(str(destination.relative_to(repo.path)))
+    write_document(original_editor.document(), destination, create=True)
     # Keep the original CRLF bytes and unrelated document content as the baseline.
     destination.write_bytes(
         b"Before\r\n" + destination.read_bytes().replace(b"\n", b"\r\n") + b"After\r\n"
@@ -442,7 +442,8 @@ def test_initial_unrepresentable_source_is_rejected(repo: Repo, name: str) -> No
 
 def test_failed_source_preflight_preserves_loaded_draft(repo: Repo) -> None:
     editor = make_editor(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
+    editor.adopt(editor.prepare_load("tree.md"))
     before = editor.region_text()
     state = editor.state
     repo.write("src/pkg/a [gitlink]")
@@ -484,7 +485,7 @@ def test_preflight_only_checks_selected_subtree(repo: Repo) -> None:
     repo.add(".")
     snapshot = capture_snapshot(repo.path / "good", repository=repo.path)
     editor = EditorController(snapshot, Settings(root="good"))
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     assert "leaf" in repo.read("tree.md")
 
 
@@ -500,7 +501,7 @@ def test_loaded_editor_preserves_optional_spacing_in_copy_and_write(
     editor.state.session.settings = replace(
         editor.state.session.settings, attribution=True
     )
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     destination = repo.path / "tree.md"
     region = destination.read_bytes()
     for marker, keep in (
@@ -533,15 +534,10 @@ def test_loaded_editor_preserves_optional_spacing_in_copy_and_write(
     )
     assert not editor.dirty
 
-    editor.create("new.md")
-    assert (repo.path / "new.md").read_bytes() == render_region(
-        editor.document()
-    ).encode()
-
 
 def test_copy_omits_file_bom_but_write_preserves_it(repo: Repo) -> None:
     editor = make_editor(repo)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     destination = repo.path / "tree.md"
     region = destination.read_bytes()
     original = b"\xef\xbb\xbf" + region
@@ -567,7 +563,7 @@ def test_editor_preserves_authored_toml_until_hidden_paths_change(
     editor = make_editor(repo)
     for path in hidden:
         editor.state.session.hide(path)
-    editor.create("tree.md")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
     destination = repo.path / "tree.md"
     region = destination.read_bytes().decode("utf-8")
     start = region.index("<!-- treestamp:config")
@@ -621,3 +617,70 @@ def test_dirty_guard_detects_unrepresentable_direct_session_mutation(
     assert editor.dirty
     with pytest.raises(MarkerError, match="single line"):
         editor.region_text()
+
+
+def test_load_retains_removed_annotations_for_manual_review(repo: Repo) -> None:
+    editor = make_editor(repo)
+    editor.state.session.set_annotation("src/a", "first")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
+    repo.git("mv", "src/a", "src/renamed")
+    editor.adopt(editor.prepare_load("tree.md"))
+    review = editor.state.reconciliation
+    assert review is not None and review.current is not None
+    assert review.current.path == "src/a"
+    assert "1 annotation to review" in editor.state.status
+    assert "src/renamed" not in editor.state.session.annotations
+    with editor.edit():
+        review.place("src/renamed")
+    editor.write("tree.md")
+    assert "renamed  # first" in repo.read("tree.md")
+    assert review.can_undo
+    assert not editor.dirty
+
+
+def test_rejected_placement_restores_queue_and_draft(repo: Repo) -> None:
+    editor = make_editor(repo)
+    editor.state.session.set_annotation("src/a", "first")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
+    repo.git("mv", "src/a", "src/renamed")
+    editor.adopt(editor.prepare_load("tree.md"))
+    review = editor.state.reconciliation
+    assert review is not None
+    before = review.snapshot(), editor.state.session.state()
+    with pytest.raises(MarkerError, match="rejected"), editor.edit():
+        review.place("src/renamed")
+        raise MarkerError("rejected")
+    assert (review.snapshot(), editor.state.session.state()) == before
+
+
+def test_new_document_does_not_inherit_review_decisions(repo: Repo) -> None:
+    editor = make_editor(repo)
+    editor.state.session.set_annotation("src/a", "first")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
+    repo.git("mv", "src/a", "src/renamed")
+    editor.adopt(editor.prepare_load("tree.md"))
+    assert editor.state.reconciliation is not None
+    editor.state.reconciliation.skip_current()
+    editor.adopt(editor.prepare_new("."))
+    assert editor.state.reconciliation is None
+
+
+def test_rejected_directory_placement_restores_entire_recursive_batch(
+    repo: Repo,
+) -> None:
+    editor = make_editor(repo)
+    session = editor.state.session
+    session.set_annotation("src/a", "first")
+    session.set_annotation("src/pkg/leaf", "nested")
+    write_document(editor.document(), repo.path / "tree.md", create=True)
+    repo.git("mv", "src", "lib")
+    editor.adopt(editor.prepare_load("tree.md"))
+    review = editor.state.reconciliation
+    assert review is not None and review.current is not None
+    assert review.current.path == "src"
+    before = review.snapshot(), editor.state.session.state()
+    with pytest.raises(MarkerError, match="rejected"), editor.edit():
+        review.place("lib")
+        assert review.placed_count == 2
+        raise MarkerError("rejected")
+    assert (review.snapshot(), editor.state.session.state()) == before

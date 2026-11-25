@@ -16,21 +16,27 @@ def assert_no_page_overflow(page: Page) -> None:
 
 
 def assert_row_actions_in_view(page: Page) -> None:
+    """Shared actions stay above the tree, never covering a row's text."""
     docs = page.locator('.row[data-path="docs"]')
-    docs.locator(".name").hover()
-    actions = docs.locator(".row-actions")
-    expect(actions).to_have_css("opacity", "1")
-    action_bounds = actions.bounding_box()
+    docs.focus()
+    expect(page.locator("#selected-path")).to_contain_text("docs")
     tree_bounds = page.locator(".tree-scroll").bounding_box()
-    assert action_bounds is not None and tree_bounds is not None
-    assert action_bounds["x"] >= tree_bounds["x"]
-    assert (
-        action_bounds["x"] + action_bounds["width"]
-        <= tree_bounds["x"] + tree_bounds["width"]
-    )
+    assert tree_bounds is not None
+    expect(page.locator("#rows .row-actions")).to_have_count(0)
+    for selector in ["#row-note", "#row-visibility"]:
+        action_bounds = page.locator(selector).bounding_box()
+        assert action_bounds is not None
+        assert action_bounds["x"] >= tree_bounds["x"]
+        assert (
+            action_bounds["x"] + action_bounds["width"]
+            <= tree_bounds["x"] + tree_bounds["width"]
+        )
+        assert action_bounds["y"] + action_bounds["height"] <= tree_bounds["y"]
 
 
-@pytest.mark.parametrize("width", [320, 390, 1023, 1024, 1025, 1280, 1440, 1920])
+@pytest.mark.parametrize(
+    "width", [320, 390, 767, 768, 900, 1023, 1024, 1025, 1280, 1440, 1920]
+)
 def test_workspace_layout(page: Page, service: str, width: int) -> None:
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(service + "/")
@@ -53,7 +59,8 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
         "&& style.backgroundColor !== 'rgba(0, 0, 0, 0)'; }"
     )
     docs_bounds = docs_link.bounding_box()
-    assert docs_bounds is not None and docs_bounds["height"] >= 44
+    assert docs_bounds is not None
+    assert docs_bounds["height"] >= (36 if width < 1024 else 44)
     theme_toggle = page.locator("#theme-toggle")
     theme_toggle.click()
     expect(theme_toggle).to_have_text("Light mode")
@@ -61,13 +68,12 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
     assert_no_page_overflow(page)
     theme_toggle.click()
 
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
-    page.click("#reload")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
 
     controls = page.locator(".controls").bounding_box()
     stage = page.locator("#result").bounding_box()
@@ -83,12 +89,16 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
         assert page.evaluate(
             "document.documentElement.scrollHeight <= window.innerHeight"
         )
-        expect(page.locator("#show_counts")).to_be_visible()
-        expect(page.locator(".settings-open")).to_be_hidden()
     else:
-        # Stacked; the settings are a sheet opened from the editor's header.
         assert controls["y"] + controls["height"] <= stage["y"]
         assert controls["width"] == pytest.approx(stage["width"], abs=1)
+    if width >= 1024:
+        expect(page.locator("#show_counts")).to_be_visible()
+        expect(page.locator("#reveal")).to_be_visible()
+        expect(page.locator(".settings-open")).to_be_hidden()
+        expect(page.locator(".attribution")).to_be_visible()
+    else:
+        # Phones and tablets keep settings out of the tree workspace.
         expect(page.locator("#show_counts")).to_be_hidden()
         page.click(".settings-open")
         expect(page.locator("#show_counts")).to_be_visible()
@@ -103,11 +113,12 @@ def test_workspace_layout(page: Page, service: str, width: int) -> None:
 
 
 @pytest.mark.parametrize(("width", "height"), [(1280, 800), (1440, 900)])
-def test_desktop_sidebar_fits_and_repository_input_gets_its_own_row(
+def test_desktop_sidebar_fits_with_a_repository_summary(
     page: Page, service: str, width: int, height: int
 ) -> None:
     page.set_viewport_size({"width": width, "height": height})
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     expect(page.locator("#rows .row").first).to_be_visible()
     page.evaluate("document.fonts.ready")
     controls = page.locator(".controls")
@@ -117,12 +128,9 @@ def test_desktop_sidebar_fits_and_repository_input_gets_its_own_row(
         'element => ({scrollHeight: element.scrollHeight, clientHeight: element.clientHeight, children: [...element.querySelectorAll("#form, #form > *, .repo-links, .repo-row, #settings, #settings > *")].map(child => ({id: child.id, class: child.className, rect: child.getBoundingClientRect().toJSON()}))})'
     )
     expect(page.locator("#reveal")).to_be_in_viewport(ratio=1)
-    row = page.locator(".repo-row").bounding_box()
-    field = page.locator("#url").bounding_box()
-    button = page.locator("#submit").bounding_box()
-    assert row is not None and field is not None and button is not None
-    assert field["width"] == pytest.approx(row["width"], abs=1)
-    assert button["y"] >= field["y"] + field["height"]
+    expect(page.locator("#url")).to_be_hidden()
+    expect(page.locator("#active-repository")).to_have_text("reponomics/treestamp")
+    expect(page.locator("#repo-info")).to_be_in_viewport(ratio=1)
 
 
 def test_a_tall_tree_scrolls_inside_its_pane_on_a_wide_window(
@@ -131,11 +139,10 @@ def test_a_tall_tree_scrolls_inside_its_pane_on_a_wide_window(
     # A window too short for nine rows: the pane scrolls, the page does not.
     page.set_viewport_size({"width": 1280, "height": 420})
     page.goto(service + "/")
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
-    page.click("#reload")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
     assert page.evaluate("document.documentElement.scrollHeight <= window.innerHeight")
     tree = page.locator(".tree-scroll")
@@ -150,10 +157,14 @@ def test_the_settings_sheet_closes_when_the_window_widens(
 ) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(service + "/")
+    page.locator("#explore-example").click()
     expect(page.locator("#rows .row")).not_to_have_count(0)
     page.click(".settings-open")
     assert page.evaluate("document.getElementById('settings').matches(':popover-open')")
-    page.set_viewport_size({"width": 1280, "height": 800})
+    page.set_viewport_size({"width": 768, "height": 800})
+    expect(page.locator("#settings:popover-open")).to_have_count(1)
+    expect(page.locator(".settings-open")).to_be_visible()
+    page.set_viewport_size({"width": 1024, "height": 800})
     expect(page.locator("#settings:popover-open")).to_have_count(0)
     expect(page.locator("#show_counts")).to_be_visible()
     expect(page.locator(".settings-open")).to_be_hidden()
@@ -165,16 +176,16 @@ def test_long_note_keeps_other_row_actions_in_view(
 ) -> None:
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(service + "/")
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
-    page.click("#reload")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
 
     src = page.locator('.row[data-path="src"]')
     src.locator(".name").hover()
-    src.get_by_role("button", name="Note", exact=True).click()
+    src.focus()
+    page.locator("#row-note").click()
     note = (
         "A lengthy annotation describing the application source and supporting modules. "
         * 3
@@ -201,13 +212,12 @@ def test_loaded_tree_is_available_in_first_viewport(
 ) -> None:
     page.set_viewport_size({"width": width, "height": height})
     page.goto(service + "/")
-    page.fill("#url", "fixture/repo")
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
-    page.click("#reload")
+    page.fill("#entry-url", "fixture/repo")
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
+    page.click("#source-load")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     page.evaluate("document.fonts.ready")
     # Clicking controls may scroll automatically; assess the actual page start.
     page.evaluate("window.scrollTo(0, 0)")
@@ -231,12 +241,13 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     page: Page, service: str, width: int
 ) -> None:
     page.set_viewport_size({"width": width, "height": 640})
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#tui-mode")).to_be_visible()
     assert_no_page_overflow(page)
 
-    page.locator('.row[data-path="docs"] [data-action="note"]').click()
+    page.locator('.row[data-path="docs"]').focus()
+    page.locator("#row-note").click()
     dialog = page.locator("#note-dialog")
     expect(dialog).to_be_visible()
     expect(page.locator("#note-text")).to_be_focused()
@@ -252,9 +263,65 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     expect(dialog.locator(".dialog-hint")).to_be_in_viewport(ratio=1)
     page.keyboard.press("Escape")
 
-    page.locator("#submit").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     dialog = page.locator("#reload-settings")
+    expect(page.locator("#source-create")).to_be_enabled()
     assert dialog.evaluate("element => element.scrollWidth <= element.clientWidth")
-    page.locator("#reload").scroll_into_view_if_needed()
-    expect(page.locator("#reload")).to_be_in_viewport(ratio=1)
+    for selector in ("#source-create", "#source-load"):
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
+    assert_no_page_overflow(page)
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), [(390, 844), (320, 568), (768, 1024), (900, 600)]
+)
+def test_phone_and_tablet_example_give_most_of_the_viewport_to_the_tree(
+    page: Page, service: str, width: int, height: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(service + "/")
+    page.locator("#explore-example").click()
+    expect(page.locator("#rows .row")).not_to_have_count(0)
+    page.evaluate("document.fonts.ready")
+    tree = page.locator(".tree-scroll").bounding_box()
+    assert tree is not None
+    assert tree["height"] > height / 2
+    assert tree["y"] + tree["height"] <= height
+    assert page.evaluate("document.documentElement.scrollHeight <= innerHeight")
+    assert_no_page_overflow(page)
+    for selector in [".wordmark", "#repo-info", "#visit-repo"]:
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
+    page.locator('.row[data-path="src/treestamp"] .fold').click()
+    expect(page.locator('.row[data-path^="src/treestamp/"]').first).to_be_visible()
+    page.locator("#rows .row").last.scroll_into_view_if_needed()
+    expect(page.locator("#row-note")).to_be_in_viewport(ratio=1)
+    expect(page.locator("#row-visibility")).to_be_in_viewport(ratio=1)
+    assert page.evaluate("window.scrollY") == 0
+
+
+@pytest.mark.parametrize("width", [390, 768, 1280])
+def test_settings_keep_discard_below_the_editing_options(
+    page: Page, service: str, width: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": 844})
+    page.goto(f"{service}/fixture/repo?root=.")
+    expect(page.locator("#rows .row")).to_have_count(9)
+    if width < 1024:
+        page.locator(".settings-open").click()
+    settings = page.locator("#settings")
+    expect(settings).to_be_visible()
+    options = settings.locator(".settings-group").bounding_box()
+    discard = page.locator("#reset-tree").bounding_box()
+    assert options is not None and discard is not None
+    assert discard["y"] >= options["y"] + options["height"]
+    for selector in [
+        "#show_counts",
+        "#attribution",
+        "#reveal",
+        "#show-all",
+        "#reset-tree",
+    ]:
+        expect(page.locator(selector)).to_be_in_viewport(ratio=1)
+    assert settings.evaluate("node => node.scrollWidth <= node.clientWidth")
     assert_no_page_overflow(page)

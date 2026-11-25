@@ -128,7 +128,7 @@ function validRow(row) {
 
 function validatePreviewOutput(data) {
   if (!data || typeof data.region !== "string" || !data.region.startsWith("<!-- treestamp:start")) {
-    throw new Error("The replacement tree has no valid output. Your previous draft is unchanged.");
+    throw new Error("The replacement tree has no valid output. Your previous tree is unchanged.");
   }
 }
 
@@ -139,14 +139,14 @@ function validatePreviewSettings(data) {
       || (settings.attribution !== undefined && typeof settings.attribution !== "boolean")
       || !validPath(settings.root) || !validPath(data.root) || !validPath(data.document)
       || ![paths.expanded, paths.hidden, paths.annotations].every(Array.isArray)) {
-    throw new Error("The replacement tree has invalid editing settings. Your previous draft is unchanged.");
+    throw new Error("The replacement tree has invalid editing settings. Your previous tree is unchanged.");
   }
 }
 
 function validatePreviewSource(data) {
   if (!data.repository || ![data.repository.owner, data.repository.name, data.repository.url, data.ref?.commit, data.permalink].every(value => typeof value === "string")
       || !Array.isArray(data.rows) || !data.rows.length || !data.rows.every(validRow)) {
-    throw new Error("The replacement tree is incomplete. Your previous draft is unchanged.");
+    throw new Error("The replacement tree is incomplete. Your previous tree is unchanged.");
   }
 }
 
@@ -182,8 +182,10 @@ export function opBody(editor, settings, reveal, type, path, text) {
 // ---------- messages
 
 export function hintFor(code, status) {
-  if (code === "snapshot_unavailable") return "This temporary snapshot is no longer available. Copy any open draft before reloading. Load the repository URL again to open its current public HEAD.";
-  if (code === "curation") return "Your previous draft is unchanged. Check the reported entry or choose another subtree.";
+  if (code === "snapshot_unavailable") return "This temporary snapshot is no longer available. Copy your current tree before reloading. Load the repository URL again to open its current public HEAD.";
+  if (code === "root_not_found") return "Choose a folder from the repository tree. Your previous tree is unchanged.";
+  if (code === "document_has_no_treestamp") return "Choose another document to load.";
+  if (code === "curation") return "Your previous tree is unchanged. Check the reported entry or choose another subtree.";
   if (status === 400 && code === "invalid_link") return ACCEPTED;
   if (code === "state_too_large") return "This tree has more folds, hidden entries, and notes than the editor can send at once.";
   if (status === 404) return "Only public repositories can be opened, and only their default branch. Check the spelling.";

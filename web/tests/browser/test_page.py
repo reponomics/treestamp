@@ -16,14 +16,13 @@ REPOSITORY = "fixture/repo"  # the fake maps every name to the fixture checkout
 
 def submit(page: Page, service: str, url: str = REPOSITORY) -> None:
     page.goto(service + "/")
-    page.fill("#url", url)
-    page.click("#submit")
-    page.click("#load-tab-document")
-    page.fill("#document", "README.md")
-    page.click("#reload")
+    page.fill("#entry-url", url)
+    page.click("#entry-browse")
+    page.locator('.source-row[data-path="README.md"]').click()
+    page.click("#source-load")
     expect(page.locator("#reload-settings")).to_be_hidden()
     page.wait_for_selector("#rows .row")
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
 
 
 def test_first_load_shows_the_loaded_treestamp_without_script_errors(
@@ -32,16 +31,16 @@ def test_first_load_shows_the_loaded_treestamp_without_script_errors(
     errors: list[str] = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     submit(page, service)
-    expect(page.locator("#loaded-note")).to_have_text("Document opened")
     expect(page.locator("#source-origin")).to_have_count(0)
-    page.locator("#submit").click()
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
     expect(page.locator("#source-origin")).to_have_count(0)
     expect(page.locator("#rows .row")).to_have_count(9)  # . + 3 dirs + 5 files
     expect(page.locator('#rows .row[data-path="docs"] .name')).to_have_text("docs/")
     assert errors == []
 
 
-@pytest.mark.parametrize("width", [320, 390, 1280])
+@pytest.mark.parametrize("width", [320, 390, 820, 1280])
 def test_repository_info_tooltip_does_not_move_the_layout(
     page: Page, service: str, width: int
 ) -> None:
@@ -53,20 +52,14 @@ def test_repository_info_tooltip_does_not_move_the_layout(
     expect(link).to_have_attribute("target", "_blank")
     expect(link).to_have_attribute("rel", "noopener")
     expect(link.locator("svg")).to_be_visible()
-    expect(link).to_have_css("border-top-style", "solid")
     expect(link).to_have_css("text-decoration-line", "none")
-    assert link.evaluate(
-        "element => { const style = getComputedStyle(element); "
-        "return style.borderTopColor !== 'rgba(0, 0, 0, 0)' "
-        "&& style.backgroundColor !== 'rgba(0, 0, 0, 0)'; }"
-    )
     expect(
         page.locator("#repo-details, #repo-details-open, #entries, #meta, #reload-open")
     ).to_have_count(0)
     info = page.get_by_role("button", name="Repository information", exact=True)
     tooltip = page.locator("#repo-tooltip")
     expect(tooltip).to_be_hidden()
-    before = page.locator("#submit, #rows").evaluate_all(
+    before = page.locator("#active-repository, #rows").evaluate_all(
         "elements => elements.map(element => element.getBoundingClientRect().toJSON())"
     )
     info.hover()
@@ -75,8 +68,18 @@ def test_repository_info_tooltip_does_not_move_the_layout(
     expect(tooltip.locator("[data-repo-commit]")).to_have_text(
         re.compile(r"[a-f0-9]{40}")
     )
+    expect(tooltip).to_be_in_viewport(ratio=1)
+    assert tooltip.evaluate("node => node.scrollWidth <= node.clientWidth")
+    # Containment alone misses clipping by a scrolling sidebar. Probe each
+    # corner inside the border to ensure the full tooltip is actually exposed.
+    assert tooltip.evaluate("""node => {
+        const box = node.getBoundingClientRect();
+        return [box.left + 2, box.right - 2].every(x =>
+            [box.top + 2, box.bottom - 2].every(y =>
+                node.contains(document.elementFromPoint(x, y))));
+    }""")
     assert (
-        page.locator("#submit, #rows").evaluate_all(
+        page.locator("#active-repository, #rows").evaluate_all(
             "elements => elements.map(element => element.getBoundingClientRect().toJSON())"
         )
         == before
@@ -84,12 +87,11 @@ def test_repository_info_tooltip_does_not_move_the_layout(
     info.press("Escape")
     expect(tooltip).to_be_hidden()
     # A keyboard user can discover the same tooltip by focusing its trigger.
-    page.locator("#url").focus()
+    page.locator("#visit-repo").focus()
     info.focus()
     expect(tooltip).to_be_visible()
     info.press("Escape")
     expect(tooltip).to_be_hidden()
-    expect(page.locator("#submit")).to_have_text("Load repo")
 
 
 @pytest.mark.parametrize("width", [390, 1280])
@@ -139,8 +141,7 @@ def test_repository_info_keyboard_focus_keeps_tooltip_until_dismissed(
     submit(page, service)
     info = page.get_by_role("button", name="Repository information", exact=True)
     tooltip = page.locator("#repo-tooltip")
-    page.locator("#url").focus()
-    page.keyboard.press("Shift+Tab")  # Visit repo
+    page.locator("#visit-repo").focus()
     page.keyboard.press("Shift+Tab")  # Repository information
     expect(info).to_be_focused()
     expect(tooltip).to_be_visible()
@@ -178,7 +179,8 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
 
     scripts = page.locator('.row[data-path="scripts"]')
     scripts.hover()
-    scripts.locator("button", has_text="Hide").click()
+    scripts.focus()
+    page.locator("#row-visibility").click()
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
     page.click("#tab-stamp")
     expect(page.locator("#region")).to_contain_text('"scripts"')
@@ -188,12 +190,14 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
     hidden = page.locator('.row.hidden-row[data-path="scripts"]')
     expect(hidden).to_have_count(1)
     hidden.hover()
-    hidden.get_by_role("button", name="Unhide", exact=True).click()
+    hidden.focus()
+    page.locator("#row-visibility").click()
     expect(page.locator('.row[data-path="scripts"]:not(.hidden-row)')).to_have_count(1)
 
     src = page.locator('.row[data-path="src"]')
     src.hover()
-    src.get_by_role("button", name="Note", exact=True).click()
+    src.focus()
+    page.locator("#row-note").click()
     page.fill("#note-text", "application code")
     page.press("#note-text", "Enter")
     expect(src.locator(".note")).to_have_text("# application code")
@@ -203,9 +207,13 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
 
 def test_branch_links_open_and_bad_links_explain(page: Page, service: str) -> None:
     submit(page, service, f"https://github.com/{REPOSITORY}/tree/main")
-    page.fill("#url", "not a link")
-    page.click("#submit")
-    page.click("#reload")
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
+    page.click("#entry-change-repo")
+    page.fill("#entry-url", "not a link")
+    page.click("#entry-browse")
+    expect(page.locator("#source-load")).to_be_disabled()
+    expect(page.locator("#source-create")).to_be_disabled()
     expect(page.locator("#reload-error")).to_be_visible()
     expect(page.locator("#reload-error")).to_contain_text("Accepted forms")
 
@@ -235,11 +243,17 @@ def test_one_count_toggle_controls_full_counts_without_config_settings(
     expect(counts).to_have_text("(2 files)")
 
 
-def test_loaded_document_completion_clears_after_edit_without_check_flow(
-    page: Page, service: str
+@pytest.mark.parametrize("width", [320, 768, 1280])
+def test_loaded_document_keeps_tree_and_toolbar_in_place_after_an_edit(
+    page: Page, service: str, width: int
 ) -> None:
+    page.set_viewport_size({"width": width, "height": 844})
     submit(page, service)
-    expect(page.locator("#stage-status")).to_have_text("Treestamp is up to date")
-    expect(page.locator("#check, #maintain, #carry")).to_have_count(0)
+    page.evaluate("document.fonts.ready")
+    anchors = page.locator("#rows, #copy, #row-note, #tab-editor")
+    geometry = "nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return {x: r.x, y: r.y}; })"
+    before = anchors.evaluate_all(geometry)
     page.locator('.row[data-path="docs"] .fold').click()
-    expect(page.locator("#stage-status")).to_be_hidden()
+    expect(page.locator('.row[data-path="docs/api.md"]')).to_have_count(0)
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
+    assert anchors.evaluate_all(geometry) == before

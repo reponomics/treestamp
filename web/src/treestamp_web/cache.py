@@ -42,7 +42,7 @@ def _key(repo: Repository, commit: str) -> SnapshotKey:
 
 
 class SnapshotCache:
-    """Evict records, blobs, and provenance together; reads never extend expiry."""
+    """Evict records, blobs, and provenance together; only accepted work renews TTL."""
 
     def __init__(self, config: Config, clock: Callable[[], float]) -> None:
         self._config, self._clock = config, clock
@@ -71,6 +71,26 @@ class SnapshotCache:
             return None
         self._items.move_to_end(key)
         return entry.snapshot
+
+    def renew(self, repo: Repository) -> None:
+        """Keep an existing snapshot warm after a successfully accepted edit."""
+        self._prune()
+        entry = self._items.get(_key(repo, repo.ref))
+        if entry is not None:
+            self._renew(entry)
+
+    def _renew(self, entry: _Retained) -> None:
+        entry.expires = self._clock() + SNAPSHOT_SECONDS
+        if entry.timer is not None:
+            entry.timer.cancel()
+        # Remove expired content even if no later request arrives. Fake-clock
+        # tests and callers without a running event loop also prune on access.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            entry.timer = None
+        else:
+            entry.timer = loop.call_later(SNAPSHOT_SECONDS, self._prune)
 
     def discard_other_identities(self, repo: Repository, identity: int) -> None:
         """A reused owner/name must not combine snapshots from different repos."""
@@ -119,14 +139,7 @@ class SnapshotCache:
             self._remove(key)
         entry = _Retained(snapshot, self._clock() + SNAPSHOT_SECONDS)
         self._items[key] = entry
-        # Remove expired content even if no later request arrives. Fake-clock
-        # tests and callers without a running event loop also prune on access.
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            pass
-        else:
-            entry.timer = loop.call_later(SNAPSHOT_SECONDS, self._prune)
+        self._renew(entry)
         while not self._fits(self._total_cost()):
             self._remove(next(iter(self._items)))
 

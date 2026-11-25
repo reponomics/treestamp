@@ -1,229 +1,188 @@
-"""Headless maintenance and lazy dispatch to the interactive editor."""
+"""Command verbs, safe terminal output, and lazy interactive dispatch."""
 
 from __future__ import annotations
 
 import argparse
 import difflib
 import sys
+import unicodedata
 from importlib.metadata import version
-from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING
 
-from treestamp.document import (
-    DEFAULT_DOCUMENT_FILE,
-    Document,
-    load_document,
-    prepare_write,
-    publish_write,
-    validate_source_tree,
-)
+from treestamp.cli_inputs import new_editor, read_source
+from treestamp.cli_maintenance import prepare_maintenance
+from treestamp.document import publish_write
 from treestamp.errors import ExecutionError, MarkerError, TreestampError
-from treestamp.gitio import (
-    Snapshot,
-    capture_snapshot,
-    changes,
-    checked_path,
-    document_path,
-    repo_root,
-)
-from treestamp.maintenance import update
-from treestamp.model import Settings, build_tree, tree_path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import TextIO
 
-    from treestamp.editor import EditorController
+COMMANDS = ("new", "load", "update", "check", "help")
 
-COMMANDS = ("tui", "update", "check", "help")
+
+def _print_argument(parser: argparse.ArgumentParser, *, child: bool = False) -> None:
+    parser.add_argument(
+        "--print",
+        dest="print_output",
+        action="store_true",
+        default=argparse.SUPPRESS if child else False,
+        help="print the selected treestamp and exit without opening the editor",
+    )
+
+
+def _editor_commands(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    for command in ("new", "load"):
+        creating = command == "new"
+        child = commands.add_parser(
+            command,
+            help="create a fresh treestamp"
+            if creating
+            else "load a treestamped document",
+            description=(
+                "Create a fresh treestamp from the staged Git index. "
+                "Stage changes before opening the editor."
+                if creating
+                else "Load a document into an updated editor draft. With --print, "
+                "extract the stored treestamp exactly, without updating it."
+            ),
+        )
+        child.add_argument(
+            "path",
+            nargs="?",
+            metavar="DIRECTORY" if creating else "DOCUMENT",
+            help=(
+                "existing directory to use as the tree root "
+                "(default: current directory)"
+                if creating
+                else "document path (default: README.md in the current directory)"
+            ),
+        )
+        _print_argument(child, child=True)
+
+
+def _maintenance_commands(
+    commands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    for command in ("check", "update"):
+        checking = command == "check"
+        child = commands.add_parser(
+            command,
+            help="report proposed changes"
+            if checking
+            else "update a treestamped document",
+            description=(
+                "Report the automatic update as a diff without writing. "
+                "Exit 1 if a change is needed, or 0 if current."
+                if checking
+                else "Update a treestamped document. Unmatched notes prevent writing "
+                "unless --skip-notes-transfer explicitly permits their omission."
+            ),
+        )
+        child.add_argument(
+            "document",
+            nargs="?",
+            help="document path (default: README.md in the current directory)",
+        )
+        if not checking:
+            child.add_argument(
+                "--skip-notes-transfer",
+                action="store_true",
+                help="allow unmatched notes to be omitted from the updated document",
+            )
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="treestamp",
         description=(
-            "Curate Git directory trees. With no command, open the editor. "
-            "Use --load DOCUMENT to open an existing treestamp directly, or --print "
-            "to print the complete treestamp without opening the editor."
+            "Curate Git directory trees. With no command, load the current directory's "
+            "README.md if it contains a treestamp; otherwise create a fresh tree here. "
+            "Use --print to extract the stored treestamp or print the new tree."
         ),
     )
     parser.add_argument(
         "--version", action="version", version=f"treestamp {version('treestamp')}"
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    editor = commands.add_parser(
-        "tui",
-        help="open the editor or print a treestamp",
-        description=(
-            "Create or edit a treestamp from the staged Git index. "
-            "Stage changes before opening the editor."
-        ),
-    )
-    editor.add_argument(
-        "--load",
-        metavar="DOCUMENT",
-        help=(
-            "open an existing treestamp directly; path is relative to cwd or absolute "
-            "and selects its containing repository"
-        ),
-    )
-    editor.add_argument(
-        "--print",
-        dest="print_output",
-        action="store_true",
-        help="print the complete treestamp and exit without writing a document",
-    )
-    for command in ("check", "update"):
-        child = commands.add_parser(
-            command,
-            help=(
-                "report whether update would change a document"
-                if command == "check"
-                else "update a treestamped document"
-            ),
-            description=(
-                "Compare a treestamped document with the target snapshot without "
-                "writing it. Print a diff and exit 1 if an update is needed; "
-                "exit 0 if it is current."
-                if command == "check"
-                else "Update a treestamped document from the target snapshot, "
-                "preserving content outside its treestamp markers."
-            ),
-        )
-        child.add_argument(
-            "document",
-            nargs="?",
-            help=(
-                "document path relative to cwd or absolute; selects its repository "
-                "(default: README.md at the root of cwd's repository)"
-            ),
-        )
-        child.add_argument(
-            "--target",
-            metavar="REF",
-            help="target Git ref (default: staged Git index)",
-        )
-        child.add_argument(
-            "--compare", metavar="REF", help="baseline Git ref for detecting moves"
-        )
+    parser.set_defaults(path=None)
+    _print_argument(parser)
+    commands = parser.add_subparsers(dest="command")
+    _editor_commands(commands)
+    _maintenance_commands(commands)
     help_command = commands.add_parser("help", help="show general or command help")
     help_command.add_argument(
-        "help_command",
-        metavar="COMMAND",
-        nargs="?",
-        choices=COMMANDS,
-        help=f"command to describe: {', '.join(COMMANDS)} (default: general help)",
+        "help_command", metavar="COMMAND", nargs="?", choices=COMMANDS
     )
     return parser
 
 
-def _cli_document(value: str | None) -> tuple[Path, Path]:
-    """Resolve shell paths once, then retain the editor's repository boundaries."""
-    if value is None:
-        repository = repo_root(Path.cwd())
-        return repository, document_path(repository, DEFAULT_DOCUMENT_FILE)
-    path = Path(value)
-    windows = PureWindowsPath(value)
-    if (
-        not value
-        or "\x00" in value
-        or ((windows.drive or windows.root) and not path.is_absolute())
-    ):
-        raise MarkerError("document path must be a nonempty native filesystem path")
-    # Inspect the original spelling before normalization can erase link/.. pairs.
-    absolute = path.absolute()
-    for parent in reversed(absolute.parents):
-        checked_path(parent)
-    destination = checked_path(absolute)
-    if destination.is_dir():
-        raise MarkerError("document path must name a file")
-    repository = repo_root(destination)
-    return repository, document_path(repository, destination.relative_to(repository))
-
-
 def _maintain(args: argparse.Namespace) -> int:
-    repository, path = _cli_document(args.document)
-    document, previous = load_document(path)
-    assert document is not None and previous is not None
-    root = repository / document.settings.root
-    target = capture_snapshot(root, args.target, repository=repository)
-    validate_source_tree(target.tree, document.settings)
-    if args.compare == "":
-        raise MarkerError("--compare requires a nonempty ref")
-    moves = changes(target, args.compare).moves if args.compare is not None else None
-    hidden = frozenset(
-        tree_path(path, document.settings.root) for path in document.hidden
-    )
-    tree = update(
-        document.tree, target.tree, document.settings, hidden=hidden, moves=moves
-    )
-    maintained = Document(tree, document.settings, document.hidden)
-    prepared = prepare_write(
-        maintained, previous.path, expected=previous, repository=repository
-    )
-    if prepared.content == previous.content:
-        _emit(f"Current: {previous.path}\n")
+    source = read_source(args.document)
+    result = prepare_maintenance(source)
+    assert source.saved is not None
+    if result.unmatched:
+        if args.command == "update" and not args.skip_notes_transfer:
+            raise MarkerError(result.transfer_notice(), location=str(source.path))
+        _diagnostic(result.transfer_notice())
+    prepared = result.prepared
+    if prepared.content == source.saved.content:
+        _emit(f"Current: {source.path}\n")
         return 0
     if args.command == "check":
-        before = previous.content.decode("utf-8", "replace").splitlines(keepends=True)
+        before = source.saved.content.decode("utf-8", "replace").splitlines(
+            keepends=True
+        )
         after = prepared.content.decode("utf-8", "replace").splitlines(keepends=True)
         _emit(
             "".join(
                 difflib.unified_diff(
-                    before,
-                    after,
-                    fromfile=str(previous.path),
-                    tofile=str(previous.path),
+                    before, after, fromfile=str(source.path), tofile=str(source.path)
                 )
             )
         )
         return 1
     publish_write(prepared)
-    _emit(f"Updated: {previous.path}\n")
+    _emit(f"Updated: {source.path}\n")
     return 0
 
 
-def _editor_inputs(args: argparse.Namespace) -> EditorController:
-    from treestamp.editor import EditorController
-
-    repository, path = _cli_document(args.load)
-    document, previous = load_document(path, allow_absent=args.load is None)
-    settings = document.settings if document else Settings()
-    target = capture_snapshot(repository / settings.root, repository=repository)
-    return EditorController(
-        target,
-        settings,
-        tree=document.tree if document else None,
-        hidden=document.hidden if document else frozenset(),
-        document_path=path,
-        document_snapshot=previous,
-        loaded_document=document,
-    )
-
-
 def _explore(args: argparse.Namespace) -> int:
+    if args.command == "new":
+        editor = new_editor(args.path)
+    else:
+        source = read_source(args.path, allow_absent=args.command is None)
+        if source.document is not None and args.print_output:
+            _emit(source.region_text())
+            return 0
+        editor = source.editor() if source.document is not None else new_editor(None)
     if args.print_output:
-        _emit(_editor_inputs(args).region_text())
+        _emit(editor.region_text())
         return 0
-    from treestamp.editor import EditorController
     from treestamp.tui import explore
 
-    if args.load is not None:
-        editor = _editor_inputs(args)
-        startup_document = None
-    else:
-        repository = repo_root(Path.cwd())
-        # New/Load captures its selected subtree only after the opening choice.
-        editor = EditorController(
-            Snapshot(repository, repository, build_tree([]), ""), Settings()
-        )
-        startup_document = Path(DEFAULT_DOCUMENT_FILE)
-    if explore(editor, startup_document=startup_document):
+    if explore(editor):
         _emit(editor.region_text())
     return 0
 
 
+def _terminal_text(text: str, stream: TextIO) -> str:
+    """Escape terminal controls, preserving layout and raw redirected output."""
+    if not stream.isatty():
+        return text
+    # CRLF is a line ending; a bare CR could overwrite already displayed text.
+    return "".join(
+        ascii(char)[1:-1]
+        if char not in "\n\t" and unicodedata.category(char) in {"Cc", "Cs"}
+        else char
+        for char in text.replace("\r\n", "\n")
+    )
+
+
 def _emit(text: str) -> None:
-    """Preserve Git bytes and newlines even through a Windows output pipe."""
+    """Display safely on a terminal; preserve Git bytes/newlines through pipes."""
+    text = _terminal_text(text, sys.stdout)
     stream = getattr(sys.stdout, "buffer", None)
     if stream is None:
         sys.stdout.write(text)
@@ -233,25 +192,29 @@ def _emit(text: str) -> None:
     stream.flush()
 
 
+def _diagnostic(text: str) -> None:
+    print(_terminal_text(f"treestamp: {text}", sys.stderr), file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    arguments = list(sys.argv[1:] if argv is None else argv)
-    if not arguments or arguments[0] not in (*COMMANDS, "--help", "-h", "--version"):
-        arguments.insert(0, "tui")
     try:
         parser = _parser()
-        args = parser.parse_args(arguments)
+        args = parser.parse_args(argv)
         if args.command == "help":
-            # Validate help's arguments before argparse's help action exits.
             target = [args.help_command] if args.help_command else []
             parser.parse_args([*target, "--help"])
-        if args.command == "tui":
-            return _explore(args)
-        return _maintain(args)
+        if args.command in ("check", "update"):
+            if args.print_output:
+                parser.error(
+                    "--print is only available for new, load, or automatic startup"
+                )
+            return _maintain(args)
+        return _explore(args)
     except TreestampError as exc:
-        print(f"treestamp: {exc}", file=sys.stderr)
+        _diagnostic(str(exc))
         return exc.exit_code
     except (OSError, UnicodeError) as exc:
-        print(f"treestamp: {exc}", file=sys.stderr)
+        _diagnostic(str(exc))
         return ExecutionError.exit_code
     except KeyboardInterrupt:
         return 130

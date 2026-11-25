@@ -27,7 +27,7 @@ nvm install
 nvm use
 ```
 
-`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. See the testing guide for [browser installation and test commands](../docs/testing.md#suites-and-commands) and [pinned actionlint setup](../docs/testing.md#workflow-linter), and [web/README.md](../web/README.md) to run the application locally.
+`make install` synchronizes both packages, build tools, and all test dependencies from the committed `uv.lock`. It fails if the dependency declarations have changed without updating the lock. `make web-install` and `make web-browser-install` are aliases for the same workspace setup. See [browser installation](#browser-tests) and [workflow linting](#workflow-linting) below for additional tools, and [web/README.md](../web/README.md) to run the application locally.
 
 The Makefile uses POSIX paths. On Windows, set `UV_PROJECT_ENVIRONMENT=venv`, then run `uv sync --locked --all-packages --all-extras --no-install-workspace --no-build` followed by `uv sync --locked --all-packages --all-extras --no-build-isolation`. Activate `venv` and invoke Python tools directly; the [CI workflow](workflows/ci.yml) contains the Windows regression and installed-package commands.
 
@@ -41,12 +41,83 @@ Dependencies are obtained from PyPI through uv. For intentional dependency chang
 
 ## Tests for changes
 
-Non-trivial changes must add or update behavioral tests in the same pull request. Both Python suites enforce a **95% coverage minimum**. The [testing guide](../docs/testing.md) defines the full policy, suite responsibilities, coverage boundaries, and current verification status.
+Follow the [testing policy](../docs/testing.md) for regression coverage, suite responsibilities, measurement boundaries, and verification limits.
 
 ## Check changes
 
-Run `make check:pre-commit` on staged changes before committing and `make check:pr` on the candidate before review. The [testing guide](../docs/testing.md#which-command-should-i-run) defines these checkpoints, their prerequisites, and the focused checks available during implementation. It also covers [CI and local hooks](../docs/testing.md#ci-and-local-hooks); use the [maintenance runbook](../docs/MAINTENANCE.md#validate-and-build) for release and installed-package checks.
+Run commands from the repository root after setup. Install the staged-file Git hook with `venv/bin/pre-commit install`.
 
-Stage source additions, deletions, and moves before running `venv/bin/treestamp update README.md`; inspect and stage the resulting README separately. Treestamp and its hooks never stage or commit files. `make integration-check` verifies the staged tree against the README. After committing a candidate, `make hook-check` verifies hooks installed from that HEAD; it does not cover uncommitted changes.
+| Checkpoint | Command | Scope |
+| --- | --- | --- |
+| Before committing | `make check:pre-commit` | Development hooks on staged files: formatting/lint, applicable types, selected Python tests, and README freshness |
+| Before opening or updating a PR | `make check:pr` | Toolchain and lock checks, workflow lint, core/hosted/JavaScript/browser suites, documentation and README checks, package and installed-hook acceptance, and the container build |
 
-Preserve exact path identity, frozen editing snapshots, and draft recovery on failed operations. Keep Markdown prose unwrapped. Include release notes when a change requires users to modify their documents or workflows. Update the documentation a change affects in the same pull request, and treat errors in the documentation as bugs.
+The staged hook may apply formatting changes; inspect and restage them before retrying. `make pre-commit-check` runs the development hooks over all files. Selected tests do not replace complete suite verification for shared behavior changes.
+
+Python test and coverage targets, including staged-file tests, treat implicit text-encoding warnings as errors in both the test runner and its Python subprocesses. Specify the intended encoding when reading or writing text, including in fixtures.
+
+The PR checkpoint requires [Chromium](#browser-tests), [actionlint](#workflow-linting), a running Docker daemon, and network access for package installation and container images. Commit the candidate before the final run because installed-hook acceptance reads `HEAD`. Run one checkpoint per invocation so formatting and environment changes do not race with tests.
+
+Stage source additions, deletions, and moves before running `venv/bin/treestamp update README.md`; inspect and stage the resulting README separately. If unmatched notes block the update, follow the [README maintenance instructions](../docs/MAINTENANCE.md#readme-tree-and-alternate-styles). Treestamp and its hooks do not stage or commit files. `make integration-check` verifies the staged tree against the README.
+
+Preserve exact path identity, frozen editing snapshots, and draft recovery on failed operations. Keep Markdown prose unwrapped. Include release notes when a change requires users to modify their documents or workflows. Update affected documentation in the same pull request.
+
+### Focused checks
+
+| Command | Scope |
+| --- | --- |
+| `make test` | Core Python regression suite |
+| `make web-test` | Hosted Python suite |
+| `make web-browser-test` | Browser journeys |
+| `make web-js-test` | Pure JavaScript logic; also `npm --prefix web test` |
+| `make ci` | Core lint, formatting, types, and coverage gate |
+| `make web-ci` | Hosted lint, formatting, types, Python coverage, and JavaScript logic coverage |
+| `make docs-check` | Local document destinations and packaged README URLs; excludes remote availability and fragment anchors |
+| `make integration-check` | README treestamp and generated style previews |
+
+For a disposable terminal note-transfer fixture, run `make reconcile-demo`. It creates a temporary repository with moved and removed paths and launches the editor there.
+
+### Browser tests
+
+Install a browser after the Python dependencies:
+
+```bash
+venv/bin/playwright install chromium
+make web-browser-test
+```
+
+Use `BROWSER_FLAGS="--browser-channel chrome"` for installed Chrome. On Linux, `venv/bin/playwright install --with-deps chromium` also installs system dependencies. Browser tests run separately from the hosted suite because Playwright's event loop conflicts with its use of `asyncio.run`.
+
+For optional visual inspection, follow the [UI review protocol](../docs/ui-review.md).
+
+### Workflow linting
+
+Install GitHub CLI and authenticate with `gh auth login`, or provide `GH_TOKEN`. Then install and run the version pinned in `.tool-versions`:
+
+```bash
+make actionlint-install
+make workflow-check
+```
+
+The installer verifies the release's GitHub artifact attestation before extracting or executing it. It supports macOS and Linux on x86_64 and ARM64 and installs into `.tools/bin/`. `ACTIONLINT=/path/to/actionlint` overrides the destination and executable; `GH=/path/to/gh` overrides GitHub CLI. Missing or mismatched versions fail with installation guidance. Tool upgrades are covered in [Maintenance](../docs/MAINTENANCE.md#dependencies-and-toolchain).
+
+### Coverage reports
+
+| Command | Report |
+| --- | --- |
+| `make cov` | Core Python statements and branches |
+| `make web-cov` | Hosted Python statements and branches |
+| `make web-js-cov` | JavaScript logic lines, branches, and functions |
+| `make cov-python` | Both Python suites, followed by their combined report |
+| `make cov-all` | Combined Python coverage and a separate JavaScript report |
+
+`cov-python` runs the suites sequentially with their independent gates, then combines `.coverage` and `web/.coverage` into `.coverage.python`. It removes an old aggregate before running and stops if either suite fails. `make clean` removes these files.
+
+Pass `COV_ARGS` to produce additional Python report formats:
+
+```bash
+make cov COV_ARGS=--cov-report=json:/tmp/treestamp-core.json
+make web-cov COV_ARGS=--cov-report=xml
+```
+
+XML reports are written as `coverage.xml` and `web/coverage.xml`. The [coverage workflow](workflows/coverage.yml) uploads these to Codecov with separate core/web flags and the path correction in [codecov.yml](../codecov.yml). JavaScript coverage is also available through `npm --prefix web run test:coverage`. See the [testing policy](../docs/testing.md#measurement-scope) for report boundaries.

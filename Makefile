@@ -4,6 +4,8 @@ PYTHON ?= python3
 UV ?= uv
 UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
 NODE ?= node
+VHS ?= vhs
+DEMO_DIR ?= output/reconcile-demo
 DOCKER ?= docker
 DIST_DIR ?= dist
 FLY ?= flyctl
@@ -28,8 +30,15 @@ SMOKE_REPO ?= reponomics/treestamp
 SMOKE_URL ?= https://treestamp.reponomics.org
 SMOKE_CHECKOUT ?= .
 WEB_VENV := $(abspath $(VENV))
+UI_URL ?= http://127.0.0.1:8000
+UI_REPO ?= fixture/repo
+UI_OUTPUT ?= output/ui-review
+UI_BROWSER ?= chrome
 # Extra pytest-cov options for cov and web-cov, e.g. COV_ARGS=--cov-report=xml
 COV_ARGS ?=
+# Fail on locale-dependent text I/O, including in Python subprocesses.
+test cov web-test web-cov web-browser-test toolchain-check: export PYTHONWARNDEFAULTENCODING = 1
+test cov web-test web-cov web-browser-test toolchain-check: export PYTHONWARNINGS := $(PYTHONWARNINGS),error::EncodingWarning
 .PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check toolchain-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets
@@ -73,9 +82,17 @@ typecheck: ## Check strict Python types
 	$(VENV)/bin/mypy
 test: ## Run the regression suite, including headless TUI journeys
 	$(PY) -m pytest
-cov: ## Run tests with branch coverage
+cov: ## Measure core Python statement and branch coverage (95% minimum)
 	$(PY) -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
-ci: format-check lint typecheck cov ## Run core quality gates (see docs/testing.md for combined checks)
+.PHONY: cov-python cov-all
+cov-python: ## Run both Python coverage suites and report their combined total
+	rm -f .coverage.python
+	$(MAKE) cov COVERAGE_FILE="$(CURDIR)/.coverage"
+	$(MAKE) web-cov COVERAGE_FILE="$(CURDIR)/web/.coverage"
+	$(PY) -m coverage combine --data-file=.coverage.python --keep .coverage web/.coverage
+	$(PY) -m coverage report --data-file=.coverage.python --fail-under=95
+cov-all: cov-python web-js-cov ## Measure all current coverage scopes: combined Python and separate JavaScript
+ci: format-check lint typecheck cov ## Run core formatting, lint, types, and coverage checks
 docs-check: ## Check retained local documentation links and packaged README URLs
 	$(PY) scripts/check_docs.py
 metadata-check: ## Check built metadata, README rendering, package contents, and hashes
@@ -107,10 +124,17 @@ hook-check: ## Exercise installed repository hooks at HEAD
 	$(PY) scripts/hook_check.py
 pre-commit-check: ## Run the repository development hooks
 	$(VENV)/bin/pre-commit run --all-files
+.PHONY: reconcile-demo reconcile-video
+reconcile-demo: ## Try annotation placement in a disposable example repository
+	PYTHONPATH=src $(PY) scripts/reconcile_demo.py
+
+reconcile-video: ## Record and verify a TUI note-placement demo (requires VHS)
+	PYTHONPATH=src $(PY) scripts/demos/record_reconcile.py --vhs "$(VHS)" --output "$(DEMO_DIR)"
+
 tui: ## Open the editor
 	$(CLI)
 clean: ## Remove generated build and coverage artifacts
-	rm -rf dist/ build/ .coverage htmlcov/ coverage.xml web/.coverage web/coverage.xml
+	rm -rf dist/ build/ .coverage .coverage.python htmlcov/ coverage.xml web/.coverage web/coverage.xml
 web-install: install ## Sync the locked workspace, including hosted development dependencies
 web-browser-install: install ## Sync the locked browser test dependencies (install Chromium separately)
 web-lint: ## Lint the web editor project
@@ -119,7 +143,7 @@ web-typecheck: ## Check strict types for the web editor project
 	cd web && $(WEB_VENV)/bin/mypy
 web-test: ## Run the web editor tests
 	cd web && $(WEB_VENV)/bin/python -m pytest
-web-cov: ## Run the web editor tests with branch coverage
+web-cov: ## Measure hosted Python statement and branch coverage (95% minimum)
 	cd web && $(WEB_VENV)/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=95 $(COV_ARGS)
 web-ci: web-lint web-typecheck web-cov web-js-cov ## Run hosted Python and JS quality gates (browser tests are separate)
 web-js-test: ## Run the page's pure-logic tests with Node's test runner
@@ -129,6 +153,11 @@ web-js-cov: ## Measure pure JavaScript logic coverage (excludes browser DOM code
 	$(NODE) --experimental-test-coverage --test --test-coverage-include='**/static/logic.js' web/tests/js/*.test.mjs
 web-browser-test: ## Drive the page in a browser (needs make install and a browser)
 	cd web && $(WEB_VENV)/bin/python -m pytest -q -o addopts="" -m browser tests/browser $(BROWSER_FLAGS)
+.PHONY: web-ui-screenshots web-ui-clean
+web-ui-screenshots: ## Capture UI states and contact sheets for a quick visual review
+	$(PY) web/scripts/capture_ui.py --url "$(UI_URL)" --repo "$(UI_REPO)" --output "$(UI_OUTPUT)" --browser "$(UI_BROWSER)"
+web-ui-clean: ## Remove the screenshot gallery after review
+	$(PY) web/scripts/capture_ui.py --output "$(UI_OUTPUT)" --clean
 web-fake: ## Serve this checkout as a fake GitHub API on FAKE_PORT (FAKE_FLAGS adds failure modes)
 	$(PY) web/scripts/fake_github.py --repo . --port $(FAKE_PORT) $(FAKE_FLAGS)
 web-serve: ## Run the web editor locally against GITHUB_API_URL

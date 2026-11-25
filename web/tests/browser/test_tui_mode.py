@@ -13,9 +13,9 @@ pytestmark = pytest.mark.browser
 
 
 def open_editor(page: Page, service: str, *, tui_mode: bool = True) -> None:
-    page.goto(f"{service}/fixture/repo")
+    page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
-    expect(page.locator("#submit")).to_be_enabled()
+    expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
     expect(page.locator("#tui-mode")).to_have_attribute("aria-pressed", "false")
     if tui_mode:
         page.locator("#tui-mode").click()
@@ -61,10 +61,11 @@ def test_tui_mode_starts_off_and_preserves_native_button_activation(
     expect(row(page, "docs/api.md")).to_have_count(0)
     docs.locator(".fold").press("Enter")
     expect(row(page, "docs/api.md")).to_have_count(1)
-    docs.get_by_role("button", name="Note", exact=True).press("Space")
+    docs.focus()
+    page.locator("#row-note").press("Space")
     expect(page.locator("#note-text")).to_be_focused()
     page.locator("#note-text").press("Escape")
-    expect(docs.get_by_role("button", name="Note", exact=True)).to_be_focused()
+    expect(page.get_by_role("button", name="Note", exact=True)).to_be_focused()
 
 
 def test_tui_mode_leaves_modified_and_composing_keys_to_the_browser(
@@ -118,7 +119,10 @@ def test_tui_annotation_uses_dialog_and_preserves_native_text_input(
     expect(docs.locator(".note")).to_have_text("# ahHSf?")
     expect(docs).to_be_focused()
 
-    repository = page.locator("#url")
+    page.locator(".wordmark").click()
+    page.locator("#entry-browse").click()
+    page.locator("#entry-change-repo").click()
+    repository = page.locator("#entry-url")
     repository.fill("")
     repository.press_sequentially("ahHSf?")
     expect(repository).to_have_value("ahHSf?")
@@ -363,3 +367,34 @@ def test_tui_count_key_toggles_one_boolean(page: Page, service: str) -> None:
         expect(page.locator("#rows")).to_have_attribute("aria-busy", "false")
         expect(page.locator("#show_counts")).to_be_checked(checked=shown)
         expect(docs).to_be_focused()
+
+
+@pytest.mark.parametrize("width", [390, 768])
+def test_home_keeps_selected_row_visible_below_toolbar(
+    page: Page, service: str, width: int
+) -> None:
+    page.set_viewport_size({"width": width, "height": 500})
+    page.goto(service + "/")
+    page.locator("#explore-example").click()
+    page.locator('.row[data-path="src/treestamp"] .fold').click()
+    expect(page.locator('.row[data-path^="src/treestamp/"]')).not_to_have_count(0)
+    page.locator("#tui-mode").click()
+    page.locator("#rows .row").last.focus()
+    page.locator(".tree-scroll").evaluate(
+        "node => { node.scrollTop = node.scrollHeight; }"
+    )
+    root = row(page, "")
+    toolbar = page.locator(".editor-toolbar")
+    before = root.bounding_box()
+    toolbar_before = toolbar.bounding_box()
+    assert before is not None and toolbar_before is not None
+    assert before["y"] < toolbar_before["y"] + toolbar_before["height"]
+
+    page.keyboard.press("Home")
+    expect(root).to_be_focused()
+    expect(root).to_have_attribute("data-selected", "true")
+    expect(root.locator(".name")).to_be_in_viewport(ratio=1)
+    selected_bounds = root.bounding_box()
+    toolbar_bounds = toolbar.bounding_box()
+    assert selected_bounds is not None and toolbar_bounds is not None
+    assert selected_bounds["y"] >= (toolbar_bounds["y"] + toolbar_bounds["height"] - 1)
