@@ -10,6 +10,7 @@ sources without matching tests select the project's full suite.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -81,7 +82,10 @@ def main(argv: list[str]) -> int:
         ]
         print(f"{project}: running {' '.join(rel)}", flush=True)
         command.extend(rel)
-    return subprocess.call(command, cwd=cwd)  # noqa: S603
+    env = dict(os.environ)
+    env["PYTHONWARNDEFAULTENCODING"] = "1"
+    env["PYTHONWARNINGS"] = env.get("PYTHONWARNINGS", "") + ",error::EncodingWarning"
+    return subprocess.call(command, cwd=cwd, env=env)  # noqa: S603
 
 
 if __name__ == "__main__":

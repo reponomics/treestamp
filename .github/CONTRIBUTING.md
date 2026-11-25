@@ -54,6 +54,8 @@ Run commands from the repository root after setup. Install the staged-file Git h
 
 The staged hook may apply formatting changes; inspect and restage them before retrying. `make pre-commit-check` runs the development hooks over all files. Selected tests do not replace complete suite verification for shared behavior changes.
 
+Python test and coverage targets, including staged-file tests, treat implicit text-encoding warnings as errors in both the test runner and its Python subprocesses. Specify the intended encoding when reading or writing text, including in fixtures.
+
 The PR checkpoint requires [Chromium](#browser-tests), [actionlint](#workflow-linting), a running Docker daemon, and network access for package installation and container images. Commit the candidate before the final run because installed-hook acceptance reads `HEAD`. Run one checkpoint per invocation so formatting and environment changes do not race with tests.
 
 Stage source additions, deletions, and moves before running `venv/bin/treestamp update README.md`; inspect and stage the resulting README separately. If unmatched notes block the update, follow the [README maintenance instructions](../docs/MAINTENANCE.md#readme-tree-and-alternate-styles). Treestamp and its hooks do not stage or commit files. `make integration-check` verifies the staged tree against the README.

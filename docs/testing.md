@@ -10,6 +10,8 @@ Changes that leave behavior unchanged, such as documentation edits or refactorin
 
 Prefer deterministic fixtures and controlled clocks or transports. Avoid assertions on incidental wording, elaborate mocks for unreachable states, and tests that only mirror the implementation. Integration tests should exercise public interfaces and real component boundaries where practical.
 
+Text I/O must specify its encoding; Python validation treats `EncodingWarning` as an error. Fixtures for byte-sensitive document behavior must control line endings explicitly. Git-index fixtures must use paths valid on supported platforms; unusual path encodings can be exercised through Git objects without checking those paths out.
+
 Focused tests provide feedback during development. Relevant complete suites are required before review. Automated browser and headless terminal tests do not establish that real terminals, native clipboards, or responsive layouts work correctly in every environment.
 
 ## Suite responsibilities

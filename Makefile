@@ -36,6 +36,9 @@ UI_OUTPUT ?= output/ui-review
 UI_BROWSER ?= chrome
 # Extra pytest-cov options for cov and web-cov, e.g. COV_ARGS=--cov-report=xml
 COV_ARGS ?=
+# Fail on locale-dependent text I/O, including in Python subprocesses.
+test cov web-test web-cov web-browser-test toolchain-check: export PYTHONWARNDEFAULTENCODING = 1
+test cov web-test web-cov web-browser-test toolchain-check: export PYTHONWARNINGS := $(PYTHONWARNINGS),error::EncodingWarning
 .PHONY: tls-check fly-production-deploy fly-preview-deploy workflow-check lock-check lock-update web-browser-install uv-check toolchain-check
 export UV_PROJECT_ENVIRONMENT := $(abspath $(VENV))
 help: ## Show available targets

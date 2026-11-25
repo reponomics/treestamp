@@ -30,7 +30,10 @@ def test_loaded_write_collapse_and_restore_preserve_transient_state(
     write_document(
         editor.document(), editor.state.snapshot.repo / "tree.md", create=True
     )
-    destination.write_text("# Before\n\n" + destination.read_text() + "\nAfter.\n")
+    destination.write_text(
+        "# Before\n\n" + destination.read_text(encoding="utf-8") + "\nAfter.\n",
+        encoding="utf-8",
+    )
     editor.adopt(editor.prepare_load("tree.md"))
 
     async def journey() -> None:

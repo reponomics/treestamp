@@ -205,7 +205,7 @@ def test_open_updates_before_editing_and_keeps_baseline(
     assert updated.dirty and updated.notice == OPEN_NOTICE
     assert "new.txt" in updated.tree and "other.txt" not in updated.tree
     assert "top.txt" not in updated.tree and "repository" in updated.tree
-    assert (repo.path / "README.md").read_text() == original
+    assert (repo.path / "README.md").read_text(encoding="utf-8") == original
     assert updated.state["curation"]["hidden"] == ["top.txt"]
     noted = op(service, updated, "annotate", "sub/new.txt", "new annotation")
     assert noted.state["baseline"] == updated.state["baseline"]
@@ -590,7 +590,7 @@ def test_open_rejects_indented_boundaries(
     service, _ = service_for(fake)
     with pytest.raises(PreviewError, match="boundary markers must not be indented"):
         preview(service)
-    assert (repo.path / "README.md").read_text() == original
+    assert (repo.path / "README.md").read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,10 @@ VERSION = r"[0-9]+\.[0-9]+\.[0-9]+"
 
 def read_pin(path: Path, entry_pattern: str, pin_pattern: str, flags: int = 0) -> str:
     """Require one entry before validating its exact version and syntax."""
-    lines = [line.split("#", 1)[0].strip() for line in path.read_text().splitlines()]
+    lines = [
+        line.split("#", 1)[0].strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
     entries = [line for line in lines if re.match(entry_pattern, line, re.IGNORECASE)]
     if len(entries) != 1:
         raise ValueError(f"{path}: expected exactly one uv pin; found {len(entries)}")

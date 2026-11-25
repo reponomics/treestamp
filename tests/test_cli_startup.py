@@ -162,7 +162,7 @@ def test_bare_startup_creates_at_cwd_without_document_destination(
     repo.add(".")
     readme = repo.path / "docs/README.md"
     if contents is not None:
-        readme.write_text(contents)
+        readme.write_text(contents, encoding="utf-8")
     monkeypatch.chdir(readme.parent)
     opened = capture_editor(monkeypatch)
 
@@ -176,7 +176,7 @@ def test_bare_startup_creates_at_cwd_without_document_destination(
     if contents is None:
         assert not readme.exists()
     else:
-        assert readme.read_text() == contents
+        assert readme.read_text(encoding="utf-8") == contents
 
 
 @pytest.mark.parametrize("saved_root", [".", "docs"])
@@ -223,7 +223,7 @@ def test_new_accepts_directory_without_attaching_document(
     assert opened[0].state.session.settings.root == "docs"
     assert opened[0].state.document_path is None
     assert not opened[0].state.session.annotations
-    assert file.read_text() == "<!-- treestamp:start -->broken"
+    assert file.read_text(encoding="utf-8") == "<!-- treestamp:start -->broken"
 
 
 @pytest.mark.parametrize("absolute", [False, True])

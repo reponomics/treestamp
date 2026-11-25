@@ -498,9 +498,9 @@ def test_healthz_reports_the_credential_and_config_rejects_partial_app_settings(
 
 def test_credentials_can_be_read_from_separate_files(tmp_path: Path) -> None:
     key = tmp_path / "app.pem"
-    key.write_text("-----BEGIN X-----\nabc\n-----END X-----\n")
+    key.write_text("-----BEGIN X-----\nabc\n-----END X-----\n", encoding="utf-8")
     token = tmp_path / "token"
-    token.write_text("ghp_example\n")
+    token.write_text("ghp_example\n", encoding="utf-8")
     config = Config.from_env(
         {
             "GITHUB_APP_CLIENT_ID": "1",
@@ -516,10 +516,10 @@ def test_credentials_can_be_read_from_separate_files(tmp_path: Path) -> None:
         Config.from_env({"GITHUB_TOKEN": "t", "GITHUB_TOKEN_FILE": str(token)})
     with pytest.raises(ConfigError, match="could not be read"):
         Config.from_env({"GITHUB_TOKEN_FILE": str(tmp_path / "missing")})
-    (tmp_path / "empty").write_text("\n")
+    (tmp_path / "empty").write_text("\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="empty file"):
         Config.from_env({"GITHUB_TOKEN_FILE": str(tmp_path / "empty")})
-    key.write_text("not a key")
+    key.write_text("not a key", encoding="utf-8")
     with pytest.raises(ConfigError, match="PEM"):
         Config.from_env(
             {

@@ -66,7 +66,7 @@ def _git(path: Path, *args: str) -> str:
     return subprocess.run(  # noqa: S603
         ["git", "-C", str(path), *signing, *args],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     ).stdout.strip()
 
@@ -93,7 +93,7 @@ def _build_fixture(path: Path) -> Fixture:
     }.items():
         target = path / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text)
+        target.write_text(text, encoding="utf-8")
     _git(path, "add", "-A")
     _git(path, "commit", "-q", "-m", "files")
     old = _git(path, "rev-parse", "HEAD")

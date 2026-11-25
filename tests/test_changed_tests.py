@@ -87,3 +87,42 @@ def test_split_suite_without_original_file_is_selected(
         path.touch()
     assert changed_tests.select(project, [str(source / "document.py")]) == expected
     assert changed_tests.select(project, [str(source / "unknown.py")]) is None
+
+
+@pytest.mark.parametrize("child", [False, True])
+@pytest.mark.parametrize("explicit", [False, True])
+def test_hook_enforces_encoding_in_tests_and_subprocesses(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    child: bool,
+    explicit: bool,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    # A caller's permissive filter must not disable this check.
+    monkeypatch.setenv("PYTHONWARNINGS", "ignore::EncodingWarning")
+    monkeypatch.setenv("PYTHONWARNDEFAULTENCODING", "0")
+    monkeypatch.delenv("PYTEST_ADDOPTS", raising=False)
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    probe = tests / "test_encoding.py"
+    read = "Path('payload').read_text(" + ('encoding="utf-8"' if explicit else "") + ")"
+    code = "from pathlib import Path; " + read
+    body = (
+        f"subprocess.run([sys.executable, '-c', {code!r}], check=True)"
+        if child
+        else read
+    )
+    probe.write_text(
+        "import subprocess, sys\nfrom pathlib import Path\n"
+        f"def test_read():\n    {body}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "payload").write_text("tree", encoding="utf-8")
+
+    result = changed_tests.main(["package", "tests/test_encoding.py"])
+
+    assert result == (0 if explicit else 1)
+    output = capfd.readouterr()
+    if not explicit:
+        assert "EncodingWarning" in output.out + output.err

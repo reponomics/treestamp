@@ -53,6 +53,7 @@ def verify_index(checkout: Path, commit: str) -> None:
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=True,
     ).stdout.strip()
     subprocess.run(  # noqa: S603
@@ -85,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         ["git", "-C", str(checkout), "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=True,
     ).stdout.strip()
 

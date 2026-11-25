@@ -38,7 +38,7 @@ def build_placement_fixture(path: Path) -> Fixture:
     for relative, content in files.items():
         target = path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content)
+        target.write_text(content, encoding="utf-8")
     _git(path, "add", "-A")
     _git(path, "commit", "-q", "-m", "Create project")
     old = _git(path, "rev-parse", "HEAD")
