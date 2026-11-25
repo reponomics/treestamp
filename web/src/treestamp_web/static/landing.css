@@ -3,7 +3,7 @@
 .entry-welcome {
   flex: none;
   width: min(100%, 44rem);
-  margin: clamp(1.5rem, 6vh, 4.5rem) auto var(--s7);
+  margin: var(--s4) auto var(--s7);
 }
 
 /* The mark fills the space beside the hero text and is omitted where that space is lacking. */
@@ -11,13 +11,13 @@
   display: grid;
   column-gap: var(--s5);
   align-items: center;
-  margin-bottom: var(--s7);
+  margin-bottom: var(--s6);
 }
 .entry-hero > :not(.entry-mark) { grid-column: 1; }
 .entry-mark {
   grid-column: 2;
   grid-row: 1 / span 3;
-  width: 10rem;
+  width: 7.5rem;
   height: auto;
   aspect-ratio: 1;
   color: var(--accent);
@@ -28,20 +28,35 @@
   margin-bottom: var(--s4);
 }
 .entry-purpose { font-size: 1.5rem; line-height: 1.4; }
-.entry-credit { margin-top: var(--s2); }
+.entry-credit { margin-top: var(--s2); font-size: var(--t-md); }
 .entry-credit a { color: var(--accent); font-weight: var(--weight-strong); }
 .entry-credit a:hover { color: var(--accent-hover); }
 
-#entry-form label { display: block; margin-bottom: var(--s2); font-weight: var(--weight-strong); }
+/* The repository field is the page's main interaction: larger type, an accent border and a soft halo. */
+#entry-form label { display: block; margin-bottom: var(--s2); font-size: var(--t-md); font-weight: var(--weight-strong); }
 .entry-repo-row { display: flex; align-items: stretch; gap: var(--s2); }
-#entry-url { flex: 1; width: 100%; min-width: 0; background: var(--controls-surface); }
+#entry-url {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: var(--s4);
+  font-family: var(--mono);
+  font-size: var(--t-md);
+  background: var(--controls-surface);
+  border: 2px solid var(--accent);
+  border-radius: var(--r-lg);
+  box-shadow:
+    0 0 0 var(--s1) color-mix(in srgb, var(--accent) 22%, transparent),
+    0 var(--s2) var(--s6) color-mix(in srgb, var(--accent) 20%, transparent);
+}
+#entry-url:focus { outline-offset: var(--s1); }
 .entry-primary-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
 .entry-primary-actions > button { flex: 1; min-width: 0; white-space: normal; }
 .entry-secondary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); }
 #entry-browse { max-width: 100%; white-space: normal; }
 #entry-progress { color: var(--ink-secondary); margin-top: var(--s2); }
 #entry-progress:empty { display: none; }
-#entry-guidance { margin-top: var(--s3); max-width: 62ch; text-wrap: pretty; }
+#entry-guidance { margin-top: var(--s3); max-width: 62ch; font-size: var(--t-md); text-wrap: pretty; }
 #explore-example { margin-left: auto; }
 #entry-return-welcome { margin-top: var(--s3); }
 
@@ -73,10 +88,12 @@
 .sample-note { margin-left: calc(2ch - var(--s1)); color: var(--accent); }
 
 @media (max-width: 39.999rem) {
-  .entry-welcome { margin-top: var(--s5); }
+  .entry-welcome { margin-top: var(--s3); }
   .entry-hero { margin-bottom: var(--s5); }
   .entry-hero h2 { font-size: 3.5rem; }
   .entry-mark { display: none; }
+  /* The monospace placeholder does not fit narrow phones. */
+  #entry-url { font-family: inherit; }
   .sample-note { display: none; }
   .entry-treestamp { margin-top: var(--s5); padding: var(--s3) var(--s4); }
   .sample-tree { font-size: var(--t-base); }
@@ -87,6 +104,8 @@
   .entry-hero { margin-bottom: var(--s3); }
   .entry-hero h2 { font-size: 2.75rem; margin-bottom: var(--s2); }
   .entry-purpose { font-size: 1.125rem; }
+  .entry-credit, #entry-form label, #entry-guidance { font-size: var(--t-base); }
+  #entry-url { padding: var(--s2) var(--s3); }
   #entry-guidance, .entry-primary-actions, .entry-secondary-actions, #entry-return-welcome {
     margin-top: var(--s2);
   }
