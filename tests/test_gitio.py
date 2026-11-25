@@ -84,8 +84,9 @@ def test_unusual_paths_survive_nul_protocol(repo: Repo) -> None:
     blob = repo.blob(b"distinct content\n")
     subtree = repo.tree([("100644", "blob", blob, path.split("/", 1)[1])])
     tree = repo.tree([("040000", "tree", subtree, "dir")])
-    repo.git("read-tree", tree)
-    assert paths(capture_snapshot(repo.path)) == {"dir": "dir", path: KIND_FILE}
+    # These object names cannot enter a Windows index or working tree.
+    entries = gitio._entries(repo.path, tree, "")
+    assert {entry.path: entry.kind for entry in entries.values()} == {path: KIND_FILE}
 
 
 def test_scope_root_may_be_missing_from_worktree(repo: Repo) -> None:

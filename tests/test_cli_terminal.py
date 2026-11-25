@@ -46,20 +46,21 @@ def test_output_controls_and_layout(
 
 
 @pytest.mark.parametrize("terminal", [False, True])
+@pytest.mark.parametrize("eol", ["\n", "\r\n"], ids=["lf", "crlf"])
 def test_check_sanitizes_surrounding_document_context_only_for_terminal(
-    repo: Repo, monkeypatch: pytest.MonkeyPatch, terminal: bool
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, terminal: bool, eol: str
 ) -> None:
     path = repo.write("README.md", "<!-- treestamp:start -->\n<!-- treestamp:end -->\n")
     repo.add(".")
     write_document(
         Document(capture_snapshot(repo.path).tree, Settings(show_counts=False)), path
     )
-    context = "context: \x1b[31mred\x1b[0m\n"
+    context = f"context: \x1b[31mred\x1b[0m{eol}"
     # A valid compact region keeps the outside text within unified diff context.
     compact = path.read_text().replace(
         "\n\n<!-- treestamp:end -->", "\n<!-- treestamp:end -->"
     )
-    path.write_text(compact + context)
+    path.write_bytes((compact.replace("\n", eol) + context).encode("utf-8"))
     repo.write("added.txt")
     repo.add(".")
     before = path.read_bytes()
@@ -71,7 +72,8 @@ def test_check_sanitizes_surrounding_document_context_only_for_terminal(
 
     diff = output.getvalue()
     assert "added.txt" in diff
-    assert (r"context: \x1b[31mred\x1b[0m" if terminal else context) in diff
+    expected = r"context: \x1b[31mred\x1b[0m" + "\n" if terminal else context
+    assert expected in diff
     assert ("\x1b" not in diff) == terminal
     assert path.read_bytes() == before
 
