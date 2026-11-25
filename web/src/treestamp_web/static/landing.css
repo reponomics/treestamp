@@ -61,9 +61,9 @@
   color: var(--ink-secondary);
 }
 .sample-row { display: flex; align-items: center; gap: var(--s1); min-height: 2em; white-space: nowrap; }
-.sample-name { min-width: 9ch; }
 .sample-root { color: var(--ink); }
-.sample-note { margin-left: var(--s4); color: var(--ink-secondary); }
+/* Notes follow their name by the two-space delimiter generated treestamps use; the row gap counts toward it. */
+.sample-note { margin-left: calc(2ch - var(--s1)); color: var(--ink-secondary); }
 :root[data-theme="dark"] .sample-tree {
   --tree-guide-ink: color-mix(in srgb, var(--ink) 55%, var(--paper));
   color: color-mix(in srgb, var(--ink) 82%, var(--paper));
