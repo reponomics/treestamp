@@ -1,6 +1,7 @@
 """SVG source identity, regeneration, and separate export publication."""
 
 from dataclasses import replace
+from uuid import uuid4
 
 import pytest
 
@@ -42,6 +43,19 @@ def test_svg_load_regenerates_drawing_and_retains_original_baseline(repo: Repo) 
     written = repo.read_bytes("tree.svg").replace(b"\r\n", b"\n")
     assert written == editor.svg_text().encode()
     assert not editor.prepare_load("tree.svg").dirty
+
+
+def test_svg_load_reports_artifact_warnings(repo: Repo) -> None:
+    editor = make_editor(repo)
+    style = f"style-{uuid4().hex}"
+    content = render_svg(editor.document()).replace(
+        f'style="{SvgAppearance().style}"', f'style="{style}"'
+    )
+    repo.write_bytes("tree.svg", content.encode())
+    editor.adopt(editor.prepare_load("tree.svg"))
+    warnings = editor.state.artifact_warnings
+    assert warnings and any(style in warning for warning in warnings)
+    assert all(warning in editor.state.status for warning in warnings)
 
 
 def test_svg_source_write_preserves_appearance_and_rejects_external_edit(

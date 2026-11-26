@@ -37,8 +37,7 @@ def test_export_save_and_cancel_preserve_source_and_dirty_state(repo: Repo) -> N
             screen = app.screen
             assert isinstance(screen, SvgExportScreen)
             screen.query_one(Input).value = "copy.svg"
-            await pilot.click("#svg-export-save")
-            await pilot.pause()
+            await press(pilot, "enter")
             assert not isinstance(app.screen, SvgExportScreen)
             assert "Saved SVG:" in rendered_text(app.status_widget)
             assert (
@@ -48,6 +47,11 @@ def test_export_save_and_cancel_preserve_source_and_dirty_state(repo: Repo) -> N
             assert controller.state.baseline is baseline and controller.dirty
             assert controller.state.document_path == repo.path / "tree.svg"
             await press(pilot, "e", "escape")
+            assert controller.state.baseline is baseline and controller.dirty
+            await press(pilot, "e")
+            await pilot.click("#svg-export-cancel")
+            await pilot.pause()
+            assert not isinstance(app.screen, SvgExportScreen)
             assert controller.state.baseline is baseline and controller.dirty
             await press(pilot, "w")
             assert not controller.dirty
