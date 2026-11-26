@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import base64
 from copy import deepcopy
+from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from treestamp.document import Document, render_region
+from treestamp.document import Document, parse_document, render_region
 from treestamp.gitio import capture_snapshot
 from treestamp.model import Settings
 from treestamp.session import TreeSession
@@ -322,3 +323,50 @@ def test_baseline_without_region_is_bad_request_not_server_error(repo: Repo) -> 
     with pytest.raises(PreviewError, match="invalid document baseline") as error:
         placed(service, opened)
     assert error.value.status == 400
+
+
+def _rendered_baseline(document: Document) -> str:
+    return base64.b64encode(render_region(document).encode()).decode()
+
+
+@pytest.mark.parametrize("baseline", ["other_root", "no_notes"])
+def test_baseline_that_cannot_start_placement_is_bad_request(
+    repo: Repo, baseline: str
+) -> None:
+    service, _ = service_for(stale(repo))
+    opened = preview(service)
+    loaded = parse_document(base64.b64decode(opened.state["baseline"]))
+    if baseline == "other_root":
+        settings = replace(loaded.settings, root="new")
+        document = replace(loaded, settings=settings)
+    else:
+        document = Document(capture_snapshot(repo.path).tree, Settings())
+    opened.state["baseline"] = _rendered_baseline(document)
+    with pytest.raises(PreviewError) as error:
+        placed(service, opened)
+    assert (error.value.status, error.value.code) == (400, "invalid_placement")
+
+
+def test_placement_conflict_response_carries_its_question(repo: Repo) -> None:
+    app = create_app(make_config(), transport=transport_for(stale(repo)))
+    with TestClient(app) as client:
+        opened = client.get("/api/preview", params={"url": "o/r"}).json()
+        opened["state"]["curation"]["annotations"].append(
+            {"path": "new/nested/a.py", "text": "Existing"}
+        )
+        response = client.post(
+            "/api/placement",
+            json={
+                "owner": "o",
+                "repo": "r",
+                "ref": opened["ref"]["commit"],
+                "state": opened["state"],
+                "decisions": [
+                    {"type": "skip"},
+                    {"type": "place", "path": "new/nested/a.py"},
+                ],
+            },
+        )
+    error = response.json()["error"]
+    assert response.status_code == 409 and error["code"] == "placement_conflict"
+    assert error["question"] == error["message"]

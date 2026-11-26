@@ -1,14 +1,18 @@
 from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from treestamp.errors import MarkerError
 from treestamp_web.app import SECURITY_HEADERS, create_app
 from treestamp_web.config import Config, ConfigError
+from treestamp_web.github import GitHubError
 from treestamp_web.localgit import FakeGitHub, FakeOptions
+from treestamp_web.preview import PreviewService
 
 from .conftest import Clock, Repo, make_config, transport_for
 
@@ -652,3 +656,26 @@ def test_byte_document_failures_return_safe_diagnostics(
         if tracked
         else "does not exist" in error["message"]
     )
+
+
+@pytest.mark.parametrize(
+    ("failure", "status", "code"),
+    [(MarkerError, 422, "curation"), (GitHubError, 503, "upstream_unavailable")],
+)
+def test_unhandled_service_errors_keep_stable_responses(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: type[Exception],
+    status: int,
+    code: str,
+) -> None:
+    message = f"Fixture failure {uuid4()}"
+
+    async def fail(*_: object) -> None:
+        raise failure(message)
+
+    monkeypatch.setattr(PreviewService, "preview", fail)
+    response = client.get("/api/preview", params={"url": "o/r"})
+    assert response.status_code == status
+    error = response.json()["error"]
+    assert (error["code"], error["message"]) == (code, message)
