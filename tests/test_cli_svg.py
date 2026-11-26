@@ -40,15 +40,17 @@ def test_text_to_svg_to_text_and_source_update(repo, style, theme):
     assert code == 0 and not error
     assert parse_document(text.encode()) == artifact.document
     assert run_cli("check", "tree.svg")[0] == 0
-    repo.write("new -> literal")
-    repo.add("new -> literal")
+    # A name that collides with row syntax and is valid on Windows.
+    added = "new [gitlink]"
+    repo.write(added)
+    repo.add(added)
     assert run_cli("check", "tree.svg")[0] == 1
     assert svg.read_text(encoding="utf-8") == output
     assert run_cli("update", "tree.svg")[0] == 0
     assert run_cli("check", "tree.svg")[0] == 0
     updated = parse_svg(svg.read_bytes())
     assert updated.appearance == artifact.appearance
-    assert "new -> literal" in [node.name for node in updated.document.tree.walk()]
+    assert added in [node.name for node in updated.document.tree.walk()]
     assert source.read_bytes() == original
     assert run_cli("load", "tree.svg", "--print")[1] == render_region(updated.document)
 
