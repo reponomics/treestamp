@@ -38,7 +38,9 @@ def test_svg_load_regenerates_drawing_and_retains_original_baseline(repo: Repo) 
     assert "<svg" not in editor.preview()
     editor.write("tree.svg")
     assert not editor.dirty
-    assert repo.read_bytes("tree.svg") == editor.svg_text().encode()
+    # The write keeps the loaded file's line endings.
+    written = repo.read_bytes("tree.svg").replace(b"\r\n", b"\n")
+    assert written == editor.svg_text().encode()
     assert not editor.prepare_load("tree.svg").dirty
 
 
@@ -49,13 +51,13 @@ def test_svg_source_write_preserves_appearance_and_rejects_external_edit(
     editor.state.session.set_annotation("src/a", "changed")
     assert editor.dirty
     original = repo.read_bytes("tree.svg")
-    repo.write("tree.svg", original.decode().replace("Repository tree", "Changed"))
+    repo.write_bytes("tree.svg", original.replace(b"Repository tree", b"Changed"))
     conflicting = repo.read_bytes("tree.svg")
     with pytest.raises(MarkerError, match="changed"):
         editor.write("tree.svg")
     assert repo.read_bytes("tree.svg") == conflicting
     assert editor.dirty
-    repo.write("tree.svg", original.decode())
+    repo.write_bytes("tree.svg", original)
     editor.write("tree.svg")
     saved = parse_artifact(repo.read_bytes("tree.svg"))
     assert saved is not None and saved.appearance.theme == "dark"

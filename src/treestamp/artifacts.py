@@ -90,10 +90,22 @@ def load_artifact(
     return artifact, snapshot
 
 
+def _uses_crlf(content: bytes) -> bool:
+    end = content.find(b"\n")
+    return end > 0 and content[end - 1 : end] == b"\r"
+
+
 def prepare_artifact_content(artifact: Artifact, previous: bytes) -> bytes:
-    """Same candidate bytes for dirty, check, update, and source writes."""
+    """Same candidate bytes for dirty, check, update, and source writes.
+
+    An SVG source keeps CRLF line endings, as a Markdown region does, so a
+    checkout converted by Git is not reported as changed.
+    """
     if artifact.format == "svg":
-        return render_svg(artifact.document, artifact.appearance).encode("utf-8")
+        newline = "\r\n" if _uses_crlf(previous) else "\n"
+        return render_svg(artifact.document, artifact.appearance, newline).encode(
+            "utf-8"
+        )
     document = artifact.document
     return prepare_content(document, document.settings.root, previous)
 

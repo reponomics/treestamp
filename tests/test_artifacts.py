@@ -1,5 +1,6 @@
 """Container-neutral source updates and isolated, conflict-checked exports."""
 
+import stat
 from dataclasses import replace
 
 import pytest
@@ -74,7 +75,7 @@ def test_optional_load_and_native_source_updates(repo):
         ("tree.svg", render_svg(document)),
         ("README.md", "before\n" + render_region(document) + "after\n"),
     ):
-        path = repo.write(name, content)
+        path = repo.write_bytes(name, content.encode())
         artifact, previous = load_artifact(path)
         candidate = replace(
             artifact, document=replace(document, settings=Settings(attribution=True))
@@ -94,6 +95,22 @@ def test_optional_load_and_native_source_updates(repo):
                 prepare_artifact_content(candidate, published.content)
                 == published.content
             )
+
+
+@pytest.mark.parametrize("newline", [b"\n", b"\r\n"])
+def test_svg_source_keeps_its_line_endings(repo, newline):
+    """A checkout whose line endings Git converted is unchanged, and updates keep them."""
+    content = render_svg(sample()).encode().replace(b"\n", newline)
+    path = repo.write_bytes("tree.svg", content)
+    artifact, previous = load_artifact(path)
+    assert prepare_artifact_content(artifact, previous.content) == content
+    candidate = replace(artifact, appearance=SvgAppearance(theme="dark"))
+    published = publish_write(
+        prepare_artifact_write(candidate, path, expected=previous, repository=repo.path)
+    )
+    lines = published.content.split(b"\n")[:-1]
+    assert all(line.endswith(b"\r") == (newline == b"\r\n") for line in lines)
+    assert parse_artifact(published.content).appearance == candidate.appearance
 
 
 def test_source_update_refuses_external_changes_and_other_containers(repo):
@@ -135,6 +152,8 @@ def test_export_create_replace_and_both_races(repo):
         )
     expected = capture_export_destination(destination, repository=repo.path)
     destination.chmod(0o640)
+    # Windows records only the read-only bit, so compare with what was stored.
+    mode = stat.S_IMODE(destination.stat().st_mode)
     result = publish_write(
         prepare_svg_export(
             sample(), destination, repository=repo.path, expected=expected
@@ -143,7 +162,7 @@ def test_export_create_replace_and_both_races(repo):
     assert "a -> b" in [
         node.name for node in parse_svg(result.content).document.tree.walk()
     ]
-    assert destination.stat().st_mode & 0o777 == 0o640
+    assert stat.S_IMODE(destination.stat().st_mode) == mode
     destination.unlink()
     result = publish_write(
         prepare_svg_export(sample(), destination, repository=repo.path)
@@ -213,7 +232,8 @@ def test_export_rejects_source_alias_even_with_replacement_confirmation(
         alias.hardlink_to(source)
     elif not alias.exists():
         pytest.skip("filesystem is case-sensitive")
-    assert alias != source and alias.samefile(source)
+    # Windows paths compare case-insensitively, so compare the names.
+    assert alias.name != source.name and alias.samefile(source)
     with pytest.raises(MarkerError, match="update the loaded source"):
         capture_export_destination(alias, repository=repo.path, source=source)
     with pytest.raises(MarkerError, match="update the loaded source"):

@@ -75,7 +75,9 @@ def render_svg_metadata(
 
 
 def render_svg(
-    document: Document, appearance: SvgAppearance = _DEFAULT_APPEARANCE
+    document: Document,
+    appearance: SvgAppearance = _DEFAULT_APPEARANCE,
+    newline: str = "\n",
 ) -> str:
     """Generate deterministic standalone SVG from validated accepted tree data."""
     style = LAYOUT_STYLES.get(appearance.style)
@@ -83,7 +85,7 @@ def render_svg(
         raise MarkerError(f"unsupported SVG visual style: {appearance.style!r}")
     metadata = encode_metadata(document, appearance)
     layout = style(document)
-    return _serialize_svg(metadata, layout, appearance)
+    return _serialize_svg(metadata, layout, appearance, newline)
 
 
 def render_svg_variants(
@@ -103,9 +105,12 @@ def render_svg_variants(
     return variants
 
 
-def _serialize_svg(metadata: str, layout: Layout, appearance: SvgAppearance) -> str:
+def _serialize_svg(
+    metadata: str, layout: Layout, appearance: SvgAppearance, newline: str = "\n"
+) -> str:
+    """Rendered line breaks are all structural, so any newline style is safe."""
     drawing = _drawing(layout, appearance)
-    return _bounded(
+    text = (
         f'<svg xmlns="{SVG_NAMESPACE}" width="{layout.width}" '
         f'height="{layout.height}" viewBox="0 0 {layout.width} {layout.height}" '
         'role="img" aria-labelledby="title description">\n'
@@ -114,6 +119,7 @@ def _serialize_svg(metadata: str, layout: Layout, appearance: SvgAppearance) -> 
         "Editable treestamp data is embedded in this image.</desc>\n"
         f"{metadata}\n{drawing}\n</svg>\n"
     )
+    return _bounded(text.replace("\n", newline))
 
 
 def _drawing(layout: Layout, appearance: SvgAppearance) -> str:

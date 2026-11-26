@@ -184,6 +184,8 @@ def test_headless_growth_preserves_syntax_colliding_file_names(
 ) -> None:
     from treestamp.document import parse_document
 
+    if ">" in name and os.name == "nt":
+        pytest.skip("Windows file names cannot contain '>'")
     stamped(repo)
     destination = repo.path / "README.md"
     before = cli_bytes(repo, "--print")
