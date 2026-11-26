@@ -32,6 +32,7 @@ def test_return_from_chooser_preserves_curation_and_source(
     original = page.locator("#region").text_content()
     address = page.url
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('.source-row[data-path="src"]').click()
     page.locator("#entry-change-repo").click()
@@ -64,6 +65,7 @@ def test_failed_explicit_open_preserves_draft_and_cannot_initialize_new(
         ),
     )
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('.source-row[data-path="README.md"]').click()
     page.locator("#source-load").click()
@@ -108,6 +110,7 @@ def test_successful_reopen_discards_unwritten_notes_hiding_and_folds(
     page.locator('.row[data-path="scripts"]').focus()
     page.locator("#row-visibility").click()
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('.source-row[data-path="README.md"]').click()
     with page.expect_response("**/api/preview*") as response:
@@ -183,6 +186,7 @@ def test_visual_selection_retains_exact_source_identity(
         ),
     )
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator(".source-row").nth(1).click()
     with page.expect_request("**/api/preview") as request:

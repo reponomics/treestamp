@@ -152,6 +152,7 @@ def test_abandoning_repository_choices_returns_to_accepted_draft(
     address = page.url
     draft = page.evaluate("localStorage.getItem('treestamp.current-draft')")
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     choose(page, "src")
     page.locator("#entry-change-repo").click()
@@ -171,6 +172,7 @@ def test_late_browse_response_cannot_reopen_the_chooser_after_return(
     pending = []
     page.route("**/api/browse*", lambda route: pending.append(route))
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#source-browser")).to_contain_text("Loading repository")
     page.locator("#entry-change-repo").click()
@@ -264,6 +266,7 @@ def test_wordmark_returns_to_landing_for_repository_and_source_choices(
     expect(page.locator("#reload-settings")).to_be_hidden()
     page.locator("#entry-return-welcome").click()
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#entry-welcome")).to_be_hidden()
@@ -285,6 +288,7 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
     record = page.evaluate("localStorage.getItem('treestamp.current-draft')")
 
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#entry-change-repo")).to_have_text("Back")
     page.locator("#entry-change-repo").click()
@@ -296,6 +300,8 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
     page.locator(".wordmark").click()
     expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
+    # Leaving the editor offers a fresh entry rather than the session's repository.
+    expect(page.locator("#entry-url")).to_have_value("")
     assert page.url == urljoin(address, "/")
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == record
     page.locator("#entry-return-welcome").click()
@@ -391,6 +397,7 @@ def test_picker_gives_tree_the_space_and_keeps_actions_at_its_foot(
         ),
     )
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#source-create")).to_be_enabled()
     page.evaluate("document.fonts.ready")

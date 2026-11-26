@@ -821,7 +821,8 @@ function openWelcome() {
   exportView.setVisible(false);
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
   repoTooltip.hidden = true;
-  const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
+  // Leaving the editor starts a fresh entry; within entry, keep what the visitor typed.
+  const repo = document.getElementById("entry").hidden ? "" : entryFlow.url;
   // The landing page has its own address, so reloading it does not reopen the session.
   history.replaceState(null, "", "/");
   entryFlow.welcome(repo, Boolean(editor?.rows.length || pendingDraft));
@@ -1015,7 +1016,7 @@ function exampleAt(address) {
     const address = new URL(pendingDraft.address, window.location.origin);
     const { owner, repo } = parseRoute(address.pathname, address.hash);
     fields.url.value = `${owner}/${repo}`;
-    if (window.location.pathname === "/") entryFlow.welcome(fields.url.value, true);
+    if (window.location.pathname === "/") entryFlow.welcome("", true);
     else browseRepository(fields.url.value);
     return;
   }

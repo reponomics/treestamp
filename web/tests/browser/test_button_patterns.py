@@ -101,6 +101,7 @@ def test_secondary_buttons_and_links_share_appearance_across_screens(
 
     page.locator(".wordmark").click()
     expect(page.locator("#entry-welcome")).to_be_visible()
+    page.locator("#entry-url").fill("fixture/repo")
     page.mouse.move(0, 0)
     for selector in (
         "#entry-return-welcome",

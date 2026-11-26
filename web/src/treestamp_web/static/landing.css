@@ -61,16 +61,16 @@
 .entry-repo-row:has(#entry-url[aria-invalid="true"]) { border-color: var(--error-line); outline-color: var(--error-line); }
 .entry-repo-row:has(#entry-url[aria-invalid="true"]) .entry-repo-icon { background: var(--error-line); }
 
+/* The button is centred on its own; "or" sits in the equal-width column to its left. */
 .entry-alternatives {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: var(--s2) var(--s3);
+  column-gap: var(--s3);
   margin-top: var(--s4);
 }
-.entry-alternatives > span { color: var(--ink-secondary); }
-.entry-alternatives > button { max-width: 100%; white-space: normal; }
+.entry-alternatives > span { justify-self: end; color: var(--ink-secondary); }
+.entry-alternatives > button { white-space: normal; }
 #entry-return-welcome { display: flex; margin: var(--s4) auto 0; }
 
 /* The example card previews the bundled snapshot that its button opens. */

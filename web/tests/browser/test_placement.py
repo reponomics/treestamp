@@ -332,6 +332,7 @@ def test_fresh_same_document_load_restarts_placement_without_losing_saved_draft(
     address = page.url
     assert previous and "Data preparation tools" in previous
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="README.md"]').click()
     page.locator("#source-load").click()
@@ -380,6 +381,7 @@ def test_failed_new_document_placement_preserves_the_previous_saved_draft(
     saved = page.evaluate(DRAFT)
     address = page.url
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="README.md"]').click()
     page.locator("#source-load").click()
@@ -595,6 +597,7 @@ def test_resume_progress_after_placement_preserves_notes_without_reopening_queue
     record = page.evaluate(DRAFT)
     address = page.url
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="tools"]').click()
     page.locator("#entry-change-repo").click()
