@@ -82,7 +82,7 @@ def placement_service(placement_repo: Fixture) -> Iterator[str]:
 
 def open_document(page: Page, base: str) -> None:
     page.goto(base + "/")
-    page.get_by_label("Public GitHub repository").fill("fixture/repo")
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator('#source-browser [data-path="README.md"]').click()
     page.locator("#source-load").click()

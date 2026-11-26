@@ -32,7 +32,7 @@ def test_first_visit_waits_for_intent_and_browsing_does_not_create_a_draft(
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("dialog[open]")).to_have_count(0)
     assert requests == []
-    repository = page.get_by_label("Public GitHub repository")
+    repository = page.locator("#entry-url")
     expect(repository).to_be_focused()
     repository.fill("fixture/repo")
     expect(repository).to_have_value("fixture/repo")
