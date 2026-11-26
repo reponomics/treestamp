@@ -44,7 +44,7 @@ export class EntryFlow {
     });
     element("entry-form").addEventListener("submit", (event) => {
       event.preventDefault();
-      this.openRoot(event.submitter?.id === "entry-load" ? "file" : "dir");
+      this.openRoot();
     });
     element("entry-browse").addEventListener("click", () => {
       const repo = element("entry-url").value.trim();
@@ -118,15 +118,16 @@ export class EntryFlow {
 
   renderWelcome() {
     const disabled = this.busy || !element("entry-url").value.trim();
-    for (const id of ["entry-create", "entry-load", "entry-browse"]) element(id).disabled = disabled;
+    for (const id of ["entry-create", "entry-browse"]) element(id).disabled = disabled;
     element("entry-progress").textContent = this.busy ? this.opening || "Opening…" : "";
   }
 
-  openRoot(kind) {
+  // The field's own action creates a fresh tree at the repository root.
+  openRoot() {
     const repo = element("entry-url").value.trim();
     if (this.busy || !repo) return;
     this.url = repo;
-    return this.openSource(kind, kind === "dir" ? "." : "README.md");
+    return this.openSource("dir", ".");
   }
 
   renderSelection() {

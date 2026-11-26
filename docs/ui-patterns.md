@@ -9,7 +9,7 @@ The web app uses native HTML controls and shared CSS rather than a component fra
 | Pattern | Markup | Use |
 | --- | --- | --- |
 | Secondary | `<button type="button">…</button>` | Navigation, alternative actions, repeated editor tools, Cancel, Close, and Resume session. Always has a visible surface and border. |
-| Primary | `<button class="primary" type="button">…</button>` | The next step or confirmation: Create, the selected source action, Apply, and Transfer here. On the landing page, Create is the default and Load remains a visible secondary alternative. Uses the accent fill when enabled. |
+| Primary | `<button class="primary" type="button">…</button>` | The next step or confirmation: Create, the selected source action, Apply, and Transfer here. On the landing page, Create is the repository field's action and Pick a file or folder… is the secondary alternative. Uses the accent fill when enabled. |
 | Navigation link styled as a button | `<a class="button-link" href="https://github.com/reponomics/treestamp">GitHub</a>` | Navigation such as visiting GitHub. Shares the secondary button's appearance and hover/focus treatment; retains native link semantics. |
 | Icon-only action | A secondary button or button link with an icon and an accessible name | Same appearance as its text equivalent. A view may make it square or visually hide its label where space is constrained. |
 

@@ -128,9 +128,7 @@
   #entry-url { padding: 0 var(--s3); font-family: inherit; }
   .entry-repo-icon { width: 2.75rem; }
   #entry-create { padding-inline: var(--s3); }
-  .entry-alternatives > span { display: none; }
-  .entry-alternatives { justify-content: stretch; margin-top: var(--s3); }
-  .entry-alternatives > button { flex: 1 1 auto; }
+  .entry-alternatives { margin-top: var(--s3); }
   .entry-example { margin-top: var(--s5); }
   .entry-example-head { padding: var(--s2) var(--s3); }
   .sample-tree { padding: var(--s3) var(--s4); }

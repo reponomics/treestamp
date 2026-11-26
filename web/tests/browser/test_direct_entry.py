@@ -29,10 +29,10 @@ def test_direct_create_opens_fresh_root_without_loading_readme(
     page.goto(service + "/")
     requests = record_api_requests(page)
     repository = page.locator("#entry-url")
-    for selector in ("#entry-create", "#entry-load"):
+    for selector in ("#entry-create", "#entry-browse"):
         expect(page.locator(selector)).to_be_disabled()
     repository.fill("fixture/repo")
-    expect(page.locator("#entry-load")).to_be_enabled()
+    expect(page.locator("#entry-browse")).to_be_enabled()
     with page.expect_response("**/api/preview") as response:
         if activation == "enter":
             repository.press("Enter")
@@ -54,50 +54,17 @@ def test_direct_create_opens_fresh_root_without_loading_readme(
     expect(page.locator("#entry")).to_be_hidden()
 
 
-def test_direct_readme_load_stays_on_landing_until_single_candidate_is_ready(
-    page: Page, service: str
-) -> None:
-    page.goto(service + "/")
-    requests = record_api_requests(page)
-    pending: list[Route] = []
-    page.route("**/api/preview", lambda route: pending.append(route))
-    page.locator("#entry-url").fill("fixture/repo")
-    page.locator("#entry-load").click()
-    expect(page.locator("#entry-load")).to_be_disabled()
-    expect(page.locator("#entry-create")).to_be_disabled()
-    expect(page.locator("#entry-browse")).to_be_disabled()
-    expect(page.locator("#entry-welcome")).to_be_visible()
-    expect(page.locator("#workspace")).to_be_hidden()
-    expect(page.locator("#entry-url")).to_have_value("fixture/repo")
-    assert page.evaluate(DRAFT) is None
-    assert page.url == service + "/"
-    assert len(pending) == len(requests) == 1
-    assert pending[0].request.post_data_json == {
-        "url": "fixture/repo",
-        "document": "README.md",
-    }
-    pending[0].continue_()
-    expect(page.locator("#workspace")).to_be_visible()
-    expect(page.locator("#entry")).to_be_hidden()
-    expect(page.locator("#tree-document")).to_have_text("README.md")
-    expect(page.locator('#rows .row[data-path="README.md"]')).to_have_count(0)
-    assert len(requests) == 1
-    assert page.evaluate(DRAFT) is not None
-
-
 @pytest.mark.parametrize(
-    ("action", "status", "code"),
+    ("status", "code"),
     [
-        ("create", 400, "invalid_link"),
-        ("load", 404, "not_found"),
-        ("load", 422, "document_has_no_treestamp"),
-        ("load", 422, "curation"),
-        ("load", None, None),
-        ("create", None, None),
+        (400, "invalid_link"),
+        (404, "not_found"),
+        (422, "curation"),
+        (None, None),
     ],
 )
 def test_failed_direct_open_keeps_landing_input_and_accepted_draft(
-    page: Page, service: str, action: str, status: int | None, code: str | None
+    page: Page, service: str, status: int | None, code: str | None
 ) -> None:
     page.goto(service + "/")
     page.locator("#explore-example").click()
@@ -121,7 +88,7 @@ def test_failed_direct_open_keeps_landing_input_and_accepted_draft(
     repository = "fixture/repo"
     page.locator("#entry-url").fill(repository)
     controls = page.locator("#entry-form").bounding_box()
-    page.locator(f"#entry-{action}").click()
+    page.locator("#entry-create").click()
     expect(page.locator("#entry-error")).to_be_visible()
     expect(page.locator("#entry-error")).not_to_be_empty()
     # The failure takes the label's place, so the form keeps its geometry.
@@ -129,7 +96,7 @@ def test_failed_direct_open_keeps_landing_input_and_accepted_draft(
     expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("#entry-url")).to_have_value(repository)
-    for selector in ("#entry-create", "#entry-load", "#entry-browse"):
+    for selector in ("#entry-create", "#entry-browse"):
         expect(page.locator(selector)).to_be_enabled()
     # Only an unusable address is attributed to the field, and editing clears it.
     field = page.locator("#entry-url")

@@ -83,7 +83,9 @@ def placement_service(placement_repo: Fixture) -> Iterator[str]:
 def open_document(page: Page, base: str) -> None:
     page.goto(base + "/")
     page.get_by_label("Public GitHub repository").fill("fixture/repo")
-    page.locator("#entry-load").click()
+    page.locator("#entry-browse").click()
+    page.locator('#source-browser [data-path="README.md"]').click()
+    page.locator("#source-load").click()
     expect(page.locator("#placement-dialog")).to_be_visible()
     expect(page.locator("#placement-work")).to_be_visible()
 
@@ -424,16 +426,19 @@ def test_invalid_transfer_preview_restores_previous_draft_and_presentation(
 
     page.route("**/api/preview", corrupt_transfer)
     page.locator("#entry-url").fill("fixture/repo")
-    page.locator("#entry-load").click()
-    expect(page.locator("#entry-error")).to_be_visible()
+    page.locator("#entry-browse").click()
+    page.locator('#source-browser [data-path="README.md"]').click()
+    page.locator("#source-load").click()
+    expect(page.locator("#reload-error")).to_be_visible()
     expect(page.locator("#placement-dialog")).to_be_hidden()
-    expect(page.locator("#entry-welcome")).to_be_visible()
+    expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("#tab-stamp")).to_have_attribute("aria-selected", "true")
     expect(page.locator("#region")).to_have_text(previous)
     assert page.locator("#rows").inner_html() == rows
     assert page.evaluate(DRAFT) == saved
     assert page.url == address
+    page.locator("#entry-change-repo").click()
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).to_have_text(previous)
