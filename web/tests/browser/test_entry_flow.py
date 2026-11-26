@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urljoin
+
 import pytest
 
 pytest.importorskip("playwright.sync_api")
@@ -32,7 +34,7 @@ def test_first_visit_waits_for_intent_and_browsing_does_not_create_a_draft(
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("dialog[open]")).to_have_count(0)
     assert requests == []
-    repository = page.get_by_label("Public GitHub repository")
+    repository = page.locator("#entry-url")
     expect(repository).to_be_focused()
     repository.fill("fixture/repo")
     expect(repository).to_have_value("fixture/repo")
@@ -62,8 +64,10 @@ def test_example_offramp_opens_one_curated_editor_without_requests(
         ),
     )
     page.goto(service + "/")
-    expect(page.get_by_role("button", name="Try example", exact=True)).to_have_count(1)
-    page.get_by_role("button", name="Try example", exact=True).click()
+    expect(
+        page.get_by_role("button", name="Open this example", exact=True)
+    ).to_have_count(1)
+    page.get_by_role("button", name="Open this example", exact=True).click()
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#entry")).to_be_hidden()
     expect(page.locator("#example-context")).to_have_count(0)
@@ -148,6 +152,7 @@ def test_abandoning_repository_choices_returns_to_accepted_draft(
     address = page.url
     draft = page.evaluate("localStorage.getItem('treestamp.current-draft')")
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     choose(page, "src")
     page.locator("#entry-change-repo").click()
@@ -167,6 +172,7 @@ def test_late_browse_response_cannot_reopen_the_chooser_after_return(
     pending = []
     page.route("**/api/browse*", lambda route: pending.append(route))
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#source-browser")).to_contain_text("Loading repository")
     page.locator("#entry-change-repo").click()
@@ -260,6 +266,7 @@ def test_wordmark_returns_to_landing_for_repository_and_source_choices(
     expect(page.locator("#reload-settings")).to_be_hidden()
     page.locator("#entry-return-welcome").click()
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#entry-welcome")).to_be_hidden()
@@ -281,6 +288,7 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
     record = page.evaluate("localStorage.getItem('treestamp.current-draft')")
 
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#entry-change-repo")).to_have_text("Back")
     page.locator("#entry-change-repo").click()
@@ -292,11 +300,23 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
     page.locator(".wordmark").click()
     expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
-    assert page.url == address
+    # Leaving the editor offers a fresh entry rather than the session's repository.
+    expect(page.locator("#entry-url")).to_have_value("")
+    assert page.url == urljoin(address, "/")
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == record
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#region")).to_have_text(region)
     expect(page.locator("#tab-editor")).to_be_focused()
+    assert page.url == address
+
+    # Reloading the landing page keeps it, with the session still offered.
+    page.locator(".wordmark").click()
+    page.reload()
+    expect(page.locator("#entry-welcome")).to_be_visible()
+    expect(page.locator("#workspace")).to_be_hidden()
+    page.locator("#entry-return-welcome").click()
+    expect(page.locator("#region")).to_have_text(region)
+    assert page.url == address
 
 
 @pytest.mark.parametrize("width", [390, 768, 1280])
@@ -310,8 +330,6 @@ def test_entry_controls_are_readable_and_fit_without_full_width_mobile_button(
         assert page.locator(selector).evaluate(
             "element => parseFloat(getComputedStyle(element).fontSize) >= 16"
         )
-    expect(page.locator("#explore-example")).to_have_css("text-decoration-line", "none")
-    expect(page.locator("#explore-example")).to_have_css("border-top-style", "solid")
     page.locator("#entry-url").fill("fixture/repo")
     button = page.locator("#entry-create").bounding_box()
     field = page.locator("#entry-url").bounding_box()
@@ -379,6 +397,7 @@ def test_picker_gives_tree_the_space_and_keeps_actions_at_its_foot(
         ),
     )
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#source-create")).to_be_enabled()
     page.evaluate("document.fonts.ready")

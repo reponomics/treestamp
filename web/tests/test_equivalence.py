@@ -30,7 +30,7 @@ def post_op(
     return response.json()
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("counts", [True, False])
 @pytest.mark.parametrize("root", [".", "sub"])
 def test_equivalent_session_operations(

@@ -264,6 +264,7 @@ def test_editor_dialogs_fit_and_keep_actions_reachable(
     page.keyboard.press("Escape")
 
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     dialog = page.locator("#reload-settings")
     expect(page.locator("#source-create")).to_be_enabled()

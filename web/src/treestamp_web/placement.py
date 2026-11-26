@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from treestamp.document import parse_document
+from treestamp.artifacts import parse_artifact
 from treestamp.errors import MarkerError
 from treestamp.model import path_value, read_path_value
 from treestamp.reconcile import Reconciliation
@@ -122,9 +122,7 @@ def replay(
     envelope = request.opening.envelope
     assert envelope.baseline is not None
     try:
-        document = parse_document(envelope.baseline)
-        if document is None:
-            raise MarkerError("the original document has no treestamp region")
+        document = parse_artifact(envelope.baseline).document
         if document.settings.root != request.opening.root:
             raise MarkerError("document baseline root does not match the request")
         session = TreeSession.restore(target, envelope.curation)

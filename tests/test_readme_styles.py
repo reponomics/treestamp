@@ -49,9 +49,10 @@ def test_refresh_preserves_document_and_surroundings(eol: str) -> None:
         == original.split(b"<!-- readme-styles:end -->")[1]
     )
     assert b"|-- src/ (2 files)  # Application" in updated
-    assert b"- src/ (2 files)  # Application" in updated
-    assert updated.count(b"Start here") == 3
-    assert updated.count(b"Maintained with") == 3
+    assert b"Markdown list" not in updated
+    assert b"\n- src/" not in updated
+    assert updated.count(b"Start here") == 2
+    assert updated.count(b"Maintained with") == 2
     assert updated.count(b"<!-- treestamp:start -->") == 1
     assert updated.count(b"secret") == 1  # Metadata is not displayed in previews.
     if eol == "\r\n":
@@ -78,7 +79,7 @@ def test_check_reports_drift_without_writing_and_write_repairs(tmp_path: Path) -
     assert styles.main([str(path)]) == 1
     assert path.read_bytes() == changed
     assert styles.main(["--write", str(path)]) == 0
-    assert path.read_bytes().count(b"New annotation") == 3
+    assert path.read_bytes().count(b"New annotation") == 2
 
 
 @pytest.mark.parametrize(

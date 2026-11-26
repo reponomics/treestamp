@@ -9,7 +9,7 @@ from treestamp.errors import MarkerError
 from treestamp.model import Entry, Node, Settings, build_tree, initial_tree
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_codec_roundtrip_all_kinds_counts_and_escaping(style: str) -> None:
     tree = Node(
         ".",
@@ -54,7 +54,7 @@ def test_simple_manual_tree_and_annotation() -> None:
     assert tree.children[1].dirs is None
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize(
     "annotation,expected",
     [
@@ -100,7 +100,7 @@ def test_invalid_annotations_are_rejected_instead_of_escaped(annotation: str) ->
 
 
 def test_parse_annotations_preserves_literal_quotes_and_normalizes_whitespace() -> None:
-    tree = parse_tree('.\n- a  # "literal\\n"\ttext \t\n')
+    tree = parse_tree('.\n└── a  # "literal\\n"\ttext \t\n')
     assert tree.children[0].annotation == '"literal\\n"  text   '
 
 
@@ -116,18 +116,18 @@ def test_whitespace_only_annotation_is_preserved() -> None:
     [
         "",
         "not-root\n",
-        ".\n  - skipped\n",
-        ".\n- a\n  - b\n",
-        ".\n- a\n- a\n",
-        ".\n- ../\n",
-        '.\n- "a/b"\n',
-        ".\n- a/ (-1 files)\n",
-        ".\n- a/ (1 file)\n  - b\n",
+        ".\n    └── skipped\n",
+        ".\n└── a\n    └── b\n",
+        ".\n└── a\n└── a\n",
+        ".\n└── ../\n",
+        '.\n└── "a/b"\n',
+        ".\n└── a/ (-1 files)\n",
+        ".\n└── a/ (1 file)\n    └── b\n",
         ". (2 files)\n",
-        ".\n- a/ [gitlink]\n",
-        ".\n- a/ (2 folders, 3 folders)\n",
-        ".\n- /\n",
-        ".\n- a\n\n",
+        ".\n└── a/ [gitlink]\n",
+        ".\n└── a/ (2 folders, 3 folders)\n",
+        ".\n└── /\n",
+        ".\n└── a\n\n",
     ],
 )
 def test_invalid_printed_trees_fail(text: str) -> None:
@@ -135,7 +135,7 @@ def test_invalid_printed_trees_fail(text: str) -> None:
         parse_tree(text)
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("length", [100_000, 100_001])
 def test_long_whitespace_row_is_rejected(style: str, length: int) -> None:
     # Include complete indentation units and an incomplete final unit.
@@ -150,7 +150,6 @@ def test_long_whitespace_row_is_rejected(style: str, length: int) -> None:
         ("unicode", "└── ", "├── a"),
         ("ascii", "|-- ", "`-- a"),
         ("ascii", "`-- ", "|-- a"),
-        ("list", "- ", "-- a"),
     ],
 )
 def test_long_repeated_connectors_remain_literal_row_content(
@@ -161,7 +160,7 @@ def test_long_repeated_connectors_remain_literal_row_content(
     assert tree.children == (Node(name, name, "file"),)
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_long_repeated_dashes_do_not_make_a_valid_connector(style: str) -> None:
     with pytest.raises(MarkerError, match=f"invalid {style} tree row"):
         parse_tree("./\n-- " + "-- a" * 20_000 + "\n", style)
@@ -174,7 +173,6 @@ def test_long_repeated_dashes_do_not_make_a_valid_connector(style: str) -> None:
         ("unicode", "    ", "└── "),
         ("ascii", "|   ", "|-- "),
         ("ascii", "    ", "`-- "),
-        ("list", "  ", "- "),
     ],
 )
 @pytest.mark.parametrize("depth", [0, 25_000])
@@ -185,9 +183,7 @@ def test_connector_requires_row_content_even_after_long_indentation(
         parse_tree(f"./\n{indent * depth}{connector}\n", style)
 
 
-@pytest.mark.parametrize(
-    "style,connector", [("unicode", "└── "), ("ascii", "`-- "), ("list", "- ")]
-)
+@pytest.mark.parametrize("style,connector", [("unicode", "└── "), ("ascii", "`-- ")])
 def test_long_indentation_with_content_reports_missing_parent(
     style: str, connector: str
 ) -> None:
@@ -201,9 +197,9 @@ def test_unknown_style_fails() -> None:
 
 
 def test_null_symlink_target_and_directory_count_roundtrip() -> None:
-    text = ".\n- dir/ (4 folders)\n- link -> null\n"
-    printed = render_tree(parse_tree(text), Settings(style="list"))
-    assert printed == "./\n- dir/ (4 folders)\n- link -> null\n"
+    text = ".\n└── dir/ (4 folders)\n└── link -> null\n"
+    printed = render_tree(parse_tree(text), Settings(style="unicode"))
+    assert printed == "./\n├── dir/ (4 folders)\n└── link -> null\n"
     assert parse_tree(printed) == parse_tree(text)
 
 
@@ -282,7 +278,7 @@ def test_settings_reject_invalid_runtime_types(field: str, value: object) -> Non
         "- child",
     ],
 )
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_special_names_and_annotations_cannot_become_tree_syntax(
     name: str, style: str
 ) -> None:
@@ -303,7 +299,7 @@ def test_special_names_and_annotations_cannot_become_tree_syntax(
 
 def test_indentation_cannot_skip_multiple_levels() -> None:
     with pytest.raises(MarkerError, match="skips a parent"):
-        parse_tree(".\n- a/\n    - missing-parent\n")
+        parse_tree(".\n└── a/\n        └── missing-parent\n")
 
 
 def test_model_rejects_invalid_root_duplicate_nodes_and_leaf_children() -> None:
@@ -345,59 +341,24 @@ def test_unencodable_path_fails_explicitly() -> None:
         "a```b",
     ],
 )
-def test_list_names_render_as_themselves(name: str) -> None:
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
+def test_fenced_names_and_notes_render_as_literal_text(name: str, style: str) -> None:
     from markdown_it import MarkdownIt
 
-    tree = replace(build_tree([Entry(name)]), children=(Node(name, name, "file"),))
-    printed = render_tree(tree, Settings(style="list"))
-    assert parse_tree(printed) == tree
-    html = MarkdownIt("commonmark", {"html": True}).render(printed)
-    for construct in ("<a ", "<img ", "<strong>", "<em>", "&copy;"):
-        assert construct not in html, (name, html)
-
-
-def test_list_annotations_are_the_maintainers_markdown() -> None:
-    from markdown_it import MarkdownIt
-
-    annotation = "see [the design](d.md), **note** the `codec`"
-    tree = replace(
-        build_tree([Entry("docs/guide.md")]),
-        children=(Node("docs", "docs", "dir", annotation=annotation),),
+    child = Node(
+        name, name, "file", annotation="see [design](url), **note** the `codec`"
     )
-    printed = render_tree(tree, Settings(style="list"))
-    assert printed == f"./\n- docs/  # {annotation}\n"
-    assert parse_tree(printed) == tree
-    html = MarkdownIt("commonmark", {"html": True}).render(printed)
-    assert '<a href="d.md">the design</a>' in html
-    assert "<strong>note</strong>" in html and "<code>codec</code>" in html
+    tree = Node(".", "", "dir", children=(child,))
+    bare = render_tree(tree, Settings(style=style))
+    framed = render_tree(tree, Settings(style=style), fenced=True)
+    assert parse_tree(bare) == tree
+    tokens = MarkdownIt("commonmark", {"html": True}).parse(framed)
+    assert len(tokens) == 1 and tokens[0].type == "fence"
+    assert tokens[0].content == bare
+    assert name in bare and child.annotation in bare
 
 
-def test_list_rows_escape_names_and_targets_and_leave_structure_plain() -> None:
-    from markdown_it import MarkdownIt
-
-    tree = parse_tree(
-        ".\n- collapsed/ (3 files, 2 folders)  # count `note`\n- expanded/\n  - link -> a`b  # <b>link</b>\n"
-    )
-    printed = render_tree(tree, Settings(style="list"))
-    assert parse_tree(printed) == tree
-    # Counts, the arrow, and the marker are the format's own text and need no
-    # protection; the target's backtick is escaped so the page shows it as is.
-    assert "- collapsed/ (3 files, 2 folders)  # count `note`" in printed
-    assert "- link -> a\\`b  # <b>link</b>" in printed
-    html = MarkdownIt("commonmark", {"html": True}).render(printed)
-    assert "<b>link</b>" in html  # the annotation is the maintainer's Markdown
-    assert "<code>note</code>" in html
-    assert "a`b" in html
-
-
-def test_list_root_annotation_stays_live_markdown() -> None:
-    tree = Node(".", "", "dir", annotation="[root](url)")
-    printed = render_tree(tree, Settings(style="list"))
-    assert printed == "./  # [root](url)\n"
-    assert parse_tree(printed, "list") == tree
-
-
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize(
     "name", ["name #", "name # ", "name ##", "name   ", "name\u00a0"]
 )
@@ -412,7 +373,7 @@ def test_marker_protects_filename_boundaries_without_an_annotation(
     assert parse_tree(trimmed, style, special_paths=special_paths(tree)) == tree
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_ordinary_names_need_no_quotes_or_extra_marker(style: str) -> None:
     names = [
         "let's try this.md",
@@ -430,7 +391,7 @@ def test_ordinary_names_need_no_quotes_or_extra_marker(style: str) -> None:
     assert parse_tree(printed, style) == tree
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_control_characters_and_literal_escapes_remain_distinct(style: str) -> None:
     names = [
         "a\nb",
@@ -449,24 +410,22 @@ def test_control_characters_and_literal_escapes_remain_distinct(style: str) -> N
     assert printed.encode("utf-8")
 
 
-@pytest.mark.parametrize("text", ["./\n└── literal\\q.txt\n", "./\n- literal\\q.txt\n"])
+@pytest.mark.parametrize(
+    "text", ["./\n└── literal\\q.txt\n", "./\n└── literal\\q.txt\n"]
+)
 def test_unknown_escapes_do_not_delete_filename_characters(text: str) -> None:
     assert parse_tree(text).children[0].name == r"literal\q.txt"
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii"])
-@pytest.mark.parametrize("name", ["odd -> name", "vendor [gitlink]"])
-def test_ambiguous_rows_are_refused_instead_of_silently_changing_identity(
+@pytest.mark.parametrize("name", ["odd -> name", "vendor [gitlink]", " [gitlink]"])
+def test_reserved_filename_syntax_preserves_file_identity(
     style: str, name: str
 ) -> None:
-    with pytest.raises(MarkerError, match="cannot represent"):
-        render_tree(build_tree([Entry(name)]), Settings(style=style))
-
-
-def test_list_escaping_can_disambiguate_names_without_a_blacklist() -> None:
-    tree = build_tree([Entry("odd -> name"), Entry("vendor [gitlink]")])
-    printed = render_tree(tree, Settings(style="list"))
-    assert parse_tree(printed, "list") == tree
+    tree = build_tree([Entry(name)])
+    printed = render_tree(tree, Settings(style=style))
+    assert special_paths(tree) == {1: name}
+    assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
 
 
 @pytest.mark.parametrize("style", ["unicode", "ascii"])
@@ -492,7 +451,7 @@ def test_fixed_fence_preserves_backticks_in_names_and_annotations(style: str) ->
     assert blocks[0].content == body
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_special_directory_establishes_identity_for_ordinary_children(
     style: str,
 ) -> None:
@@ -515,7 +474,7 @@ def test_special_directory_establishes_identity_for_ordinary_children(
     assert special_paths(collapsed, "src") == {1: "src/notes  # drafts"}
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize(
     "name",
     [
@@ -552,7 +511,7 @@ def test_special_registrations_must_match_visible_scoped_names(
         parse_tree("./\n└── ordinary\n", special_paths=paths)
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("reverse", [False, True])
 def test_special_name_prefixes_resolve_using_row_identities(
     style: str, reverse: bool
@@ -564,7 +523,7 @@ def test_special_name_prefixes_resolve_using_row_identities(
     assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_special_parents_and_children_resolve_by_row(style: str) -> None:
     tree = build_tree(
         [Entry("x  # y/a  # b"), Entry("x  # y  # z/a  # b"), Entry("ordinary")]
@@ -588,7 +547,7 @@ def test_identical_printed_rows_have_exact_registered_identities(
     assert (ordinary.path, ordinary.annotation) == ("x", "y")
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_filename_and_annotation_overlap_keeps_registered_identity(style: str) -> None:
     tree = Node(
         ".",
@@ -603,7 +562,7 @@ def test_filename_and_annotation_overlap_keeps_registered_identity(style: str) -
     assert parse_tree(printed, style, special_paths=special_paths(tree)) == tree
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_registered_prefix_file_and_directory_remain_distinct(style: str) -> None:
     tree = Node(
         ".",
@@ -627,7 +586,7 @@ def test_registered_prefix_file_and_directory_remain_distinct(style: str) -> Non
     )
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_registered_rows_preserve_types_targets_and_counts(style: str) -> None:
     tree = Node(
         ".",
@@ -684,12 +643,10 @@ def test_special_rows_do_not_revisit_following_ordinary_rows(
     original = codec._parse_row
     calls = 0
 
-    def counted(
-        text: str, parent: str, *, root: bool = False, markdown: bool = False
-    ) -> Node:
+    def counted(text: str, parent: str, *, root: bool = False) -> Node:
         nonlocal calls
         calls += 1
-        return original(text, parent, root=root, markdown=markdown)
+        return original(text, parent, root=root)
 
     monkeypatch.setattr(codec, "_parse_row", counted)
     parsed = parse_tree(text, special_paths=dict(enumerate(names, 1)))
@@ -698,7 +655,7 @@ def test_special_rows_do_not_revisit_following_ordinary_rows(
 
 
 @pytest.mark.parametrize("target", ["ordinary  # target", "null"])
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_symlink_facts_cannot_be_silently_reinterpreted(
     target: str, style: str
 ) -> None:
@@ -729,10 +686,21 @@ def test_nontext_git_bytes_are_rejected() -> None:
 
 def test_directory_cannot_print_zero_counts() -> None:
     with pytest.raises(MarkerError, match="zero counts are not printed"):
-        parse_tree("./\n- empty/ (0 files)\n")
+        parse_tree("./\n└── empty/ (0 files)\n")
 
 
-def test_render_rejects_names_that_parse_as_invalid_facts() -> None:
-    tree = build_tree([Entry(" [gitlink]")])
-    with pytest.raises(MarkerError, match="cannot represent tree"):
-        render_tree(tree, Settings())
+def test_list_setting_and_explicit_parser_style_are_retired() -> None:
+    with pytest.raises(MarkerError, match="list style is no longer supported"):
+        Settings(style="list")
+    with pytest.raises(MarkerError, match="list style is no longer supported"):
+        parse_tree("./\n- file\n", "list")
+
+
+@pytest.mark.parametrize("text", ["./\n- file\n", "./\n- dir/\n  - file\n"])
+def test_list_rows_are_not_reinterpreted_as_another_style(text: str) -> None:
+    with pytest.raises(MarkerError, match="list style is no longer supported"):
+        parse_tree(text)
+
+
+def test_bare_root_remains_supported_for_internal_tree_previews() -> None:
+    assert parse_tree("./\n") == Node(".", "", "dir")

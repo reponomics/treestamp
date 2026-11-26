@@ -197,6 +197,8 @@ def _special_path_array(value: object) -> dict[int, str]:
 def _metadata(text: str) -> tuple[Settings, frozenset[str], dict[int, str]]:
     try:
         values = tomllib.loads(text)
+    except RecursionError:
+        raise MarkerError("document metadata is nested too deeply") from None
     except tomllib.TOMLDecodeError as exc:
         raise MarkerError(f"invalid document metadata: {exc}") from exc
     unknown = values.keys() - {"root", "hidden", "special_paths"}

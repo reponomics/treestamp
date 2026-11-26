@@ -4,7 +4,7 @@ The web editor loads public GitHub repositories at their default-branch HEAD, ed
 
 The service is a FastAPI application using the core treestamp package. It ships in the hosted container and is not part of the core PyPI distribution. The public web editor uses [treestamp.reponomics.org](https://treestamp.reponomics.org/); see [PRIVACY.md](../PRIVACY.md).
 
-Enter a repository on the landing page and choose **Create treestamp** for a fresh tree at its root, or **Load treestamp** to read its root README.md. **Choose another folder or file…** opens the source picker. **Try example** opens a bundled snapshot of reponomics/treestamp. **Resume session** offers best-effort recovery of recent work while the required cached data remains available. The [UI flow reference](../docs/ui-flow.md) describes navigation, temporary drafts, note transfer, and Discard changes.
+Enter a repository on the landing page and choose **Create** for a fresh tree at its root. **Pick a file or folder…** opens the source picker to load an existing treestamp or start from a subtree. **Open this example** opens a bundled snapshot of reponomics/treestamp. **Resume session** offers best-effort recovery of recent work while the required cached data remains available. The [UI flow reference](../docs/ui-flow.md) describes navigation, temporary drafts, note transfer, and Discard changes.
 
 Loaded treestamps preserve supported document formatting when copied or restored. See the [document format](../docs/design.md#document-format) for boundary spacing, line endings, and configuration formatting. The [design reference](../docs/design.md#hosted-http-api) describes the browser's session envelope and HTTP operations.
 
@@ -37,6 +37,14 @@ The hosted service applies three limits to symlinks within the selected subtree.
 The byte limits are checked before building or rendering the source tree, on opening and on subsequent edits or note transfers. Exceeding a limit rejects the selected subtree without truncating targets. These are hosted-service constraints; the local CLI and TUI retain their existing behavior.
 
 Counting each reference bounds repeated decoding and the targets' contribution to rendered output: the current codec expands a raw target byte to at most five characters, including list-style escaping. This does not impose a global memory ceiling on the service; other source data and concurrent requests remain subject to their separate limits.
+
+## SVG work limits
+
+`SVG_EXPORT_RATE_LIMIT_PER_MINUTE` limits standalone exports per client (default 30; zero disables this client limit). SVG export uses one rendering thread per process. Hosted editing and change detection are independent of that thread. Additional jobs receive `503 svg_busy` with `Retry-After` while it is occupied.
+
+Each export prepares Adaptive, Light, and Dark together; appearance switches use the browser-held results.
+
+The worker has two seconds of render-time credit, replenished at 0.25 seconds per elapsed second. Completed work consumes credit, including failures and work whose caller disconnected. Exhausted credit rejects new jobs until replenished; an admitted job finishes before its cost is charged. This allows short editing bursts while limiting sustained rendering across clients. The per-process work budget remains active independently of the client rate limit.
 
 ## Test and build
 

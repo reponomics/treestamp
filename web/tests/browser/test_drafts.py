@@ -43,6 +43,7 @@ def test_return_restores_notes_hides_and_can_resume_from_picker(
     expect(page.locator("#draft-status, #forget-draft")).to_have_count(0)
     expect(page.locator('.row[data-path="scripts"]')).to_have_count(0)
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#replace-draft-warning")).to_have_count(0)
     page.locator("#entry-change-repo").click()
@@ -96,6 +97,7 @@ def test_expired_draft_does_not_silently_load_head_and_can_start_fresh(
     expect(page.locator("#entry-error")).to_contain_text("Snapshot expired")
     assert previews == []
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == saved
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
@@ -151,6 +153,7 @@ def test_failed_network_restore_can_be_replaced_by_a_fresh_load(
     page.goto(service + "/")
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#entry-error")).to_contain_text("Could not reach the service")
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()

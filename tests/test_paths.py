@@ -190,9 +190,10 @@ def test_publication_rechecks_repository_boundary(repo: Repo) -> None:
 
 
 def test_hidden_unsupported_source_is_still_rejected(repo: Repo) -> None:
-    repo.write("nested/a [gitlink]")
     repo.write("keep")
     repo.add(".")
+    target = repo.blob(b"null")
+    repo.git("update-index", "--add", "--cacheinfo", f"120000,{target},nested/link")
     document = Document(build_tree([Entry("keep")]), hidden=frozenset({"nested"}))
     repo.write("README.md", render_region(document))
     before = repo.read_bytes("README.md")

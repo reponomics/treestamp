@@ -135,7 +135,7 @@ function validatePreviewOutput(data) {
 function validatePreviewSettings(data) {
   const paths = data?.state?.curation;
   const settings = paths?.settings;
-  if (!settings || !["unicode", "ascii", "list"].includes(settings.style) || typeof settings.show_counts !== "boolean"
+  if (!settings || !["unicode", "ascii"].includes(settings.style) || typeof settings.show_counts !== "boolean"
       || (settings.attribution !== undefined && typeof settings.attribution !== "boolean")
       || !validPath(settings.root) || !validPath(data.root) || !validPath(data.document)
       || ![paths.expanded, paths.hidden, paths.annotations].every(Array.isArray)) {
@@ -192,6 +192,20 @@ export function hintFor(code, status) {
   if (status === 413) return "Large repositories can be curated locally with the treestamp command instead.";
   if (status === 503) return "GitHub is unavailable or the shared request budget is used up. Try again in a few minutes.";
   return "";
+}
+
+// The landing page shows a failure in place of the field's label, so known
+// failures get one short line; anything else keeps the service's message.
+const ENTRY_ERRORS = {
+  invalid_link: "Use owner/repo or a github.com link",
+  not_found: "Not found, or not a public repository",
+  too_large: "Too large for the web editor",
+  upstream_unavailable: "GitHub is unavailable. Try again shortly",
+  upstream_timeout: "GitHub did not respond. Try again",
+};
+
+export function entryErrorText(code, message) {
+  return Object.hasOwn(ENTRY_ERRORS, code) ? ENTRY_ERRORS[code] : message;
 }
 
 // ---------- the output region

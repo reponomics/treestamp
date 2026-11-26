@@ -22,7 +22,7 @@ def paths(tree: Node) -> list[str]:
 
 
 def test_update_admits_all_siblings_beyond_former_limits() -> None:
-    printed = parse_tree(".\n- src/\n  - old  # keep\n")
+    printed = parse_tree(".\n└── src/\n    └── old  # keep\n")
     current = target(
         "src/old", *[f"src/new{i}" for i in range(50)], *[f"top{i}" for i in range(50)]
     )
@@ -40,7 +40,7 @@ def test_new_directory_chain_is_collapsed_in_new_and_update() -> None:
 
 
 def test_hidden_paths_block_existing_and_new_children() -> None:
-    printed = parse_tree(".\n- src/\n  - a\n  - b\n- hidden/\n")
+    printed = parse_tree(".\n└── src/\n    └── a\n    └── b\n└── hidden/\n")
     actual = update(
         printed,
         target("src/a", "src/b", "hidden/x"),
@@ -52,7 +52,7 @@ def test_hidden_paths_block_existing_and_new_children() -> None:
 
 def test_last_child_replacement_retains_original_expansion() -> None:
     actual = update(
-        parse_tree(".\n- src/  # keep\n  - old  # gone\n"), target("src/new"), S
+        parse_tree(".\n└── src/  # keep\n    └── old  # gone\n"), target("src/new"), S
     )
     assert paths(actual) == ["src", "src/new"]
     assert actual.children[0].annotation == "keep"
@@ -60,7 +60,7 @@ def test_last_child_replacement_retains_original_expansion() -> None:
 
 
 def test_collapsed_counts_refresh_include_hidden_and_obey_visibility() -> None:
-    before = parse_tree(".\n- src/ (90 files)\n")
+    before = parse_tree(".\n└── src/ (90 files)\n")
     after = target("src/a", "src/d/b")
     actual = update(before, after, S, hidden=frozenset({"src/a"}))
     assert paths(actual) == ["src"]
@@ -70,7 +70,7 @@ def test_collapsed_counts_refresh_include_hidden_and_obey_visibility() -> None:
 
 
 def test_disappeared_subtree_and_empty_repository() -> None:
-    assert not update(parse_tree(".\n- gone/\n"), target(), S).children
+    assert not update(parse_tree(".\n└── gone/\n"), target(), S).children
     with pytest.raises(MarkerError, match="no tracked descendants"):
         update(target(), Node(".", "", "dir", (Node("x", "x", "dir"),)), S)
     with pytest.raises(MarkerError, match="invalid"):
@@ -78,7 +78,7 @@ def test_disappeared_subtree_and_empty_repository() -> None:
 
 
 def test_notes_stay_at_existing_paths_and_do_not_follow_renamed_files() -> None:
-    printed = parse_tree(".\n- old  # source\n- existing  # retained\n")
+    printed = parse_tree(".\n├── old  # source\n└── existing  # retained\n")
     current = target("new", "existing")
     actual = update(printed, current, S)
     notes = {node.path: node.annotation for node in actual.walk()}
@@ -87,7 +87,7 @@ def test_notes_stay_at_existing_paths_and_do_not_follow_renamed_files() -> None:
 
 
 def test_kind_replacement_drops_annotation_and_never_expands() -> None:
-    printed = parse_tree(".\n- item  # old leaf\n")
+    printed = parse_tree(".\n└── item  # old leaf\n")
     actual = update(printed, target("item/file"), S)
     assert paths(actual) == ["item"]
     assert actual.children[0].annotation == ""
@@ -95,7 +95,7 @@ def test_kind_replacement_drops_annotation_and_never_expands() -> None:
 
 
 def test_symlink_facts_refresh_without_structural_change() -> None:
-    printed = parse_tree('.\n- link -> "old"  # note\n')
+    printed = parse_tree('.\n└── link -> "old"  # note\n')
     current = build_tree([Entry("link", "symlink", "new")])
     actual = update(printed, current, S)
     assert actual.children[0].target == "new"

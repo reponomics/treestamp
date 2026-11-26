@@ -1,5 +1,5 @@
 // Repository and source selection before adopting a new editing session.
-import { hintFor } from "./logic.js";
+import { entryErrorText, hintFor } from "./logic.js";
 import { SourceBrowser } from "./source-browser.js";
 
 const element = (id) => document.getElementById(id);
@@ -44,7 +44,7 @@ export class EntryFlow {
     });
     element("entry-form").addEventListener("submit", (event) => {
       event.preventDefault();
-      this.openRoot(event.submitter?.id === "entry-load" ? "file" : "dir");
+      this.openRoot();
     });
     element("entry-browse").addEventListener("click", () => {
       const repo = element("entry-url").value.trim();
@@ -96,13 +96,16 @@ export class EntryFlow {
 
   clearError() {
     for (const id of ["entry-error", "reload-error"]) element(id).hidden = true;
+    element("entry-url").removeAttribute("aria-invalid");
   }
 
-  showError(message, hint = "") {
-    for (const id of ["entry-error", "reload-error"]) {
-      element(id).textContent = [message, hint].filter(Boolean).join(" ");
-      element(id).hidden = false;
-    }
+  // The landing line replaces the field's label, so it is kept short; the picker has room for the hint.
+  // Only an unusable address marks the field invalid; other failures leave it as typed.
+  showError(message, hint = "", code = "") {
+    element("entry-error").textContent = entryErrorText(code, message);
+    element("reload-error").textContent = [message, hint].filter(Boolean).join(" ");
+    for (const id of ["entry-error", "reload-error"]) element(id).hidden = false;
+    if (code === "invalid_link") element("entry-url").setAttribute("aria-invalid", "true");
   }
 
   setBusy(busy) {
@@ -115,15 +118,16 @@ export class EntryFlow {
 
   renderWelcome() {
     const disabled = this.busy || !element("entry-url").value.trim();
-    for (const id of ["entry-create", "entry-load", "entry-browse"]) element(id).disabled = disabled;
+    for (const id of ["entry-create", "entry-browse"]) element(id).disabled = disabled;
     element("entry-progress").textContent = this.busy ? this.opening || "Opening…" : "";
   }
 
-  openRoot(kind) {
+  // The field's own action creates a fresh tree at the repository root.
+  openRoot() {
     const repo = element("entry-url").value.trim();
     if (this.busy || !repo) return;
     this.url = repo;
-    return this.openSource(kind, kind === "dir" ? "." : "README.md");
+    return this.openSource("dir", ".");
   }
 
   renderSelection() {

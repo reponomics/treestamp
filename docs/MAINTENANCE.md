@@ -100,13 +100,6 @@ make fly-status FLY_CONFIG=web/fly.preview.toml
 
 Deploy a clean, committed revision so its build identifier describes the deployed files, then verify it as for production with `SMOKE_URL=https://reponomics-treestamp-preview.fly.dev`.
 
-## Open setup tasks
-
-- [ ] Deploy a reviewed revision to production and verify two-Machine session routing and draft recovery.
-- [ ] Enable Cloudflare proxying with Full (strict) TLS, then verify cache behavior and rerun the domain and smoke checks.
-- [ ] Configure credentials for `reponomics-treestamp-preview` and deploy it before using it for previews.
-- [ ] Publish the product page and demos from the separate `reponomics-web` repository, then link them from this project.
-
 ## README tree and alternate styles
 
 The README contains one managed treestamp. Its ASCII and list previews are generated from that tree by `scripts/readme_styles.py`, preserving its curation, annotations, counts, and footer setting. The preview region has separate `readme-styles` markers so the normal document parser still sees only one managed treestamp.

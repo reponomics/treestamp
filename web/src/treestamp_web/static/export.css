@@ -1,0 +1,26 @@
+/* Export owns layout only; action treatment comes from buttons.css. */
+.stage[data-view="stamp"][data-output="svg"] #copy,
+.stage[data-view="stamp"][data-output="svg"] #copy-status,
+.stage[data-view="stamp"][data-output="svg"] #stage-status { display: none; }
+#stamp-panel { overflow: auto; }
+#svg-output { display: flex; flex: 1; flex-direction: column; gap: var(--s3); min-height: 0; }
+.svg-controls, .svg-actions, .svg-preview-heading { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2) var(--s3); }
+.svg-controls .output-toolbar { margin-bottom: 0; }
+.svg-actions { margin-left: auto; }
+.export-guidance { color: var(--ink-secondary); max-width: 65ch; }
+.svg-preview-heading { justify-content: space-between; }
+#svg-status { flex: 1; min-width: 0; color: var(--ink-secondary); overflow-wrap: anywhere; }
+#svg-status[data-error="true"] { color: var(--error-ink); }
+.svg-preview { flex: 1; overflow: auto; min-height: 6rem; border: 1px solid var(--rule); border-radius: var(--r); background: var(--document-surface); }
+/* Adaptive inherits the app's color-scheme, including inside the SVG image.
+   Fixed overrides use their own preview context; every export stays transparent. */
+.svg-preview[data-theme="light"] { color-scheme: light; background: #fff; }
+.svg-preview[data-theme="dark"] { color-scheme: dark; background: #0d1117; }
+.svg-preview img { display: block; max-width: 100%; height: auto; }
+.svg-preview[data-actual-size="true"] img { max-width: none; }
+@media (max-width: 47.999rem) {
+  .svg-actions { margin-left: 0; }
+  #svg-status { flex-basis: 100%; }
+  .svg-controls .output-toolbar select { min-width: 7rem; }
+  .svg-preview { max-height: 55dvh; }
+}

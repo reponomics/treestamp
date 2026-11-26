@@ -392,7 +392,7 @@ def test_show_counts_and_style_are_session_only(fake: FakeGitHub) -> None:
     assert "show_counts" not in result.region and "style =" not in result.region
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_attribution_is_opt_in_and_survives_loading_and_editing(
     fake: FakeGitHub, repo: Repo, style: str
 ) -> None:
@@ -551,8 +551,8 @@ def test_noncanonical_and_crlf_baselines_survive_restore(
     path.write_bytes(data.replace(b"```sh\r\n", b"```text\r\n"))
     repo.commit("cosmetic drift")
     result = preview(service)
-    assert result.dirty and result.notice == OPEN_NOTICE
-    assert op(service, result, "restore").dirty
+    assert not result.dirty and result.notice is None
+    assert not op(service, result, "restore").dirty
 
 
 @pytest.mark.parametrize("eol", [b"\n", b"\r\n"])

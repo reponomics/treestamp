@@ -17,6 +17,11 @@ KIND_GITLINK = "gitlink"
 KINDS = frozenset((KIND_FILE, KIND_DIR, KIND_SYMLINK, KIND_GITLINK))
 MAX_DEPTH = 128
 ANNOTATION_DELIMITER = "  # "
+TEXT_STYLES = ("unicode", "ascii")
+LIST_STYLE_REMOVED = (
+    "Markdown list style is no longer supported; "
+    "use a fenced Unicode or ASCII treestamp"
+)
 
 
 @dataclass(frozen=True)
@@ -64,8 +69,10 @@ class Settings:
     def __post_init__(self) -> None:
         if self.root != ".":
             validate_path(self.root)
-        if self.style not in ("unicode", "ascii", "list"):
-            raise MarkerError("style must be unicode, ascii, or list")
+        if self.style == "list":
+            raise MarkerError(LIST_STYLE_REMOVED)
+        if self.style not in TEXT_STYLES:
+            raise MarkerError("style must be unicode or ascii")
         if type(self.show_counts) is not bool:
             raise MarkerError("show_counts must be a boolean")
         if type(self.attribution) is not bool:

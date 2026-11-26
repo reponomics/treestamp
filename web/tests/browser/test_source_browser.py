@@ -14,6 +14,7 @@ def open_source_browser(page: Page, service: str) -> None:
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator('.source-row[data-path="."]')).to_be_visible()
 
@@ -148,6 +149,7 @@ def test_source_browser_failure_preserves_the_existing_draft(
         ),
     )
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#reload-error")).to_contain_text("Try again")
     expect(page.locator("#source-load")).to_be_disabled()
@@ -222,6 +224,7 @@ def test_picker_matches_editor_tree_density_and_indentation(
         root_before = editor_root.evaluate(geometry, ".name")
         folder_before = editor_folder.evaluate(geometry, ".name")
         page.locator(".wordmark").click()
+        page.locator("#entry-url").fill("fixture/repo")
         page.locator("#entry-browse").click()
         source_root = page.locator('.source-row[data-path="."]')
         source_folder = page.locator('.source-row[data-path="src"]')

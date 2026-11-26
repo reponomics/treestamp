@@ -158,6 +158,7 @@ def service(fixture_repo: Fixture) -> Iterator[str]:
         "GITHUB_RATE_RESERVE": "0",
         "RATE_LIMIT_PER_MINUTE": "1000",
         "OP_RATE_LIMIT_PER_MINUTE": "10000",
+        "SVG_EXPORT_RATE_LIMIT_PER_MINUTE": "10000",
     }
     app = subprocess.Popen(  # noqa: S603
         [
