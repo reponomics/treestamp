@@ -18,8 +18,17 @@
 
 # treestamp
 
-treestamp is an editor for creating and maintaining annotated directory trees—treestamps—for project documentation. Select which files and folders to include, add brief annotations, and reload the treestamp to update it later. Automated checks report when the displayed tree differs from the repository.
+treestamp is an open source editor for creating and maintaining annotated directory trees for project documentation. It offers a few conveniences over manually drafting and updating file trees, or using `tree`. The interactive editor allows users to:
 
+- select which files and folders to include via a visual interface.
+- add brief annotations to rows in the file tree.
+- reload the tree into the editor when it's time to update it.
+- automatically detect when the displayed tree needs to be updated.
+- easily maintain an SVG-based rendering of the tree.
+
+The same core application is available in the terminal and in the hosted web editor.
+
+<br>
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/reponomics/treestamp/main/assets/demos/quicktour.gif" alt="Quicktour of the TUI, the web editor, and how to create a new treestamp." width="600">
@@ -35,19 +44,15 @@ treestamp is an editor for creating and maintaining annotated directory trees—
 
 <p><h3 align="center"><a href="#project-structure">See this repo's treestamp 🌲</a></h3></p>
 
-
-
 ## Quickstart
 
 ### 1. Generate a treestamp
 
-treestamp can be accessed locally in your terminal, or online via the web editor.
-
 #### In the browser
 
-[Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL (or `OWNER/REPONAME`), and choose **Create** for a new tree at its root. **Pick a file or folder…** opens the source picker, where you can load an existing treestamp from a document such as the README or start from a different subtree. The server reads the repository's default branch. Failed loads preserve your current work.
+[Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL (or `OWNER/REPONAME`), and choose **Create** for a new tree at its root. The server reads the repository's default branch. After editing the treestamp, copy it to your clipboard and paste it into your project's documentation.
 
-#### In your terminal
+#### In the terminal
 
 treestamp is available on PyPI. It requires Python 3.11+ and Git, and is distributed with a Textual TUI for cross-platform support.
 
@@ -60,21 +65,19 @@ Homebrew users on macOS or Linux can install from the [Reponomics tap](https://g
 
 ```bash
 brew install reponomics/tap/treestamp
+treestamp
 ```
 
-Invoke it directly from anywhere within a Git repository. You can also run it directly without a persistent installation:
+Invoke from anywhere within a Git repository. You can also run it directly without a persistent installation:
 
 ```
 pipx run treestamp
 ```
 
-Bare `treestamp` opens the editor immediately: it loads a treestamp from `README.md` in your current directory, or starts a fresh tree at that directory if the README is missing or has no treestamp. Use `treestamp new docs` to create a subtree explicitly, or `treestamp load docs/README.md` to edit an existing treestamp. An unreadable or malformed document reports an error instead of starting over.
-
-> [!NOTE]
-> CLI paths and implicit README selection follow your current working directory. Stored configuration paths remain relative to the _repository root_, and entries in the rendered tree are relative to the selected subtree. Loading respects the tree root saved in the document.
+For new users, `treestamp` opens the editor with a tree rooted at the current working directory. If you already have a treestamp at `./README.md`, it will load that document for editing. Use `treestamp new path/to/dir` to create a treestamp rooted in some other directory, or `treestamp load path/to/doc.md` to edit an existing treestamp located elsewhere.
 
 > [!TIP]
-> The terminal editor captures the Git index, so stage additions, deletions, and renames before opening it; untracked files and unstaged changes are not included. The web editor reads the pushed state of the repository's default branch.
+> The terminal editor captures the Git index, so stage additions, deletions, and renames before opening it; untracked files and unstaged changes are not included.
 
 ### 2. Edit the tree
 
@@ -98,7 +101,7 @@ When first writing a treestamp to a document, choose **Copy** in the terminal ed
 
 These markers help the application recognize existing treestamps, and make sure that everything outside the boundaries stays the same.
 
-Paste the whole block, including the markers, anywhere in your project's document (the web editor does not perform any writes to GitHub).
+Paste the whole block, including the markers, anywhere in your project's document.
 
 ````markdown
 <!-- treestamp:start -->
@@ -119,11 +122,11 @@ Paste the whole block, including the markers, anywhere in your project's documen
 
 #### SVG instead of a text block
 
-The web **Export** tab also offers SVG preview, Download SVG, and Copy SVG. In the terminal, press `e` to save or copy SVG; `w` updates a loaded SVG. New SVG exports default to **Adaptive** appearance: one transparent image switches between black and white ink to match the embedding page’s light or dark color scheme. Fixed Light and Dark overrides remain available in the web export controls. Existing SVGs retain their saved appearance. The image carries an editable treestamp in its metadata, so it can be loaded again. Save it in your repository and add a README image reference yourself, using Markdown image syntax. See [SVG export](https://github.com/reponomics/treestamp/blob/main/docs/cli-reference.md#svg-export) for the CLI and file-safety rules.
+You can export the treestamp in SVG format, and retain its structure for future editing. In the web editor, select the SVG output format. In the terminal, press `e` to save or copy SVG; `w` updates a loaded SVG in-place. SVG exports default to **Adaptive** appearance: one transparent image switches between black and white ink to match the embedding page’s light or dark color scheme. Fixed Light and Dark outputs are also available. The image carries an editable treestamp in its metadata, so it can be loaded again. Save it to a file in your repository, then add a link to it using Markdown image syntax. See [SVG export](https://github.com/reponomics/treestamp/blob/main/docs/cli-reference.md#svg-export) for the CLI and file-safety rules.
 
 #### The config block
 
-The treestamp may also contain a configuration comment after the top boundary marker. It opens with `<!-- treestamp:config`, contains TOML settings, and closes with `-->` on a separate line. For example:
+The treestamp may also contain a configuration comment after the top boundary marker. For example:
 
 ```html
 <!-- treestamp:config
@@ -131,23 +134,23 @@ hidden = ["tests"]
 -->
 ```
 
-The `hidden` array records paths that the user has elected to hide, so that when the treestamp is reloaded, the application can remember: "don't render these in the output." These hidden paths can always be viewed and unhidden in the editor interface.
-
-
+The `hidden` array records paths that are tracked in git, but that you wish to exclude from the rendered tree, so that when the treestamp is reloaded, the application can remember: "don't render these in the output." These hidden paths can always be viewed and unhidden in the editor interface.
 
 ### 4. Update an existing treestamp
 
-To load an existing treestamp for editing, run `treestamp load docs/structure.md`, or `treestamp load` for the README in your current directory. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will read the Markdown boundary markers or SVG metadata and load the treestamp with the same editorial decisions (hidden paths, collapsed directories, etc.). However, the following modifications will be applied to the tree when loaded into the editor:
+To load an existing treestamp for editing, run `treestamp load path/to/doc.md`, or `treestamp load` for `./README.md`. The CLI path is relative to your current directory (absolute paths also work), and the document selects its containing repository. The editor will load the treestamp with the same editorial decisions (hidden paths, collapsed directories), and will attempt to update the draft if it has drifted from the repo's actual file structure:
 
-(i) paths that are rendered in the tree but are no longer tracked in Git will be removed from the tree;
+(i) paths that are rendered in the tree but are no longer tracked in Git will be removed;
 
-(ii) new tracked entries (files and folders) will be added if they appear beneath already-expanded directories, including the tree root. Entries beneath collapsed directories remain unexpanded, and newly added directories start collapsed.
+(ii) paths that are found in the git index but are not in the rendered tree will be added if they are children of a directory that is not collapsed. If the path is a directory, it will appear collapsed when first added.
 
-The editor preserves supported curation while updating the displayed paths. If notes lose their original paths, it offers to transfer them before editing continues. The document remains unchanged until you write it or replace its treestamp with copied output.
+**Transfer any displaced annotations**
+
+If a file or folder that had annotations in the treestamp is moved or renamed, treestamp will ask you to reassign those notes from the old path to the new one. This allows you to preserve a file's annotation even as the project structure changes.
 
 ### Include a treestamp footer (optional)
 
-To include an attribution footer, select **Add “Maintained with treestamp” footer** (or press <kbd>t</kbd> in the terminal). It is off by default. When enabled, the following line appears below the rendered tree and before the closing boundary marker:
+We know that you will probably like this software, and you may be eager to tell others about it as well. To include an attribution footer, select **Add “Maintained with treestamp” footer** (or press <kbd>t</kbd> in the terminal). When enabled, the following line appears below the rendered tree and before the closing boundary marker:
 
 ```markdown
 Maintained with [treestamp](https://github.com/reponomics/treestamp)
@@ -188,13 +191,13 @@ Use a terminal and font that display Unicode tree characters, or choose ASCII ou
 
 </details>
 
-## Limitations and edge cases
+## Technical details
 
-Textual treestamps use fenced Unicode or ASCII branches. The former unfenced Markdown-list format has been removed, including loading existing list treestamps. Such documents fail with an explicit unsupported-style error and are not rewritten.
+Textual treestamps use fenced Unicode or ASCII branches.
 
 The editor has to define a reserved sequence to be the delimiter between a filename and the annotation that follows it. In this case, it's `  # ` (space-space-hash-space). The problem is: this sequence is legal within a filename. This creates the potential for ambiguity for the parser. To avoid this, and maintain support for these uncommon filenames, pathnames whose final segment contains that sequence are stored in the config block in a `special_paths` array (see [special-path-resolution](https://github.com/reponomics/treestamp/blob/main/docs/special-path-resolution.md)).
 
-The same exact-path registrations protect filenames containing ` -> ` or ending in ` [gitlink]`, so an ordinary file cannot be confused with a symlink or Git-link entry. The registration rule applies to every entry kind and output style. Readers predating this extension reject these new registrations and need to be upgraded.
+The same exact-path registrations protect filenames containing ` -> ` or ending in ` [gitlink]`, so an ordinary file cannot be confused with a symlink or Git-link entry. The registration rule applies to every entry kind and output style.
 
 Trailing whitespace in filenames and symlink targets is emitted as visible escape sequences so a formatter does not trim it away. Preserve those sequences when editing a document. Rendering fails if parsing the result would change the tree's identity or facts.
 
@@ -206,55 +209,47 @@ New output includes a blank line after the start marker, between the configurati
 
 Configuration arrays use compact wrapping with an 80-character target: short arrays stay inline, and longer arrays fit several entries per line where possible. Individual entries are never split, so a long path or record may exceed the target. Existing TOML formatting, including comments and multiline arrays, is preserved while the configuration values remain unchanged and does not cause `check` to fail. When those values change, the configuration is regenerated using the default layout; comments within that configuration are not retained. The configuration must still use supported settings and valid values inside the `treestamp:config` comment wrapper.
 
-The [document format reference](https://github.com/reponomics/treestamp/blob/main/docs/design.md#document-format) describes the current formatting rules. [ADR 0002](https://github.com/reponomics/treestamp/blob/main/docs/adr/0002-formatter-compatible-documents.md) records the rationale and alternatives.
+The [document format reference](https://github.com/reponomics/treestamp/blob/main/docs/design.md#document-format) describes the current formatting rules.
 
 ## Project Structure
 
 <!-- treestamp:start -->
 <!-- treestamp:config
-hidden = [".dockerignore", ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml", ".python-version", ".tool-versions", "CHANGELOG.md", "LICENSE", "Makefile", "PRIVACY.md", "codecov.yml", "osv-scanner.toml", "pyproject.toml", "src/treestamp/__init__.py", "src/treestamp/__main__.py", "src/treestamp/py.typed", "uv.lock", "vex"]
+hidden = [
+    ".dockerignore", ".github/.release-please-manifest.json",
+    ".github/CODEOWNERS", ".github/CODE_OF_CONDUCT.md",
+    ".github/CONTRIBUTING.md", ".github/DCO.txt", ".github/ISSUE_TEMPLATE",
+    ".github/PULL_REQUEST_TEMPLATE.md", ".github/SECURITY.md",
+    ".github/dependabot.yml", ".github/release-please-config.json",
+    ".gitignore", ".nvmrc", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml",
+    ".python-version", ".tool-versions", "CHANGELOG.md", "LICENSE", "Makefile",
+    "PRIVACY.md", "README.treestamp.svg", "codecov.yml", "docs/GOVERNANCE.md",
+    "docs/MAINTENANCE.md", "docs/ROADMAP.md", "docs/cli-reference.md",
+    "docs/design.md", "docs/homebrew-tap.md", "docs/security-assessment.md",
+    "docs/special-path-resolution.md", "docs/testing.md", "docs/ui-flow.md",
+    "docs/ui-patterns.md", "docs/ui-review.md", "docs/verifying-releases.md",
+    "osv-scanner.toml", "pyproject.toml", "uv.lock", "vex", "web/Dockerfile",
+    "web/README.md", "web/fly.preview.toml", "web/fly.toml", "web/package.json",
+    "web/pyproject.toml",
+]
 -->
 ```sh
 ./
-├── .github/ (9 files, 2 folders)
+├── .github/  # GitHub Actions workflows and community docs
+│   └── workflows/ (10 files)
 ├── assets/ (2 files, 1 folder)
-├── docs/ (13 files, 2 folders)
+├── docs/  # Project documentation
+│   ├── adr/ (5 files)
+│   └── planning/ (2 files)
 ├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
-│   └── treestamp/  # Shared model and terminal editor
-│       ├── artifacts.py
-│       ├── cli.py
-│       ├── cli_inputs.py
-│       ├── cli_maintenance.py
-│       ├── codec.py
-│       ├── document.py
-│       ├── editor.py
-│       ├── errors.py
-│       ├── gitio.py
-│       ├── maintenance.py
-│       ├── model.py
-│       ├── reconcile.py
-│       ├── session.py
-│       ├── sources.py
-│       ├── svg.py
-│       ├── svg_layout.py
-│       ├── svg_metadata.py
-│       ├── tui.py
-│       ├── tui_dialogs.py
-│       ├── tui_export.py
-│       ├── tui_reconcile.py
-│       └── tui_rows.py
+│   └── treestamp/ (25 files)  # Shared model and terminal editor
 ├── tests/ (39 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
-│   ├── src/ (1 folder)
-│   ├── tests/ (22 files, 2 folders)
-│   ├── Dockerfile
-│   ├── README.md
-│   ├── fly.preview.toml
-│   ├── fly.toml
-│   ├── package.json
-│   └── pyproject.toml
+│   ├── src/
+│   │   └── treestamp_web/ (15 files, 2 folders)
+│   └── tests/ (22 files, 2 folders)
 └── README.md
 ```
 
@@ -269,45 +264,21 @@ The alternate styles below are generated from the same tree and checked for fres
 
 ```sh
 ./
-|-- .github/ (9 files, 2 folders)
+|-- .github/  # GitHub Actions workflows and community docs
+|   `-- workflows/ (10 files)
 |-- assets/ (2 files, 1 folder)
-|-- docs/ (13 files, 2 folders)
+|-- docs/  # Project documentation
+|   |-- adr/ (5 files)
+|   `-- planning/ (2 files)
 |-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
-|   `-- treestamp/  # Shared model and terminal editor
-|       |-- artifacts.py
-|       |-- cli.py
-|       |-- cli_inputs.py
-|       |-- cli_maintenance.py
-|       |-- codec.py
-|       |-- document.py
-|       |-- editor.py
-|       |-- errors.py
-|       |-- gitio.py
-|       |-- maintenance.py
-|       |-- model.py
-|       |-- reconcile.py
-|       |-- session.py
-|       |-- sources.py
-|       |-- svg.py
-|       |-- svg_layout.py
-|       |-- svg_metadata.py
-|       |-- tui.py
-|       |-- tui_dialogs.py
-|       |-- tui_export.py
-|       |-- tui_reconcile.py
-|       `-- tui_rows.py
+|   `-- treestamp/ (25 files)  # Shared model and terminal editor
 |-- tests/ (39 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
-|   |-- src/ (1 folder)
-|   |-- tests/ (22 files, 2 folders)
-|   |-- Dockerfile
-|   |-- README.md
-|   |-- fly.preview.toml
-|   |-- fly.toml
-|   |-- package.json
-|   `-- pyproject.toml
+|   |-- src/
+|   |   `-- treestamp_web/ (15 files, 2 folders)
+|   `-- tests/ (22 files, 2 folders)
 `-- README.md
 ```
 
@@ -315,6 +286,13 @@ Maintained with [treestamp](https://github.com/reponomics/treestamp)
 
 </details>
 <!-- readme-styles:end -->
+
+<details>
+<summary>View SVG style</summary>
+<picture>
+<img src="https://raw.githubusercontent.com/reponomics/treestamp/main/README.treestamp.svg" alt="treestamp project structure in SVG format">
+</picture>
+</details>
 
 ## Development and support
 
