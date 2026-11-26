@@ -106,6 +106,7 @@ def test_secondary_buttons_and_links_share_appearance_across_screens(
         "#entry-return-welcome",
         "#entry-load",
         "#entry-browse",
+        "#explore-example",
     ):
         action = page.locator(selector)
         expect(action).to_be_visible()

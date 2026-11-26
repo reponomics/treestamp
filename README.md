@@ -45,7 +45,7 @@ treestamp can be accessed locally in your terminal, or online via the web editor
 
 #### In the browser
 
-[Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL (or `OWNER/REPONAME`), and choose **Create treestamp** for a new tree at its root or **Load from README** for its README. **Pick a folder or file…** opens the source picker for a different subtree or document. The server reads the repository's default branch. Failed loads preserve your current work.
+[Open the web editor](https://treestamp.reponomics.org/), enter a public GitHub repository URL (or `OWNER/REPONAME`), and choose **Create** for a new tree at its root or **Load from README** for its README. **Pick a folder or file…** opens the source picker for a different subtree or document. The server reads the repository's default branch. Failed loads preserve your current work.
 
 #### In your terminal
 

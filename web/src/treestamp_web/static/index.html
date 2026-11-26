@@ -52,40 +52,43 @@
   <main id="entry" class="entry">
     <section id="entry-welcome" class="entry-welcome" aria-labelledby="entry-title">
       <div class="entry-hero">
-        <h2 id="entry-title" class="brand-wordmark">treestamp</h2>
-        <p class="entry-purpose">an open source editor for directory trees</p>
-        <p class="entry-credit">built by the humans and agents at <a href="https://github.com/reponomics">reponomics</a></p>
         <svg class="entry-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><use href="#treestamp-mark"/></svg>
+        <h2 id="entry-title" class="brand-wordmark">treestamp</h2>
+        <p class="entry-purpose">Annotated directory trees for your README.</p>
       </div>
       <form id="entry-form" autocomplete="off">
-        <label for="entry-url">Public GitHub repository</label>
+        <div class="entry-field-head">
+          <label for="entry-url">Public GitHub repository</label>
+          <p id="entry-error" class="entry-error" role="alert" hidden></p>
+          <p id="entry-progress" role="status"></p>
+        </div>
         <div class="entry-repo-row">
           <span class="entry-repo-icon"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="#github-mark"/></svg></span>
           <input id="entry-url" type="text" placeholder="owner/repo or URL" aria-describedby="entry-error" required spellcheck="false">
+          <button id="entry-create" class="primary" type="submit" disabled>Create</button>
         </div>
-        <p id="entry-error" class="entry-error" role="alert" hidden></p>
-        <div class="entry-primary-actions">
-          <button id="entry-create" class="primary" type="submit" disabled>Create treestamp</button>
+        <div class="entry-alternatives">
+          <span>or</span>
           <button id="entry-load" type="submit" disabled>Load from README</button>
-        </div>
-        <p id="entry-progress" role="status"></p>
-        <div class="entry-secondary-actions">
           <button id="entry-browse" type="button" disabled>Pick a folder or file…</button>
-          <p class="entry-example">No repository handy? <button id="explore-example" class="text-action" type="button">Try an example</button></p>
         </div>
       </form>
       <button id="entry-return-welcome" type="button" hidden>Resume session</button>
-      <figure class="entry-treestamp">
-        <figcaption class="visually-hidden">An example treestamp showing a project's folders and files with notes.</figcaption>
+      <figure class="entry-example">
+        <figcaption class="entry-example-head">
+          <span class="entry-example-title"><strong>See one first</strong> <span>reponomics/treestamp</span></span>
+          <button id="explore-example" type="button">Open this example</button>
+        </figcaption>
         <ul class="sample-tree" aria-hidden="true">
-          <li class="sample-row sample-root" data-depth="0"><span class="sample-name">your-project/</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">docs/</span><span class="sample-note"># guides and reference</span></li>
-          <li class="sample-row" data-depth="2"><span class="sample-name">getting-started.md</span></li>
-          <li class="sample-row" data-depth="2"><span class="sample-name">architecture.md</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">src/</span><span class="sample-note"># the work itself</span></li>
-          <li class="sample-row" data-depth="2"><span class="sample-name">app.py</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">tests/</span><span class="sample-note"># room to experiment</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">README.md</span><span class="sample-note"># a place to begin</span></li>
+          <li class="sample-row" data-depth="0"><span class="sample-name">./</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">docs/</span><span class="sample-count">(10 files, 1 folder)</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">src/</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">treestamp/</span><span class="sample-count">(15 files)</span><span class="sample-note"># CLI, editor, and rendering</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">tests/</span><span class="sample-count">(18 files)</span><span class="sample-note"># Core behavior and regression tests</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">web/</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">src/</span><span class="sample-count">(1 folder)</span><span class="sample-note"># Hosted editor and API</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">tests/</span><span class="sample-count">(14 files, 2 folders)</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">pyproject.toml</span><span class="sample-note"># Package metadata and dependencies</span></li>
         </ul>
       </figure>
     </section>

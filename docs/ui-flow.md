@@ -10,9 +10,9 @@ The web editor opens repository-root treestamps directly from the landing page. 
 | Return to `/` with a cached draft | Repository entry with **Resume session** |
 | Bare `/owner/repo` | Source selection for that repository |
 | Explicit session, commit, or source settings in the URL | Attempt to open the specified session or source |
-| **Try an example** | Open a curated, bundled snapshot of reponomics/treestamp |
+| **Open this example** | Open a curated, bundled snapshot of reponomics/treestamp, previewed on the landing page |
 
-The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session**. **Create treestamp** opens a fresh tree at the repository root without reading a document. **Load from README** reads an existing treestamp from root `README.md`. **Pick a folder or file…** opens source selection. Pressing Enter in the repository input defaults to Create. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or attempts to restore the cached draft after a short return visit.
+The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session**. **Create**, inside the repository field, opens a fresh tree at the repository root without reading a document. **Load from README** reads an existing treestamp from root `README.md`. **Pick a folder or file…** opens source selection. Pressing Enter in the repository input defaults to Create. Progress and failures appear in place of the field's label, so the controls do not move. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or attempts to restore the cached draft after a short return visit.
 
 Root README validation happens in the load request while the landing page remains visible. A missing README, absent or malformed treestamp, or service error appears inline and retains the entered repository and previous session. All entry actions are disabled while a request is pending.
 

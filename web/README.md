@@ -4,7 +4,7 @@ The web editor loads public GitHub repositories at their default-branch HEAD, ed
 
 The service is a FastAPI application using the core treestamp package. It ships in the hosted container and is not part of the core PyPI distribution. The public web editor uses [treestamp.reponomics.org](https://treestamp.reponomics.org/); see [PRIVACY.md](../PRIVACY.md).
 
-Enter a repository on the landing page and choose **Create treestamp** for a fresh tree at its root, or **Load from README** to read its root README.md. **Pick a folder or file…** opens the source picker. **Try an example** opens a bundled snapshot of reponomics/treestamp. **Resume session** offers best-effort recovery of recent work while the required cached data remains available. The [UI flow reference](../docs/ui-flow.md) describes navigation, temporary drafts, note transfer, and Discard changes.
+Enter a repository on the landing page and choose **Create** for a fresh tree at its root, or **Load from README** to read its root README.md. **Pick a folder or file…** opens the source picker. **Open this example** opens a bundled snapshot of reponomics/treestamp. **Resume session** offers best-effort recovery of recent work while the required cached data remains available. The [UI flow reference](../docs/ui-flow.md) describes navigation, temporary drafts, note transfer, and Discard changes.
 
 Loaded treestamps preserve supported document formatting when copied or restored. See the [document format](../docs/design.md#document-format) for boundary spacing, line endings, and configuration formatting. The [design reference](../docs/design.md#hosted-http-api) describes the browser's session envelope and HTTP operations.
 

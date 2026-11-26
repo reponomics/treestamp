@@ -1,7 +1,6 @@
 /* Shared action controls. See docs/ui-patterns.md.
    Default: bordered secondary action, including links styled as buttons.
    .primary: the next step or confirmation, sharing all base geometry.
-   .text-action: a low-emphasis alternative set inside a sentence.
    Views may adjust geometry, never redefine these appearance/state recipes.
    Tabs, tree disclosures, and selection rows have separate semantic patterns. */
 
@@ -35,18 +34,3 @@ button.primary:enabled {
 }
 button.primary:enabled:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
 button:disabled { cursor: default; background: var(--well); border-color: var(--rule-strong); color: var(--ink-secondary); }
-
-/* Reads as part of its sentence; the accent and underline mark it as an action. */
-button.text-action {
-  display: inline;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  white-space: normal;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-button.text-action:enabled:hover { color: var(--accent-hover); }
-button.text-action:disabled { background: none; color: var(--ink-secondary); text-decoration: none; }

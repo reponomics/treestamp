@@ -194,6 +194,20 @@ export function hintFor(code, status) {
   return "";
 }
 
+// The landing page shows a failure in place of the field's label, so known
+// failures get one short line; anything else keeps the service's message.
+const ENTRY_ERRORS = {
+  invalid_link: "Use owner/repo or a github.com link",
+  not_found: "Not found, or not a public repository",
+  too_large: "Too large for the web editor",
+  upstream_unavailable: "GitHub is unavailable. Try again shortly",
+  upstream_timeout: "GitHub did not respond. Try again",
+};
+
+export function entryErrorText(code, message) {
+  return Object.hasOwn(ENTRY_ERRORS, code) ? ENTRY_ERRORS[code] : message;
+}
+
 // ---------- the output region
 
 function regionHeaderEnd(lines) {

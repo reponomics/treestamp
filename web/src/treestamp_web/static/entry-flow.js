@@ -1,5 +1,5 @@
 // Repository and source selection before adopting a new editing session.
-import { hintFor } from "./logic.js";
+import { entryErrorText, hintFor } from "./logic.js";
 import { SourceBrowser } from "./source-browser.js";
 
 const element = (id) => document.getElementById(id);
@@ -99,12 +99,12 @@ export class EntryFlow {
     element("entry-url").removeAttribute("aria-invalid");
   }
 
+  // The landing line replaces the field's label, so it is kept short; the picker has room for the hint.
   // Only an unusable address marks the field invalid; other failures leave it as typed.
   showError(message, hint = "", code = "") {
-    for (const id of ["entry-error", "reload-error"]) {
-      element(id).textContent = [message, hint].filter(Boolean).join(" ");
-      element(id).hidden = false;
-    }
+    element("entry-error").textContent = entryErrorText(code, message);
+    element("reload-error").textContent = [message, hint].filter(Boolean).join(" ");
+    for (const id of ["entry-error", "reload-error"]) element(id).hidden = false;
     if (code === "invalid_link") element("entry-url").setAttribute("aria-invalid", "true");
   }
 

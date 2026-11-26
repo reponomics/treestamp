@@ -10,7 +10,6 @@ The web app uses native HTML controls and shared CSS rather than a component fra
 | --- | --- | --- |
 | Secondary | `<button type="button">…</button>` | Navigation, alternative actions, repeated editor tools, Cancel, Close, and Resume session. Always has a visible surface and border. |
 | Primary | `<button class="primary" type="button">…</button>` | The next step or confirmation: Create, the selected source action, Apply, and Transfer here. On the landing page, Create is the default and Load remains a visible secondary alternative. Uses the accent fill when enabled. |
-| Text action | `<button class="text-action" type="button">…</button>` inside a sentence | A low-emphasis alternative that should not compete with the screen's actions, such as Try an example beside the repository field. Uses the accent colour and an underline, with no surface or border. Use it only inside running text. |
 | Navigation link styled as a button | `<a class="button-link" href="https://github.com/reponomics/treestamp">GitHub</a>` | Navigation such as visiting GitHub. Shares the secondary button's appearance and hover/focus treatment; retains native link semantics. |
 | Icon-only action | A secondary button or button link with an icon and an accessible name | Same appearance as its text equivalent. A view may make it square or visually hide its label where space is constrained. |
 
@@ -18,7 +17,7 @@ Button prominence and submission behavior are independent: use `type="submit"` f
 
 Use the native `disabled` attribute for unavailable button actions. Disabled primary buttons use the same disabled treatment as other buttons. Do not imitate a disabled control by changing its opacity, and do not make an anchor look disabled when it can still navigate.
 
-Views may adjust placement, width, spacing, and compact control dimensions to fit their layout. They must not assign independent background, border, font-weight, corner, or hover recipes to ordinary actions. Secondary actions remain visibly button-like at every breakpoint; text actions are the only borderless action. Introduce a new shared variant only when a distinct interaction role requires it; do not create a variant for one screen or one action.
+Views may adjust placement, width, spacing, and compact control dimensions to fit their layout. They must not assign independent background, border, font-weight, corner, or hover recipes to ordinary actions. Secondary actions remain visibly button-like at every breakpoint. Introduce a new shared variant only when a distinct interaction role requires it; do not create a variant for one screen or one action.
 
 Copy is a repeated editor action and uses the secondary treatment. Its temporary success label and green border communicate confirmation. The TUI-mode pressed appearance communicates a toggle that stays enabled until switched off in the current page; it is not persisted across page loads. These state treatments do not create separate button families. The theme switch describes its next action in its label and keeps the secondary treatment in both themes.
 

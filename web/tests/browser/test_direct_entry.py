@@ -120,10 +120,12 @@ def test_failed_direct_open_keeps_landing_input_and_accepted_draft(
     page.route("**/api/preview", reject)
     repository = "fixture/repo"
     page.locator("#entry-url").fill(repository)
+    controls = page.locator("#entry-form").bounding_box()
     page.locator(f"#entry-{action}").click()
     expect(page.locator("#entry-error")).to_be_visible()
-    if status is not None:
-        expect(page.locator("#entry-error")).to_contain_text(message)
+    expect(page.locator("#entry-error")).not_to_be_empty()
+    # The failure takes the label's place, so the form keeps its geometry.
+    assert page.locator("#entry-form").bounding_box() == controls
     expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
     expect(page.locator("#entry-url")).to_have_value(repository)

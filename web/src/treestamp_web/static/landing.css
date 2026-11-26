@@ -1,40 +1,29 @@
-/* An introduction: the repository is the action; the tree is the illustration.
-   Keep these styles independent of the picker and editor's viewport layout. */
+/* An introduction: the repository field is the action, and the example shows
+   the result it produces. Keep these styles independent of the picker and
+   editor's viewport layout. */
 .entry-welcome {
   flex: none;
-  width: min(100%, 44rem);
-  margin: var(--s4) auto var(--s7);
+  width: min(100%, 46rem);
+  margin: var(--s6) auto var(--s7);
 }
 
-/* The mark fills the space beside the hero text and is omitted where that space is lacking. */
-.entry-hero {
-  display: grid;
-  column-gap: var(--s5);
-  align-items: center;
-  margin-bottom: var(--s6);
-}
-.entry-hero > :not(.entry-mark) { grid-column: 1; }
-.entry-mark {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  width: 7.5rem;
-  height: auto;
-  aspect-ratio: 1;
-  color: var(--accent);
-}
-.entry-hero h2 {
-  font-size: 4.5rem;
-  line-height: 1.1;
-  margin-bottom: var(--s4);
-}
-.entry-purpose { font-size: 1.5rem; line-height: 1.4; }
-.entry-credit { margin-top: var(--s2); font-size: var(--t-md); }
-.entry-credit a { color: var(--accent); font-weight: var(--weight-strong); }
-.entry-credit a:hover { color: var(--accent-hover); }
+.entry-hero { text-align: center; margin-bottom: var(--s6); }
+.entry-mark { width: 5rem; height: 5rem; color: var(--accent); }
+.entry-hero h2 { margin-top: var(--s3); font-size: 4.5rem; line-height: 1.1; }
+.entry-purpose { margin-top: var(--s2); font-size: 1.5rem; line-height: 1.4; color: var(--ink-secondary); }
+
+/* The label, progress, and error share one line above the field, so a status
+   or failure replaces the label instead of moving the controls below it.
+   The label stays in the accessibility tree to keep naming the field. */
+.entry-field-head { display: grid; margin-bottom: var(--s2); font-size: var(--t-md); font-weight: var(--weight-strong); }
+.entry-field-head > * { grid-area: 1 / 1; }
+.entry-field-head:has(#entry-error:not([hidden]), #entry-progress:not(:empty)) label { opacity: 0; }
+#entry-progress { color: var(--ink-secondary); }
+#entry-progress:empty { display: none; }
 
 /* The repository field is the page's main interaction: one solid bar whose
-   filled GitHub cell is the only accent fill until a repository is entered. */
-#entry-form label { display: block; margin-bottom: var(--s2); font-size: var(--t-md); font-weight: var(--weight-strong); }
+   filled GitHub cell is the only accent fill until a repository is entered,
+   with Create as the bar's own submit action. */
 .entry-repo-row {
   display: flex;
   align-items: stretch;
@@ -67,68 +56,94 @@
   font-size: var(--t-md);
 }
 #entry-url:focus { outline: none; }
-/* An unusable repository address recolours the whole bar, not just the message below it. */
+#entry-create { flex: none; margin: var(--s1); padding-inline: var(--s5); }
+/* An unusable repository address recolours the whole bar, not just the line above it. */
 .entry-repo-row:has(#entry-url[aria-invalid="true"]) { border-color: var(--error-line); outline-color: var(--error-line); }
 .entry-repo-row:has(#entry-url[aria-invalid="true"]) .entry-repo-icon { background: var(--error-line); }
-.entry-primary-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
-.entry-primary-actions > button { flex: 1; min-width: 0; white-space: normal; }
-.entry-secondary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-top: var(--s3); }
-#entry-browse { max-width: 100%; white-space: normal; }
-#entry-progress { color: var(--ink-secondary); margin-top: var(--s2); }
-#entry-progress:empty { display: none; }
-/* The example is an aside for visitors without a repository; it stays quieter than every button. */
-.entry-example { margin-left: auto; color: var(--ink-secondary); }
-#entry-return-welcome { margin-top: var(--s3); }
 
-/* The illustration uses the editor/picker branch renderer and .indent geometry,
-   set bold with accent branches and notes; line segments meet across adjacent rows. */
-.entry-treestamp {
-  margin: var(--s6) 0 0;
-  padding: var(--s5) var(--s6);
+.entry-alternatives {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2) var(--s3);
+  margin-top: var(--s4);
+}
+.entry-alternatives > span { color: var(--ink-secondary); }
+.entry-alternatives > button { max-width: 100%; white-space: normal; }
+#entry-return-welcome { display: flex; margin: var(--s4) auto 0; }
+
+/* The example card previews the bundled snapshot that its button opens. */
+.entry-example {
+  margin: var(--s7) 0 0;
   border: 1px solid var(--rule);
-  border-left: 4px solid var(--accent);
   border-radius: var(--r-lg);
   background: var(--well);
+  overflow: hidden;
 }
+.entry-example-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--rule);
+  background: var(--card);
+}
+.entry-example-title { margin-right: auto; min-width: 0; }
+.entry-example-title strong { display: block; font-size: var(--t-md); }
+.entry-example-title span { color: var(--ink-secondary); font-family: var(--mono); }
+
+/* The tree uses the editor/picker branch renderer and .indent geometry, set
+   bold with accent branches and notes; line segments meet across adjacent rows. */
 .sample-tree {
   margin: 0;
-  padding: 0;
+  padding: var(--s4) var(--s5);
   --tree-step: 4ch;
   --tree-guide-ink: var(--accent);
   --tree-guide-width: 2px;
   list-style: none;
   font-family: var(--mono);
-  font-size: var(--t-md);
+  font-size: var(--t-base);
   font-weight: var(--weight-strong);
   line-height: 2;
   color: var(--ink);
 }
 .sample-row { display: flex; align-items: center; gap: var(--s1); min-height: 2em; white-space: nowrap; }
+.sample-count { color: var(--ink-secondary); font-weight: var(--weight-body); }
 /* Notes follow their name by the two-space delimiter generated treestamps use; the row gap counts toward it. */
 .sample-note { margin-left: calc(2ch - var(--s1)); color: var(--accent); }
+
+@media (max-width: 47.999rem) {
+  .sample-count { display: none; }
+}
 
 @media (max-width: 39.999rem) {
   .entry-welcome { margin-top: var(--s3); }
   .entry-hero { margin-bottom: var(--s5); }
-  .entry-hero h2 { font-size: 3.5rem; }
   .entry-mark { display: none; }
+  .entry-hero h2 { margin-top: 0; font-size: 3.25rem; }
+  .entry-purpose { font-size: 1.25rem; }
   /* The monospace placeholder does not fit narrow phones. */
   #entry-url { padding: 0 var(--s3); font-family: inherit; }
   .entry-repo-icon { width: 2.75rem; }
+  #entry-create { padding-inline: var(--s3); }
+  .entry-alternatives > span { display: none; }
+  .entry-alternatives { justify-content: stretch; margin-top: var(--s3); }
+  .entry-alternatives > button { flex: 1 1 auto; }
+  .entry-example { margin-top: var(--s5); }
+  .entry-example-head { padding: var(--s2) var(--s3); }
+  .sample-tree { padding: var(--s3) var(--s4); }
   .sample-note { display: none; }
-  .entry-treestamp { margin-top: var(--s5); padding: var(--s3) var(--s4); }
-  .sample-tree { font-size: var(--t-base); }
 }
 
 @media (max-width: 39.999rem) and (max-height: 40rem) {
   .entry-welcome { margin-top: 0; }
   .entry-hero { margin-bottom: var(--s3); }
-  .entry-hero h2 { font-size: 2.75rem; margin-bottom: var(--s2); }
+  .entry-hero h2 { font-size: 2.75rem; }
   .entry-purpose { font-size: 1.125rem; }
-  .entry-credit, #entry-form label { font-size: var(--t-base); }
+  .entry-field-head { font-size: var(--t-base); }
   .entry-repo-row { min-height: 3rem; }
   #entry-url { padding: 0 var(--s2); }
-  .entry-primary-actions, .entry-secondary-actions, #entry-return-welcome {
-    margin-top: var(--s2);
-  }
+  .entry-alternatives, #entry-return-welcome { margin-top: var(--s2); }
 }

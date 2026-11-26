@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addressFor, decodeState, encodeState, hintFor, pathKey, displayPath,
+  addressFor, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -81,6 +81,17 @@ test("the address keeps path and query on this origin and appends the state", ()
   assert.equal(addressFor("/o/r?root=.", {}, "http://h"), `/o/r?root=.#s=${encodeState({})}`);
 });
 
+
+test("landing errors replace long service messages for known failures only", () => {
+  const message = `service message ${Math.random()}`;
+  for (const code of ["invalid_link", "not_found", "too_large", "upstream_unavailable", "upstream_timeout"]) {
+    const text = entryErrorText(code, message);
+    assert.ok(text && text !== message, code);
+  }
+  for (const code of [`unknown_${Math.random()}`, "", undefined, "toString"]) {
+    assert.equal(entryErrorText(code, message), message);
+  }
+});
 
 test("hints follow the error table", () => {
   assert.match(hintFor("root_not_found", 404), /Choose a folder/);
