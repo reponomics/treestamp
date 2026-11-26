@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from urllib.parse import urljoin
 
 import pytest
 
@@ -270,7 +271,7 @@ def test_invalid_candidate_keeps_the_accepted_draft(
     expect(page.locator("#reload-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#region")).to_have_text(original_region)
-    assert page.url == original_address
+    assert page.url == urljoin(original_address, "/")
     page.locator("#entry-change-repo").click()
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#copy")).to_be_enabled()

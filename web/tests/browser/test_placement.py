@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import urljoin
 
 import pytest
 
@@ -340,7 +341,7 @@ def test_fresh_same_document_load_restarts_placement_without_losing_saved_draft(
     expect(page.locator("#workspace")).to_be_visible()
     expect(page.locator("#region")).not_to_contain_text("Data preparation tools")
     assert page.evaluate(DRAFT) == saved
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     for selector in ("#placement-skip", "#placement-finish", "#placement-reveal"):
         expect(page.locator(selector)).to_be_enabled()
     page.locator("#placement-finish").click()
@@ -386,7 +387,7 @@ def test_failed_new_document_placement_preserves_the_previous_saved_draft(
     page.locator("#placement-place").click()
     expect(page.locator("#placement-source")).to_have_text("retired.py")
     assert page.evaluate(DRAFT) == saved
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     candidate = page.locator("#region").text_content()
     page.route("**/api/placement", lambda route: route.abort())
     page.locator("#placement-skip").click()
@@ -395,7 +396,7 @@ def test_failed_new_document_placement_preserves_the_previous_saved_draft(
     )
     expect(page.locator("#placement-source")).to_have_text("retired.py")
     assert page.evaluate(DRAFT) == saved
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     expect(page.locator("#region")).to_have_text(candidate)
     page.unroute("**/api/placement")
     page.locator("#placement-finish").click()
@@ -437,7 +438,7 @@ def test_invalid_transfer_preview_restores_previous_draft_and_presentation(
     expect(page.locator("#region")).to_have_text(previous)
     assert page.locator("#rows").inner_html() == rows
     assert page.evaluate(DRAFT) == saved
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     page.locator("#entry-change-repo").click()
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#workspace")).to_be_visible()

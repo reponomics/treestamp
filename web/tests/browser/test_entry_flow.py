@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urljoin
+
 import pytest
 
 pytest.importorskip("playwright.sync_api")
@@ -294,11 +296,21 @@ def test_back_and_wordmark_navigation_preserve_the_current_tree(
     page.locator(".wordmark").click()
     expect(page.locator("#entry-welcome")).to_be_visible()
     expect(page.locator("#workspace")).to_be_hidden()
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     assert page.evaluate("localStorage.getItem('treestamp.current-draft')") == record
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#region")).to_have_text(region)
     expect(page.locator("#tab-editor")).to_be_focused()
+    assert page.url == address
+
+    # Reloading the landing page keeps it, with the session still offered.
+    page.locator(".wordmark").click()
+    page.reload()
+    expect(page.locator("#entry-welcome")).to_be_visible()
+    expect(page.locator("#workspace")).to_be_hidden()
+    page.locator("#entry-return-welcome").click()
+    expect(page.locator("#region")).to_have_text(region)
+    assert page.url == address
 
 
 @pytest.mark.parametrize("width", [390, 768, 1280])

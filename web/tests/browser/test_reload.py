@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 
 import pytest
 
@@ -71,7 +71,7 @@ def test_failed_explicit_open_preserves_draft_and_cannot_initialize_new(
     expect(page.locator("#reload-settings")).to_be_visible()
     expect(page.locator("#source-load")).to_be_enabled()
     expect(page.locator("#region")).to_have_text(original)
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     page.locator("#entry-change-repo").click()
     page.locator("#entry-return-welcome").click()
     add_note(page, "work after failed open")

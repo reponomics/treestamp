@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from urllib.parse import urljoin
 from uuid import uuid4
 
 import pytest
@@ -106,6 +107,6 @@ def test_failed_direct_open_keeps_landing_input_and_accepted_draft(
         field.press_sequentially("/")
     expect(field).not_to_have_attribute("aria-invalid", "true")
     assert len(requests) == 1
-    assert page.url == address
+    assert page.url == urljoin(address, "/")
     assert page.evaluate(DRAFT) == saved
     expect(page.locator("#region")).to_have_text(region)

@@ -382,6 +382,7 @@ function render(data, opening = false) {
     root: data.root,
     document: data.document,
     state: data.state,
+    address: prepared.address,
     rows: prepared.rows,
     revealed: reveal.checked,
     dirty: data.dirty,
@@ -821,11 +822,14 @@ function openWelcome() {
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
   repoTooltip.hidden = true;
   const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
+  // The landing page has its own address, so reloading it does not reopen the session.
+  history.replaceState(null, "", "/");
   entryFlow.welcome(repo, Boolean(editor?.rows.length || pendingDraft));
 }
 
 async function resumeSession() {
   if (editor?.rows.length) {
+    history.replaceState(null, "", editor.address);
     entryFlow.hide();
     exportView.setVisible(stage.dataset.view === "stamp");
     fields.url.value = `${editor.owner}/${editor.repo}`;
