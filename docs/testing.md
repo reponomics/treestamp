@@ -28,6 +28,16 @@ Hosted tests use controlled GitHub responses or local repository fixtures. Bundl
 
 The CI matrix checks supported Python versions on Linux and Windows. Local validation covers the machine and environment on which it runs. Container build and health checks, dependency scanning, and static analysis complement the behavioral suites; they do not replace them. The [CI workflow](../.github/workflows/ci.yml) defines the execution matrix.
 
+## Live GitHub compatibility validation
+
+[reponomics/treestamp-testing](https://github.com/reponomics/treestamp-testing) is part of the development surface for actual GitHub rendering, API acquisition, and local/hosted compatibility checks. It began with adaptive SVG inspection and can hold other controlled compatibility fixtures. Its [usage policy](https://github.com/reponomics/treestamp-testing/blob/main/POLICY.md) defines the protocol, evidence requirements, access, and publication rules; its [fixture inventory](https://github.com/reponomics/treestamp-testing/blob/main/FIXTURES.md) distinguishes experiments from current generated output.
+
+Use GitHub's `POST /markdown` endpoint to inspect the HTML produced from explicit Markdown inputs. Use an actual GitHub README/browser view to assess image loading, sanitization in context, and light/dark rendering. Use real tree/blob API responses to verify acquisition and byte identities. None substitutes for the others or for deterministic regression tests.
+
+Live checks are explicitly invoked supplementary validation. They do not run implicitly in ordinary CI, push fixtures, or rely on mutable repository contents as an unrecorded baseline. Record exact fixture and application commits, the question and result, and the relevant API or browser environment. Compare local and hosted behavior against the same source commit; an unavailable cached snapshot does not establish a document-format incompatibility. Editing-session links are not durable fixtures or a supported sharing workflow.
+
+Only the maintainer authorizes publication to the testing repository. Contributors and agents may prepare changes and run read-only checks within the policy. [Governance](GOVERNANCE.md) records ownership and access responsibilities.
+
 ## Coverage policy
 
 Core and hosted Python suites each enforce a **95% minimum**, measured independently. PRs should avoid reducing coverage by more than one percentage point; this review guideline is separate from the enforced minimum. JavaScript logic coverage is reported without a percentage gate. Codecov statuses are informational; the local and CI quality gates enforce the Python minimums.

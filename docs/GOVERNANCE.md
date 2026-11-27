@@ -24,6 +24,10 @@ Reviewers are organization members with the Triage role. They review pull reques
 
 Contributors propose changes through issues and pull requests, following [CONTRIBUTING](../.github/CONTRIBUTING.md) and the [code of conduct](../.github/CODE_OF_CONDUCT.md). Contributing does not grant write access or access to sensitive resources. Only the maintainer can merge; [CODEOWNERS](../.github/CODEOWNERS) records the maintainer as owner of all code.
 
+## GitHub compatibility fixture repository
+
+[reponomics/treestamp-testing](https://github.com/reponomics/treestamp-testing) is a public development resource owned by Reponomics and maintained by @hesreallyhim. Its [usage and governance policy](https://github.com/reponomics/treestamp-testing/blob/main/POLICY.md) governs fixture publication, contributor access, and live validation. Public read access does not grant write authority: only the maintainer may push or merge, including explicitly authorized publication through the maintainer's account. Routine tests and automation have no independent publishing authority. The maintainer reviews access and records any future delegation in that policy before use.
+
 ## Decisions and changes to access
 
 The maintainer makes project decisions, discussing significant changes in public issues or discussions before adopting them. Access to the resources above is granted only by the maintainer, taking into account the individual's prior contributions, level of commitment, and availability, and changes are recorded in this file. Access is limited to what the person's role requires.
