@@ -1,6 +1,6 @@
 # ADR 0003: Generated testing plan
 
-Status: accepted with amendments; initial increment implemented (see [Results](#results-of-the-initial-increment)). Scope is the existing parsers, session transport, and browser input/rendering boundary, before adding restoration onto a newer repository tree.
+Status: superseded by [ADR 0007](0007-focused-generated-testing.md). The implementation plan and results below describe the earlier approach.
 
 Review: the proposal was checked against the codec, document, session, hosted request, and browser modules before implementation, and the resulting amendments received an independent review that verified their claims against the code. That review corrected the definition of unrepresentable entries and the browser identity domain, refined the server-state and fabricated-commit requirements, and found two hosted responses that failed with HTTP 500 (both fixed with regressions). [Revision](#revision) lists each amendment. An independent review of the implementation led to further fixes, recorded in the results below.
 
