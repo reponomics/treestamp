@@ -551,6 +551,18 @@ def _check_plain_document(content: bytes, document: str) -> None:
         )
 
 
+def _check_utf8_region(region: bytes, document: str) -> None:
+    """Authored bytes retained verbatim, such as config comments, are shown as text."""
+    try:
+        region.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise PreviewError(
+            422,
+            "curation",
+            f"The treestamp in {_display(document)} is not valid UTF-8 text.",
+        ) from None
+
+
 def _loaded_document(
     content: bytes, request: PreviewRequest
 ) -> tuple[Artifact, bytes] | None:
@@ -562,6 +574,7 @@ def _loaded_document(
                 if parsed.format == "svg"
                 else extract_region(content, location=request.document)
             )
+            _check_utf8_region(baseline, request.document)
             return parsed, baseline
     except MarkerError as exc:
         raise PreviewError(422, "curation", str(exc)) from None

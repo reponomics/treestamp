@@ -166,6 +166,26 @@ def test_plain_document_load_has_specific_warning_code(
     assert malformed.json()["error"]["code"] == "curation"
 
 
+def test_region_bytes_that_are_not_utf8_are_rejected_before_caching(
+    client: TestClient, repo: Repo
+) -> None:
+    # Found by review of generated testing: equivalent config is retained
+    # verbatim, so an undecodable comment byte reached the JSON response.
+    region = (
+        b"<!-- treestamp:start -->\n<!-- treestamp:config\n# note \x80\n-->\n\n"
+        b"```sh\n./\n\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 top.txt\n```\n"
+        b"<!-- treestamp:end -->\n"
+    )
+    repo.write("top.txt")
+    (repo.path / "README.md").write_bytes(region)
+    repo.commit()
+    response = client.post("/api/preview", json={"url": "o/r", "document": "README.md"})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "curation"
+    assert "UTF-8" in response.json()["error"]["message"]
+    assert client.app.state.service.stats()["trees"] == 0
+
+
 @pytest.mark.parametrize("content", [b"image\x00bytes", b"not UTF-8\xff"])
 def test_plain_binary_file_is_not_a_treestamp_document(
     client: TestClient, repo: Repo, content: bytes
