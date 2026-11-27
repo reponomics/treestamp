@@ -56,27 +56,37 @@ def pointers(
 
 @dataclass(frozen=True)
 class Mutation:
-    """Replace, delete, or add one member somewhere in a valid request."""
+    """Change one member of a valid request; the body itself has the pointer ().
+
+    ``replace`` substitutes the value; ``delete`` removes the member (deleting
+    the body leaves an empty object); ``add`` gives the object or list at the
+    pointer one more member, and replaces a scalar, so no mutation is a no-op.
+    """
 
     pointer: tuple[object, ...]
     kind: str
     value: object
 
     def apply(self, body: dict[str, Any]) -> Any:
-        if not self.pointer:
-            return self.value if self.kind == "replace" else body
-        result = deepcopy(body)
+        result: Any = {"body": deepcopy(body)}
         parent: Any = result
-        for step in self.pointer[:-1]:
+        path = ("body", *self.pointer)
+        for step in path[:-1]:
             parent = parent[step]
-        last = self.pointer[-1]
-        if self.kind == "replace":
+        last = path[-1]
+        target = parent[last]
+        if self.kind == "delete":
+            if self.pointer:
+                del parent[last]
+            else:
+                parent[last] = {}
+        elif self.kind == "add" and isinstance(target, dict):
+            target["unexpected"] = self.value
+        elif self.kind == "add" and isinstance(target, list):
+            target.append(self.value)
+        else:
             parent[last] = self.value
-        elif self.kind == "delete":
-            del parent[last]
-        elif isinstance(parent, dict):
-            parent["unexpected"] = self.value
-        return result
+        return result["body"]
 
 
 # One value of each JSON type, to swap a member's type outright.

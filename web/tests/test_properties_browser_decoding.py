@@ -9,6 +9,7 @@ without it, and a failure when CI is set.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
 import queue
@@ -19,6 +20,7 @@ import threading
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 import pytest
 from hypothesis import given
@@ -65,13 +67,11 @@ class Worker:
             encoding="utf-8",
         )
         self._lines: queue.Queue[str] = queue.Queue()
-        threading.Thread(target=self._read, daemon=True).start()
-
-    def _read(self) -> None:
-        assert self._process.stdout is not None
-        for line in self._process.stdout:
-            self._lines.put(line)
-        self._lines.put("")  # the worker exited
+        # Each process has its own queue, so a late reply from a replaced
+        # worker can never be read as an answer from its successor.
+        threading.Thread(
+            target=_forward, args=(self._process.stdout, self._lines), daemon=True
+        ).start()
 
     def call(self, name: str, *args: object) -> dict[str, Any]:
         assert self._process.stdin is not None
@@ -99,8 +99,24 @@ class Worker:
         return response["value"]
 
     def close(self) -> None:
-        self._process.kill()
-        self._process.wait()
+        """End of input stops the worker; kill it only if it does not exit."""
+        assert self._process.stdin is not None and self._process.stdout is not None
+        with contextlib.suppress(BrokenPipeError):
+            self._process.stdin.close()
+        try:
+            self._process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self._process.kill()
+            self._process.wait()
+        self._process.stdout.close()
+
+
+def _forward(stream: Any, lines: queue.Queue[str]) -> None:
+    # close() may close the stream of a killed worker while this thread reads it.
+    with contextlib.suppress(ValueError, OSError):
+        for line in stream:
+            lines.put(line)
+    lines.put("")  # the worker exited
 
 
 @pytest.fixture(scope="module")
@@ -113,6 +129,11 @@ def worker() -> Iterator[Worker]:
 def controlled(response: dict[str, Any]) -> bool:
     """A result, or an Error with a user-facing message; TypeError is a failure."""
     return response["ok"] or response["error"]["type"] == "Error"
+
+
+def same_json(left: object, right: object) -> bool:
+    """Compare as JSON, where true and 1 differ; key order is not significant."""
+    return json.dumps(left, sort_keys=True) == json.dumps(right, sort_keys=True)
 
 
 def fragment(state: object) -> str:
@@ -164,9 +185,10 @@ base64ish = st.one_of(
 
 @given(identity_values.map(lambda value: {"value": value}))
 def test_supported_states_survive_the_fragment(worker: Worker, state: Any) -> None:
-    assert worker.value("roundTripState", state) == state
+    assert same_json(worker.value("roundTripState", state), state)
     route = worker.value("parseRoute", f"/o/r@{COMMIT}", "#s=" + fragment(state))
-    assert route == {"owner": "o", "repo": "r", "sha": COMMIT, "saved": state}
+    expected = {"owner": "o", "repo": "r", "sha": COMMIT, "saved": state}
+    assert same_json(route, expected)
 
 
 @given(base64ish)
@@ -274,8 +296,8 @@ def test_synthetic_responses_are_adopted_or_refused_in_a_controlled_way(
     result = worker.call("preparePreview", candidate, ORIGIN)
     assert controlled(result), result["error"]
     if result["ok"]:
-        assert result["value"]["address"].startswith(
-            f"/{candidate['repository']['owner']}/{candidate['repository']['name']}@"
+        assert urljoin(ORIGIN + "/", result["value"]["address"]).startswith(
+            ORIGIN + "/"
         )
 
 

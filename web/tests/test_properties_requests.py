@@ -66,7 +66,7 @@ class Upstream:
 
     def transport(self, calls: list[str]) -> httpx.MockTransport:
         def handler(request: httpx.Request) -> httpx.Response:
-            calls.append(request.url.path)
+            calls.append(str(request.url))
             key = (
                 request.method,
                 request.url.path,
@@ -135,10 +135,13 @@ def upstream(tmp_path_factory: pytest.TempPathFactory) -> Upstream:
 
 
 @contextmanager
-def fresh_client(upstream: Upstream, calls: list[str]) -> Iterator[TestClient]:
+def fresh_client(
+    upstream: Upstream, calls: list[str], clock: Clock | None = None
+) -> Iterator[TestClient]:
     # Rejected requests consume rate-limit tokens by design; 0 disables limits.
     config = make_config(rate_limit_per_minute=0, op_rate_limit_per_minute=0)
-    app = create_app(config, transport=upstream.transport(calls), clock=Clock())
+    transport = upstream.transport(calls)
+    app = create_app(config, transport=transport, clock=clock or Clock())
     with TestClient(app) as client:
         yield client
 
@@ -194,26 +197,29 @@ def placement_body(opening: dict[str, Any], decisions: list[Any]) -> dict[str, A
     return {**body, "decisions": decisions}
 
 
-def _domain_rejection(call: Callable[[object], object], value: object) -> None:
+def _domain_rejection(
+    call: Callable[[object], object], value: object, *, document_error: bool = False
+) -> None:
+    """Expect a result or a 4xx PreviewError; MarkerError only where documented.
+
+    Over HTTP an escaped MarkerError becomes 422 ``curation``, which request
+    parsers must not produce; SVG export reports document errors that way.
+    """
     try:
         call(value)
     except PreviewError as exc:
         assert 400 <= exc.status < 500, exc.status
     except MarkerError:
-        pass
+        assert document_error, "a request parser leaked a MarkerError"
 
 
 @given(json_values)
 def test_request_parsers_turn_arbitrary_json_into_domain_rejections(
     value: object,
 ) -> None:
-    for parse in (
-        parse_op_request,
-        parse_placement_request,
-        parse_preview_body,
-        export_svg,
-    ):
+    for parse in (parse_op_request, parse_placement_request, parse_preview_body):
         _domain_rejection(parse, value)
+    _domain_rejection(export_svg, value, document_error=True)
 
 
 @given(
@@ -280,6 +286,7 @@ ENDPOINTS = {"/api/op": operation_body, "/api/placement": placement_body}
 
 def _exercise(
     client: TestClient,
+    clock: Clock,
     upstream: Upstream,
     calls: list[str],
     endpoint: str,
@@ -288,6 +295,9 @@ def _exercise(
     accepted: dict[str, Any],
 ) -> int:
     """Post one mutated request after its valid original was accepted."""
+    # Time passes between requests, so a rejected request that renewed the
+    # snapshot's lease would change its expiry.
+    clock.now += 1
     cache, fetched = _cache(client), len(calls)
     response = _post(client, endpoint, mutated)
     assert len(calls) == fetched, "an edit request reached GitHub"
@@ -313,14 +323,22 @@ def test_mutated_requests_are_rejected_without_changing_service_state(
     # Several independent single-field mutations share one fresh application.
     variants = data.draw(st.lists(mutations(valid), min_size=1, max_size=6))
     calls: list[str] = []
-    with fresh_client(upstream, calls) as client:
+    clock = Clock()
+    with fresh_client(upstream, calls, clock) as client:
         opened(client)
         accepted = _post(client, endpoint, valid)
         assert accepted.status_code == 200, accepted.text
         for variant in variants:
             mutated = variant.apply(valid)
             status = _exercise(
-                client, upstream, calls, endpoint, valid, mutated, accepted.json()
+                client,
+                clock,
+                upstream,
+                calls,
+                endpoint,
+                valid,
+                mutated,
+                accepted.json(),
             )
             event(f"{endpoint} {status}")
 
@@ -329,19 +347,22 @@ def test_mutated_requests_are_rejected_without_changing_service_state(
     ("endpoint", "choice"),
     [("/api/op", {"type": "toggle", "path": "sub"}), ("/api/placement", [])],
 )
-def test_every_member_rejects_each_json_type(
+def test_type_swaps_of_every_member_end_in_rejection_or_accepted_constraints(
     upstream: Upstream, opening: dict[str, Any], endpoint: str, choice: object
 ) -> None:
     """A complete sweep of type swaps, which random mutation reaches slowly."""
     valid = ENDPOINTS[endpoint](opening, choice)
     calls: list[str] = []
-    with fresh_client(upstream, calls) as client:
+    clock = Clock()
+    with fresh_client(upstream, calls, clock) as client:
         opened(client)
         accepted = _post(client, endpoint, valid).json()
         for pointer in pointers(valid):
             for value in TYPE_CONFUSION:
                 mutated = Mutation(pointer, "replace", value).apply(valid)
-                _exercise(client, upstream, calls, endpoint, valid, mutated, accepted)
+                _exercise(
+                    client, clock, upstream, calls, endpoint, valid, mutated, accepted
+                )
 
 
 def pinned_commits(upstream: Upstream) -> st.SearchStrategy[str]:
@@ -375,7 +396,7 @@ def test_fabricated_commits_never_authorize_github_reads(
         assert client.post("/api/preview", json=pinned).status_code == 410
         assert client.get("/api/browse", params=pinned).status_code == 410
         # Only repository metadata and default-branch resolution are allowed.
-        assert all(commit not in path for path in calls[fetched:])
+        assert all(commit not in url for url in calls[fetched:])
         assert not any(
-            "/git/trees" in path or "/git/blobs" in path for path in calls[fetched:]
+            "/git/trees" in url or "/git/blobs" in url for url in calls[fetched:]
         )
