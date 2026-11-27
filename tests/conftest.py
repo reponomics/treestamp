@@ -2,11 +2,24 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from hypothesis import settings
+
+# Generated tests: ordinary runs and `make test-properties-extended`. Explicit
+# randomization overrides Hypothesis's derandomized profile for CI, so CI runs
+# do not depend on one fixed seed. Deadlines would be wall-clock assertions.
+settings.register_profile(
+    "ordinary", max_examples=100, deadline=None, derandomize=False, print_blob=True
+)
+settings.register_profile(
+    "extended", max_examples=1000, deadline=None, derandomize=False, print_blob=True
+)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ordinary"))
 
 
 def _options(args: tuple[str, ...]) -> list[str]:
