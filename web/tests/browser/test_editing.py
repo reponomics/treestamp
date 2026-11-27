@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from urllib.parse import urljoin
 
 import pytest
 
@@ -270,7 +271,7 @@ def test_invalid_candidate_keeps_the_accepted_draft(
     expect(page.locator("#reload-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#region")).to_have_text(original_region)
-    assert page.url == original_address
+    assert page.url == urljoin(original_address, "/")
     page.locator("#entry-change-repo").click()
     page.locator("#entry-return-welcome").click()
     expect(page.locator("#copy")).to_be_enabled()
@@ -315,13 +316,18 @@ def test_rejected_presentation_restores_accepted_controls(
         ),
     )
     page.locator("#tab-stamp").click()
-    page.locator("#style").select_option("ascii")
+    with page.expect_response("**/api/op"):
+        page.locator("#style").select_option("ascii")
     expect(page.locator("#error")).to_be_visible()
     expect(page.locator("#style")).to_have_value("unicode")
     page.locator("#tab-editor").click()
-    page.locator("#show_counts").uncheck()
+    # Rejected edits can revert before check/uncheck verifies its temporary state.
+    # Click to request the change, then assert the accepted state after the response.
+    with page.expect_response("**/api/op"):
+        page.locator("#show_counts").click()
     expect(page.locator("#show_counts")).to_be_checked()
-    page.locator("#attribution").check()
+    with page.expect_response("**/api/op"):
+        page.locator("#attribution").click()
     expect(page.locator("#attribution")).not_to_be_checked()
     expect(page.locator("#tree-attribution")).to_be_hidden()
     expect(page.locator("#region")).to_have_text(original_region)
@@ -392,7 +398,7 @@ def test_failed_copy_does_not_report_success(page: Page, service: str) -> None:
     open_editor(page, service)
     page.locator("#copy").click()
     expect(page.locator("#copy-status")).to_have_text("Copy failed")
-    expect(page.locator("#copy-label")).to_have_text("Copy treestamp")
+    expect(page.locator("#copy-label")).to_have_text("Copy Markdown")
     expect(page.locator("#copy")).to_be_enabled()
 
 

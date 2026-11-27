@@ -51,18 +51,18 @@ def test_markdown_format_keeps_the_curated_tree_editable(
     workflows = page.locator('.row[data-path="src/treestamp"]')
     note = "Package metadata and dependencies"
     expect(config.locator(".note")).to_have_text(f"# {note}")
-    expect(page.get_by_label("Format", exact=True)).to_be_hidden()
+    expect(page.get_by_label("Branches", exact=True)).to_be_hidden()
 
-    for style, connector in [("ascii", "|-- "), ("list", "- ")]:
+    for style, connector in [("ascii", "|-- "), ("unicode", "├── ")]:
         page.locator("#tab-stamp").click()
-        page.get_by_label("Format", exact=True).select_option(style)
+        page.get_by_label("Branches", exact=True).select_option(style)
         expect(page.locator("#region")).not_to_contain_text("style =")
         expect(page.locator("#region")).to_contain_text(connector + "src/")
         expect(page.locator("#region")).to_contain_text(note)
         expect(page.locator("#tab-stamp")).to_have_attribute("aria-selected", "true")
 
         page.locator("#tab-editor").click()
-        expect(page.get_by_label("Format", exact=True)).to_be_hidden()
+        expect(page.get_by_label("Branches", exact=True)).to_be_hidden()
         expect(config.locator(".note")).to_have_text(f"# {note}")
         expect(page.locator('.row[data-path="README.md"]')).to_have_count(0)
         expect(page.locator('.row[data-path^="src/treestamp/"]')).to_have_count(0)
@@ -71,7 +71,7 @@ def test_markdown_format_keeps_the_curated_tree_editable(
     expect(page.locator('.row[data-path^="src/treestamp/"]')).not_to_have_count(0)
     expect(config.locator(".note")).to_have_text(f"# {note}")
     page.locator("#tab-stamp").click()
-    expect(page.get_by_label("Format", exact=True)).to_have_value("list")
+    expect(page.get_by_label("Branches", exact=True)).to_have_value("unicode")
 
 
 @pytest.mark.parametrize("name,root,note", EXAMPLES)

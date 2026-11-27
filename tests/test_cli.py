@@ -73,7 +73,9 @@ def test_module_entrypoint_uses_cli_arguments(
     assert captured.err == ""
 
 
-@pytest.mark.parametrize("command", [None, "new", "check", "update", "help"])
+@pytest.mark.parametrize(
+    "command", [None, "new", "load", "check", "update", "export", "help"]
+)
 def test_help_alias_matches_flag_outside_repository(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -116,7 +118,9 @@ def test_help_rejects_invalid_arguments(
     assert diagnostic in captured.err
 
 
-@pytest.mark.parametrize("command", [None, "new", "check", "update", "help"])
+@pytest.mark.parametrize(
+    "command", [None, "new", "load", "check", "update", "export", "help"]
+)
 def test_help_does_not_import_textual(tmp_path: Path, command: str | None) -> None:
     arguments = ["help", command] if command else ["help"]
     source = str(Path(__file__).resolve().parents[1] / "src")

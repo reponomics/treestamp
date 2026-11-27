@@ -15,11 +15,11 @@ make integration-check
 
 ## CI configuration
 
-The local PR checkpoint and primary Linux CI jobs share two internal Make phases. `_check-pr-core` performs toolchain, lock, and workflow checks; synchronizes the environment; builds fresh distributions; and runs core, documentation, README, metadata, installed-package, and installed-hook checks. `_check-pr-web` runs hosted Python and JavaScript checks, browser journeys, and the container build. Maintain the shared check lists in these targets rather than duplicating them in workflow YAML.
+The local PR checkpoint and primary Linux CI jobs share two internal Make phases. `_check-pr-core` performs toolchain, lock, and workflow checks; synchronizes the environment; builds fresh distributions; and runs core, documentation, README, metadata, installed-package, and installed-hook checks. `_check-pr-web` runs hosted Python and JavaScript checks and browser journeys, then builds the container image; the build waits because Docker network changes interrupt Chromium page loads. Maintain the shared check lists in these targets rather than duplicating them in workflow YAML.
 
 Local execution completes the core phase before starting the hosted phase so dependency synchronization cannot race with tests. The PR checkpoint builds into a temporary directory that is removed on completion or failure; existing `dist/` contents are untouched. Release publication retains its validated artifacts for upload. The CI matrix runs in isolated jobs and adds platform/version coverage and a container health probe.
 
-The OSV workflow scans `uv.lock` and a generated inventory from `.tool-versions`: actionlint maps to `Go / github.com/rhysd/actionlint`, and uv to `PyPI / uv`. The report retains that inventory. This checks known advisories for those tool releases, not every dependency embedded in their binaries. CodeQL, Scorecard, and coverage upload run separately from the shared test phases.
+The OSV workflow scans `uv.lock` and a generated inventory of the pinned tools: actionlint from `.tool-versions` maps to `Go / github.com/rhysd/actionlint`, and uv from `web/Dockerfile` to `PyPI / uv`. The report retains that inventory. This checks known advisories for those tool releases, not every dependency embedded in their binaries. CodeQL, Scorecard, and coverage upload run separately from the shared test phases.
 
 ## Coverage reporting and review
 
@@ -29,9 +29,9 @@ The OSV workflow scans `uv.lock` and a generated inventory from `.tool-versions`
 
 The core and hosted projects share `uv.lock`. `make install` installs locked dependencies and build tools into `venv`, then builds the local editable packages without isolated dependency resolution. `make build` synchronizes that locked toolchain before building. Docker selects only the hosted runtime dependencies and operational TLS tools from the same lock, builds both local wheels with the locked build group, and installs those wheels offline. Third-party dependencies must have compatible wheels; the controlled install fails rather than resolving unpinned build dependencies for a source archive.
 
-The uv version is pinned in `.tool-versions`, checked by the Makefile, and read by CI. Docker uses the matching version and image digest. Update those together, including when Dependabot proposes an update to the Docker image; Dependabot does not maintain the `.tool-versions` pin. CI runs `make toolchain-check` (the same script directly on Windows) before dependency installation and fails if the two versions differ or either pin is missing or malformed. Run this check locally after updating either file; `make web-image` also runs it before building. The check validates the Docker digest format, not its registry contents. Keep pip at least `26.2.2`, certifi at least `2026.10.19`, and uv at least `0.13.4` for the eMudhra certificate incident. Continue updating the pinned Python base image, whose system certificate store the Python lock does not manage. The Docker build checks certificate stores, and `make tls-check` performs the same check locally.
+The uv version has one pin: the digest-pinned `ghcr.io/astral-sh/uv` image in `web/Dockerfile`, which Dependabot updates. `scripts/check_toolchain.py` reads it for the Makefile's `uv-check` and for each workflow's setup-uv step, and fails if the image is missing, unpinned, or ambiguous, or if `.tool-versions` reintroduces a uv entry. `make toolchain-check` runs the same check, and `make web-image` runs it before building. The check validates the digest format, not its registry contents. After a uv update merges, install the new version locally. Keep pip at least `26.2.2`, certifi at least `2026.10.19`, and uv at least `0.13.4` for the eMudhra certificate incident. Continue updating the pinned Python base image, whose system certificate store the Python lock does not manage. The Docker build checks certificate stores, and `make tls-check` performs the same check locally.
 
-Actionlint is also pinned in `.tool-versions`. Upgrades are manual: review the upstream release, change the actionlint pin, run `make actionlint-install`, then run `make workflow-check` and `make check:pr` on the candidate. Commit the pin and any required workflow fixes together. The shared installer verifies release provenance and the expected source tag, so there are no platform checksum lists to update. Dependabot's GitHub Actions configuration does not update this tool pin. The OSV workflow checks both actionlint and uv release versions as described under [CI configuration](#ci-configuration). Installation instructions are in [Contributing](../.github/CONTRIBUTING.md#workflow-linting).
+Actionlint is pinned in `.tool-versions`. Upgrades are manual: review the upstream release, change the actionlint pin, run `make actionlint-install`, then run `make workflow-check` and `make check:pr` on the candidate. Commit the pin and any required workflow fixes together. The shared installer verifies release provenance and the expected source tag, so there are no platform checksum lists to update. Dependabot's GitHub Actions configuration does not update this tool pin. The OSV workflow checks both actionlint and uv release versions as described under [CI configuration](#ci-configuration). Installation instructions are in [Contributing](../.github/CONTRIBUTING.md#workflow-linting).
 
 Review Dependabot's lock updates by running the quality gates and container checks. Release Please also updates the two local package versions in the lock. The clean-distribution checks intentionally use pip to resolve the published dependency ranges outside the workspace, testing consumer compatibility separately from the locked development environment.
 
@@ -99,13 +99,6 @@ make fly-status FLY_CONFIG=web/fly.preview.toml
 ```
 
 Deploy a clean, committed revision so its build identifier describes the deployed files, then verify it as for production with `SMOKE_URL=https://reponomics-treestamp-preview.fly.dev`.
-
-## Open setup tasks
-
-- [ ] Deploy a reviewed revision to production and verify two-Machine session routing and draft recovery.
-- [ ] Enable Cloudflare proxying with Full (strict) TLS, then verify cache behavior and rerun the domain and smoke checks.
-- [ ] Configure credentials for `reponomics-treestamp-preview` and deploy it before using it for previews.
-- [ ] Publish the product page and demos from the separate `reponomics-web` repository, then link them from this project.
 
 ## README tree and alternate styles
 

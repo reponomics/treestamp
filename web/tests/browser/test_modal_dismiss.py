@@ -120,6 +120,7 @@ def test_in_flight_actions_cannot_be_dismissed_by_outside_clicks(
         dialog = page.locator("#note-dialog")
     else:
         page.locator(".wordmark").click()
+        page.locator("#entry-url").fill("fixture/repo")
         page.locator("#entry-browse").click()
         page.locator("#source-create").click()
         dialog = page.locator("#reload-settings")

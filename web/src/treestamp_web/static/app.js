@@ -2,6 +2,7 @@
 // Decisions that need no DOM live in logic.js and are tested with node --test.
 
 import { treeGuides, appendTreeGuides } from "./tree-view.js";
+import { ExportView } from "./export-view.js";
 import { EXAMPLES } from "./example.js";
 import { EntryFlow, renderRepository } from "./entry-flow.js";
 import { NotePlacement } from "./placement.js";
@@ -74,6 +75,10 @@ const noteSave = document.getElementById("note-save");
 const noteCancel = document.getElementById("note-cancel");
 
 const placement = new NotePlacement();
+const exportView = new ExportView({
+  getEditor: () => editor,
+  waitForEdits,
+});
 
 let controller = null;
 let countdown = null;
@@ -143,11 +148,11 @@ function clearCountdown() {
   }
 }
 
-function showError(message, hint, retryAfter) {
+function showError(message, hint, retryAfter, code = "") {
   errorMessage.textContent = message;
   errorHint.textContent = hint || "";
   errorPanel.hidden = false;
-  if (!document.getElementById("entry").hidden) entryFlow.showError(message, hint);
+  if (!document.getElementById("entry").hidden) entryFlow.showError(message, hint, code);
   const dialogError = document.querySelector("dialog[open] .dialog-error");
   if (dialogError) {
     dialogError.textContent = [message, hint].filter(Boolean).join(" ");
@@ -377,16 +382,22 @@ function render(data, opening = false) {
     root: data.root,
     document: data.document,
     state: data.state,
+    address: prepared.address,
     rows: prepared.rows,
     revealed: reveal.checked,
     dirty: data.dirty,
     loaded: data.loaded,
     region: data.region,
+    sourceFormat: data.source_format || "markdown",
+    svgAppearance: data.svg_appearance || { style: "continuous", theme: "light" },
+    sourceNotice: data.source_format === "svg"
+      ? ((!opening && previous?.sourceNotice) || [data.notice || "Treestamp loaded from SVG metadata.", ...(data.warnings || [])].join(" ")) : "",
   };
   if (opening) {
     editingSession += 1;
     queue = Promise.resolve(true);
   }
+  exportView.accept(editor, opening);
   history.replaceState(null, "", prepared.address);
   saveDraft(prepared.address);
 }
@@ -413,7 +424,7 @@ function presentPreview(data, prepared) {
 
   renderRegion(data.region);
   copy.disabled = false;
-  copyLabel.textContent = "Copy treestamp";
+  copyLabel.textContent = "Copy Markdown";
   setCopyStatus("");
   copy.classList.remove("copied");
   const hiddenCount = data.state.curation.hidden.length;
@@ -515,7 +526,13 @@ async function acceptResponse(body, opening, ticket) {
       // Validate the transfer tree before exposing either part of the preview.
       preparePreview({ ...body, rows: body.placement.rows }, window.location.origin);
       presentIncoming(body, prepared, ticket);
+      const source = body;
       body = await placement.run(body);
+      if (body) body = {
+        ...body,
+        notice: source.notice || body.notice,
+        warnings: [...new Set([...(source.warnings || []), ...(body.warnings || [])])],
+      };
     }
     if (!body || ticket !== generation) return false;
     setBusy(false, opening);
@@ -541,7 +558,7 @@ function rejectResponse(body, responseStatus) {
       ? "Choose the treestamp wordmark to return to the start page."
       : "Browse the repository to start a new treestamp."
     : hintFor(error.code, responseStatus);
-  showError(message, hint, error.retry_after || null);
+  showError(message, hint, error.retry_after || null, error.code);
   return false;
 }
 
@@ -583,11 +600,13 @@ async function preview(params) {
 let queue = Promise.resolve(true);
 
 function enqueueEdit(action) {
+  exportView.invalidate();
   const session = editingSession;
   queue = queue.then((saved) => {
     if (!editor || session !== editingSession) return false;
     return action(saved);
   });
+  queue.then(() => exportView.showOutput());
   return queue;
 }
 
@@ -799,15 +818,21 @@ function browseRepository(repo) {
 
 function openWelcome() {
   if (entryFlow.busy) return;
+  exportView.setVisible(false);
   if (settingsPanel.matches(":popover-open")) settingsPanel.hidePopover();
   repoTooltip.hidden = true;
-  const repo = document.getElementById("entry").hidden ? fields.url.value : entryFlow.url;
+  // Leaving the editor starts a fresh entry; within entry, keep what the visitor typed.
+  const repo = document.getElementById("entry").hidden ? "" : entryFlow.url;
+  // The landing page has its own address, so reloading it does not reopen the session.
+  history.replaceState(null, "", "/");
   entryFlow.welcome(repo, Boolean(editor?.rows.length || pendingDraft));
 }
 
 async function resumeSession() {
   if (editor?.rows.length) {
+    history.replaceState(null, "", editor.address);
     entryFlow.hide();
+    exportView.setVisible(stage.dataset.view === "stamp");
     fields.url.value = `${editor.owner}/${editor.repo}`;
     errorPanel.hidden = true;
     tabs[stage.dataset.view || "editor"].focus({ preventScroll: true });
@@ -935,10 +960,10 @@ copy.addEventListener("click", async () => {
       return;
     }
     const copied = await copyText(region.textContent, region);
-    copyLabel.textContent = copied ? "Copied" : "Copy treestamp";
+    copyLabel.textContent = copied ? "Copied" : "Copy Markdown";
     copy.classList.toggle("copied", copied);
-    const destination = !saved ? "Copied previous treestamp" : editor.document ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
-    setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Markdown and select the block to copy it manually.");
+    const destination = !saved ? "Copied previous treestamp" : editor.document && editor.sourceFormat !== "svg" ? `Paste into ${displayPath(editor.document)}` : "Copied treestamp";
+    setCopyStatus(copied ? destination : "Copy failed", copied ? "" : "Open Export, choose Markdown, and select the block to copy it manually.");
   } finally {
     copy.disabled = typeof editor?.region !== "string";
   }
@@ -950,6 +975,7 @@ function selectTab(name) {
   settingsPanel.hidden = !editing;
   settingsTrigger.hidden = !editing;
   stage.dataset.view = name;
+  exportView.setVisible(name === "stamp");
   for (const key of tabNames) {
     const active = key === name;
     tabs[key].setAttribute("aria-selected", active ? "true" : "false");
@@ -990,7 +1016,7 @@ function exampleAt(address) {
     const address = new URL(pendingDraft.address, window.location.origin);
     const { owner, repo } = parseRoute(address.pathname, address.hash);
     fields.url.value = `${owner}/${repo}`;
-    if (window.location.pathname === "/") entryFlow.welcome(fields.url.value, true);
+    if (window.location.pathname === "/") entryFlow.welcome("", true);
     else browseRepository(fields.url.value);
     return;
   }

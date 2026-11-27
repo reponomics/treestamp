@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/static/buttons.css">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/landing.css">
+  <link rel="stylesheet" href="/static/export.css">
   <script type="module" src="/static/app.js"></script>
   <script type="module" src="/static/landing.js"></script>
 </head>
@@ -24,15 +25,17 @@
     <div class="masthead-inner">
       <a class="wordmark" href="/" aria-label="treestamp — choose a repository">
         <svg class="mark" viewBox="0 0 64 64" width="30" height="30" aria-hidden="true" focusable="false">
-          <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="5"/>
-          <g fill="currentColor">
-            <path d="M9 22h6l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 37z"/>
-            <path d="M37 13h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
-            <path d="M37 27h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
-            <path d="M37 41h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
-          </g>
-          <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square">
-            <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
+          <g id="treestamp-mark">
+            <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="5"/>
+            <g fill="currentColor">
+              <path d="M9 22h6l2 2.5h6a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H10.5A1.5 1.5 0 0 1 9 37z"/>
+              <path d="M37 13h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+              <path d="M37 27h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+              <path d="M37 41h4.5l1.5 2h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H38a1 1 0 0 1-1-1z"/>
+            </g>
+            <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square">
+              <path d="M24.5 32H31M31 19.5V45M31 19.5H37M31 32H37M31 45H37"/>
+            </g>
           </g>
         </svg>
         <h1 class="brand-wordmark">treestamp</h1>
@@ -40,7 +43,7 @@
       </a>
       <button id="theme-toggle" type="button">Dark mode</button>
       <a class="docs button-link" href="https://github.com/reponomics/treestamp" target="_blank" rel="noopener" aria-label="treestamp on GitHub (opens in a new tab)" title="treestamp on GitHub (opens in a new tab)">
-        <svg class="control-icon github-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>
+        <svg class="control-icon github-icon" viewBox="0 0 16 16" aria-hidden="true"><path id="github-mark" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>
         <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7m0-7L10 14m0-10H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5"/></svg>
       </a>
     </div>
@@ -49,44 +52,47 @@
   <main id="entry" class="entry">
     <section id="entry-welcome" class="entry-welcome" aria-labelledby="entry-title">
       <div class="entry-hero">
+        <svg class="entry-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><use href="#treestamp-mark"/></svg>
         <h2 id="entry-title" class="brand-wordmark">treestamp</h2>
-        <p class="entry-purpose">an open source editor for directory trees</p>
-        <p class="entry-credit">built by the humans and agents at <a href="https://github.com/reponomics">reponomics</a></p>
+        <p class="entry-purpose">An open source editor for directory trees.</p>
       </div>
       <form id="entry-form" autocomplete="off">
-        <label for="entry-url">Public GitHub repository</label>
+        <div class="entry-field-head">
+          <label for="entry-url">Enter any public GitHub repo below to view its directory tree in the web editor</label>
+          <p id="entry-error" class="entry-error" role="alert" hidden></p>
+          <p id="entry-progress" role="status"></p>
+        </div>
         <div class="entry-repo-row">
-          <input id="entry-url" type="text" placeholder="owner/repo or a GitHub link" aria-describedby="entry-guidance" required spellcheck="false">
+          <span class="entry-repo-icon"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="#github-mark"/></svg></span>
+          <input id="entry-url" type="text" placeholder="owner/repo or URL" aria-describedby="entry-error" required spellcheck="false">
+          <button id="entry-create" class="primary" type="submit" disabled>Create</button>
         </div>
-        <p id="entry-guidance">Create a new tree at the repository root, or load a treestamp from README.md.</p>
-        <div class="entry-primary-actions">
-          <button id="entry-create" class="primary" type="submit" disabled>Create treestamp</button>
-          <button id="entry-load" type="submit" disabled>Load treestamp</button>
+        <div class="entry-alternatives">
+          <span>or</span>
+          <button id="entry-browse" type="button" disabled>Pick a file or folder…</button>
         </div>
-        <p id="entry-progress" role="status"></p>
-        <button id="entry-browse" class="entry-source-choice" type="button" disabled>Choose another folder or file…</button>
       </form>
-      <p id="entry-error" class="entry-error" role="alert" hidden></p>
-      <div class="entry-offramp">
-        <button id="entry-return-welcome" type="button" hidden>Resume session</button>
-        <button id="explore-example" type="button">Try example</button>
-      </div>
-      <figure class="entry-treestamp">
-        <figcaption class="visually-hidden">An example treestamp showing a project's folders and files with notes.</figcaption>
+      <button id="entry-return-welcome" type="button" hidden>Resume session</button>
+      <figure class="entry-example">
+        <figcaption class="entry-example-head">
+          <span class="entry-example-title"><strong>See one first</strong> <span>reponomics/treestamp</span></span>
+          <button id="explore-example" type="button">Open this example</button>
+        </figcaption>
         <ul class="sample-tree" aria-hidden="true">
-          <li class="sample-row sample-root" data-depth="0"><span class="sample-name">your-project/</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">docs/</span><span class="sample-note"># guides and reference</span></li>
-          <li class="sample-row" data-depth="2"><span class="sample-name">getting-started.md</span></li>
-          <li class="sample-row" data-depth="2"><span class="sample-name">architecture.md</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">src/</span><span class="sample-note"># the work itself</span></li>
-          <li class="sample-row" data-depth="2"><span class="sample-name">app.py</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">tests/</span><span class="sample-note"># room to experiment</span></li>
-          <li class="sample-row" data-depth="1"><span class="sample-name">README.md</span><span class="sample-note"># a place to begin</span></li>
+          <li class="sample-row" data-depth="0"><span class="sample-name">./</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">docs/</span><span class="sample-count">(10 files, 1 folder)</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">src/</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">treestamp/</span><span class="sample-count">(15 files)</span><span class="sample-note"># CLI, editor, and rendering</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">tests/</span><span class="sample-count">(18 files)</span><span class="sample-note"># Core behavior and regression tests</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">web/</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">src/</span><span class="sample-count">(1 folder)</span><span class="sample-note"># Hosted editor and API</span></li>
+          <li class="sample-row" data-depth="2"><span class="sample-name">tests/</span><span class="sample-count">(14 files, 2 folders)</span></li>
+          <li class="sample-row" data-depth="1"><span class="sample-name">pyproject.toml</span><span class="sample-note"># Package metadata and dependencies</span></li>
         </ul>
       </figure>
     </section>
 
-    <section id="reload-settings" class="entry-browser" aria-label="Choose a folder or file" hidden>
+    <section id="reload-settings" class="entry-browser" aria-label="Choose a file or folder" hidden>
       <div class="entry-browser-head">
         <div class="entry-instructions">
           <p><strong>Create a new treestamp</strong><span>Select a folder to start your tree.</span></p>
@@ -172,16 +178,16 @@
       <div class="stage-head">
         <div class="tabs" role="tablist" aria-label="View">
           <button id="tab-editor" type="button" role="tab" aria-selected="true" aria-controls="editor-panel">Tree</button>
-          <button id="tab-stamp" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="stamp-panel">Markdown</button>
+          <button id="tab-stamp" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="stamp-panel">Export</button>
           <button id="tab-info" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="info-panel">Info</button>
         </div>
         <button type="button" class="settings-open" popovertarget="settings" title="Settings">
           <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-.5 2-2 .9-1.9-.6-2 3.4 1.5 1.4v2.3l-1.5 1.4 2 3.4 1.9-.6 2 .9L9 20h4l.5-2.1 2-.9 1.9.6 2-3.4-1.5-1.4v-2.3l1.5-1.4-2-3.4-1.9.6-2-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
           <span class="control-label">Settings</span>
         </button>
-        <button id="copy" type="button" title="Copy treestamp">
+        <button id="copy" type="button" title="Copy Markdown">
           <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
-          <span id="copy-label">Copy treestamp</span>
+          <span id="copy-label">Copy Markdown</span>
         </button>
         <span id="copy-status" role="status" aria-live="polite"></span>
       </div>
@@ -207,14 +213,46 @@
 
       <div id="stamp-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-stamp" hidden>
         <div class="output-toolbar">
-          <label for="style">Format</label>
+          <label for="output-format">Output</label>
+          <select id="output-format">
+            <option value="markdown">Markdown</option>
+            <option value="svg">SVG</option>
+          </select>
+        </div>
+        <div id="markdown-controls" class="output-toolbar">
+          <label for="style">Branches</label>
           <select id="style" name="style">
             <option value="unicode" selected>Unicode ├─</option>
             <option value="ascii">ASCII +--</option>
-            <option value="list">Markdown list</option>
           </select>
         </div>
         <pre id="region" class="region"></pre>
+        <section id="svg-output" aria-label="SVG export" hidden>
+          <div class="svg-controls">
+            <div class="output-toolbar">
+              <label for="svg-theme">Appearance</label>
+              <select id="svg-theme">
+                <option value="adaptive">Adaptive</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+            <div class="svg-actions" role="group" aria-label="SVG actions">
+              <button id="svg-download" class="primary" type="button" disabled>Download SVG</button>
+              <button id="svg-copy" type="button" disabled>Copy SVG</button>
+            </div>
+          </div>
+          <p class="export-guidance">Save the SVG in your repository, then reference it from your README. Adaptive automatically adjusts to light and dark mode.</p>
+          <p id="svg-source-notice" class="export-guidance" hidden></p>
+          <div class="svg-preview-heading">
+            <p id="svg-status" role="status" aria-live="polite"></p>
+            <button id="svg-retry" type="button" hidden>Try again</button>
+            <button id="svg-size" type="button" aria-pressed="false">Actual size</button>
+          </div>
+          <div id="svg-preview" class="svg-preview" tabindex="0" role="region" aria-label="SVG image preview" aria-busy="false">
+            <img id="svg-image" alt="Exported directory tree and annotations" hidden>
+          </div>
+        </section>
       </div>
 
       <div id="info-panel" class="stage-body" role="tabpanel" aria-labelledby="tab-info" hidden>
@@ -237,7 +275,7 @@
                 </li>
                 <li>
                   <h3>Copy into your docs</h3>
-                  <p>Copy the treestamp block into Markdown. Install the treestamp command locally to refresh it as your repository changes, including with local or unpublished commits.</p>
+                  <p>Open Export to copy a Markdown block or download an SVG image. Save SVG files in your repository and add the README image reference yourself. Install the treestamp command locally to refresh either format as your repository changes.</p>
                 </li>
               </ol>
             </section>

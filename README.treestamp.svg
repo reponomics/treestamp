@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="636" height="480" viewBox="0 0 636 480" role="img" aria-labelledby="title description">
+<title id="title">Repository tree</title>
+<desc id="description">Directory structure and annotations. Editable treestamp data is embedded in this image.</desc>
+<metadata><ts:treestamp xmlns:ts="urn:treestamp:svg:1" version="1" codec="treestamp-text-v1" encoding="base64" text_style="unicode" show_counts="true" style="continuous" theme="adaptive">PCEtLSB0cmVlc3RhbXA6c3RhcnQgLS0+Cgo8IS0tIHRyZWVzdGFtcDpjb25maWcKaGlkZGVuID0gWwogICAgIi5kb2NrZXJpZ25vcmUiLCAiLmdpdGh1Yi8ucmVsZWFzZS1wbGVhc2UtbWFuaWZlc3QuanNvbiIsCiAgICAiLmdpdGh1Yi9DT0RFT1dORVJTIiwgIi5naXRodWIvQ09ERV9PRl9DT05EVUNULm1kIiwKICAgICIuZ2l0aHViL0NPTlRSSUJVVElORy5tZCIsICIuZ2l0aHViL0RDTy50eHQiLCAiLmdpdGh1Yi9JU1NVRV9URU1QTEFURSIsCiAgICAiLmdpdGh1Yi9QVUxMX1JFUVVFU1RfVEVNUExBVEUubWQiLCAiLmdpdGh1Yi9TRUNVUklUWS5tZCIsCiAgICAiLmdpdGh1Yi9kZXBlbmRhYm90LnltbCIsICIuZ2l0aHViL3JlbGVhc2UtcGxlYXNlLWNvbmZpZy5qc29uIiwKICAgICIuZ2l0aWdub3JlIiwgIi5udm1yYyIsICIucHJlLWNvbW1pdC1jb25maWcueWFtbCIsICIucHJlLWNvbW1pdC1ob29rcy55YW1sIiwKICAgICIucHl0aG9uLXZlcnNpb24iLCAiLnRvb2wtdmVyc2lvbnMiLCAiQ0hBTkdFTE9HLm1kIiwgIkxJQ0VOU0UiLCAiTWFrZWZpbGUiLAogICAgIlBSSVZBQ1kubWQiLCAiUkVBRE1FLnRyZWVzdGFtcC5zdmciLCAiY29kZWNvdi55bWwiLCAiZG9jcy9HT1ZFUk5BTkNFLm1kIiwKICAgICJkb2NzL01BSU5URU5BTkNFLm1kIiwgImRvY3MvUk9BRE1BUC5tZCIsICJkb2NzL2NsaS1yZWZlcmVuY2UubWQiLAogICAgImRvY3MvZGVzaWduLm1kIiwgImRvY3MvaG9tZWJyZXctdGFwLm1kIiwgImRvY3Mvc2VjdXJpdHktYXNzZXNzbWVudC5tZCIsCiAgICAiZG9jcy9zcGVjaWFsLXBhdGgtcmVzb2x1dGlvbi5tZCIsICJkb2NzL3Rlc3RpbmcubWQiLCAiZG9jcy91aS1mbG93Lm1kIiwKICAgICJkb2NzL3VpLXBhdHRlcm5zLm1kIiwgImRvY3MvdWktcmV2aWV3Lm1kIiwgImRvY3MvdmVyaWZ5aW5nLXJlbGVhc2VzLm1kIiwKICAgICJvc3Ytc2Nhbm5lci50b21sIiwgInB5cHJvamVjdC50b21sIiwgInV2LmxvY2siLCAidmV4IiwgIndlYi9Eb2NrZXJmaWxlIiwKICAgICJ3ZWIvUkVBRE1FLm1kIiwgIndlYi9mbHkucHJldmlldy50b21sIiwgIndlYi9mbHkudG9tbCIsICJ3ZWIvcGFja2FnZS5qc29uIiwKICAgICJ3ZWIvcHlwcm9qZWN0LnRvbWwiLApdCi0tPgoKYGBgc2gKLi8K4pSc4pSA4pSAIC5naXRodWIvICAjIEdpdEh1YiBBY3Rpb25zIHdvcmtmbG93cyBhbmQgY29tbXVuaXR5IGRvY3MK4pSCICAg4pSU4pSA4pSAIHdvcmtmbG93cy8gKDEwIGZpbGVzKQrilJzilIDilIAgYXNzZXRzLyAoMiBmaWxlcywgMSBmb2xkZXIpCuKUnOKUgOKUgCBkb2NzLyAgIyBQcm9qZWN0IGRvY3VtZW50YXRpb24K4pSCICAg4pSc4pSA4pSAIGFkci8gKDUgZmlsZXMpCuKUgiAgIOKUlOKUgOKUgCBwbGFubmluZy8gKDIgZmlsZXMpCuKUnOKUgOKUgCBzY3JpcHRzLyAoMTAgZmlsZXMsIDEgZm9sZGVyKSAgIyBJbnN0YWxsZWQtcGFja2FnZSBhY2NlcHRhbmNlCuKUnOKUgOKUgCBzcmMvCuKUgiAgIOKUlOKUgOKUgCB0cmVlc3RhbXAvICgyNSBmaWxlcykgICMgU2hhcmVkIG1vZGVsIGFuZCB0ZXJtaW5hbCBlZGl0b3IK4pSc4pSA4pSAIHRlc3RzLyAoMzkgZmlsZXMpICAjIENvbnRyYWN0IGFuZCBpbnRlZ3JhdGlvbiB0ZXN0cwrilJzilIDilIAgd2ViLyAgIyBIb3N0ZWQgZWRpdG9yOiBhIEZhc3RBUEkgYWRhcHRlciBvdmVyIHRoZSBzYW1lIHBhY2thZ2UK4pSCICAg4pSc4pSA4pSAIHNjcmlwdHMvICg0IGZpbGVzKQrilIIgICDilJzilIDilIAgc3JjLwrilIIgICDilIIgICDilJTilIDilIAgdHJlZXN0YW1wX3dlYi8gKDE1IGZpbGVzLCAyIGZvbGRlcnMpCuKUgiAgIOKUlOKUgOKUgCB0ZXN0cy8gKDIyIGZpbGVzLCAyIGZvbGRlcnMpCuKUlOKUgOKUgCBSRUFETUUubWQKYGBgCgpNYWludGFpbmVkIHdpdGggW3RyZWVzdGFtcF0oaHR0cHM6Ly9naXRodWIuY29tL3JlcG9ub21pY3MvdHJlZXN0YW1wKQoKPCEtLSB0cmVlc3RhbXA6ZW5kIC0tPgo=</ts:treestamp></metadata>
+<style>
+  text { fill: #000000; }
+  g[stroke] { stroke: #000000; }
+  @media (prefers-color-scheme: dark) {
+    text { fill: #ffffff; }
+    g[stroke] { stroke: #ffffff; }
+  }
+</style>
+<g fill="none" stroke="#000000" stroke-opacity="0.4" stroke-width="1.25">
+<line x1="39" y1="47" x2="39" y2="419"/>
+<line x1="39" y1="59" x2="48" y2="59"/>
+<line x1="39" y1="107" x2="48" y2="107"/>
+<line x1="39" y1="131" x2="48" y2="131"/>
+<line x1="39" y1="203" x2="48" y2="203"/>
+<line x1="39" y1="227" x2="48" y2="227"/>
+<line x1="39" y1="275" x2="48" y2="275"/>
+<line x1="39" y1="299" x2="48" y2="299"/>
+<line x1="39" y1="419" x2="48" y2="419"/>
+<line x1="69" y1="71" x2="69" y2="83"/>
+<line x1="69" y1="83" x2="78" y2="83"/>
+<line x1="69" y1="143" x2="69" y2="179"/>
+<line x1="69" y1="155" x2="78" y2="155"/>
+<line x1="69" y1="179" x2="78" y2="179"/>
+<line x1="69" y1="239" x2="69" y2="251"/>
+<line x1="69" y1="251" x2="78" y2="251"/>
+<line x1="69" y1="311" x2="69" y2="395"/>
+<line x1="69" y1="323" x2="78" y2="323"/>
+<line x1="69" y1="347" x2="78" y2="347"/>
+<line x1="69" y1="395" x2="78" y2="395"/>
+<line x1="99" y1="359" x2="99" y2="371"/>
+<line x1="99" y1="371" x2="108" y2="371"/>
+</g>
+<g font-family="monospace" font-size="14" xml:space="preserve">
+<text x="24" y="40" fill="#000000" fill-opacity="1" font-weight="600">./</text>
+<text x="54" y="64" fill="#000000" fill-opacity="1" font-weight="600">.github/</text>
+<text x="144" y="64" fill="#000000" fill-opacity="0.65" font-weight="400"># GitHub Actions workflows and community docs</text>
+<text x="84" y="88" fill="#000000" fill-opacity="1" font-weight="600">workflows/ (10 files)</text>
+<text x="54" y="112" fill="#000000" fill-opacity="1" font-weight="600">assets/ (2 files, 1 folder)</text>
+<text x="54" y="136" fill="#000000" fill-opacity="1" font-weight="600">docs/</text>
+<text x="117" y="136" fill="#000000" fill-opacity="0.65" font-weight="400"># Project documentation</text>
+<text x="84" y="160" fill="#000000" fill-opacity="1" font-weight="600">adr/ (5 files)</text>
+<text x="84" y="184" fill="#000000" fill-opacity="1" font-weight="600">planning/ (2 files)</text>
+<text x="54" y="208" fill="#000000" fill-opacity="1" font-weight="600">scripts/ (10 files, 1 folder)</text>
+<text x="333" y="208" fill="#000000" fill-opacity="0.65" font-weight="400"># Installed-package acceptance</text>
+<text x="54" y="232" fill="#000000" fill-opacity="1" font-weight="600">src/</text>
+<text x="84" y="256" fill="#000000" fill-opacity="1" font-weight="600">treestamp/ (25 files)</text>
+<text x="291" y="256" fill="#000000" fill-opacity="0.65" font-weight="400"># Shared model and terminal editor</text>
+<text x="54" y="280" fill="#000000" fill-opacity="1" font-weight="600">tests/ (39 files)</text>
+<text x="225" y="280" fill="#000000" fill-opacity="0.65" font-weight="400"># Contract and integration tests</text>
+<text x="54" y="304" fill="#000000" fill-opacity="1" font-weight="600">web/</text>
+<text x="108" y="304" fill="#000000" fill-opacity="0.65" font-weight="400"># Hosted editor: a FastAPI adapter over the same package</text>
+<text x="84" y="328" fill="#000000" fill-opacity="1" font-weight="600">scripts/ (4 files)</text>
+<text x="84" y="352" fill="#000000" fill-opacity="1" font-weight="600">src/</text>
+<text x="114" y="376" fill="#000000" fill-opacity="1" font-weight="600">treestamp_web/ (15 files, 2 folders)</text>
+<text x="84" y="400" fill="#000000" fill-opacity="1" font-weight="600">tests/ (22 files, 2 folders)</text>
+<text x="54" y="424" fill="#000000" fill-opacity="1" font-weight="400">README.md</text>
+<text x="24" y="456" fill="#000000" fill-opacity="0.65" font-weight="400">Maintained with treestamp</text>
+</g>
+</svg>

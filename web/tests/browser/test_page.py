@@ -33,6 +33,7 @@ def test_first_load_shows_the_loaded_treestamp_without_script_errors(
     submit(page, service)
     expect(page.locator("#source-origin")).to_have_count(0)
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     expect(page.locator("#source-origin")).to_have_count(0)
     expect(page.locator("#rows .row")).to_have_count(9)  # . + 3 dirs + 5 files
@@ -208,6 +209,7 @@ def test_fold_hide_reveal_show_and_note_update_the_treestamp(
 def test_branch_links_open_and_bad_links_explain(page: Page, service: str) -> None:
     submit(page, service, f"https://github.com/{REPOSITORY}/tree/main")
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.click("#entry-change-repo")
     page.fill("#entry-url", "not a link")
