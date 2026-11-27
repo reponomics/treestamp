@@ -57,7 +57,11 @@ _check-pr-core:
 	  trap 'rm -rf "$$check_dist"' EXIT; \
 	  $(MAKE) build DIST_DIR="$$check_dist"; \
 	  $(MAKE) ci docs-check integration-check metadata-check distribution-check hook-check DIST_DIR="$$check_dist"
-_check-pr-web: web-ci web-browser-test web-image
+# Docker build steps change the host's network interfaces, which makes Chromium
+# abort in-flight requests (ERR_NETWORK_CHANGED), so build the image only after
+# the browser journeys finish.
+_check-pr-web: web-ci web-browser-test
+	$(MAKE) web-image
 toolchain-check: ## Verify the uv pin in web/Dockerfile, the only uv pin
 	$(PYTHON) scripts/check_toolchain.py
 uv-check: ## Check that uv matches the pinned development tool version

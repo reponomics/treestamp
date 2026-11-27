@@ -15,7 +15,7 @@ make integration-check
 
 ## CI configuration
 
-The local PR checkpoint and primary Linux CI jobs share two internal Make phases. `_check-pr-core` performs toolchain, lock, and workflow checks; synchronizes the environment; builds fresh distributions; and runs core, documentation, README, metadata, installed-package, and installed-hook checks. `_check-pr-web` runs hosted Python and JavaScript checks, browser journeys, and the container build. Maintain the shared check lists in these targets rather than duplicating them in workflow YAML.
+The local PR checkpoint and primary Linux CI jobs share two internal Make phases. `_check-pr-core` performs toolchain, lock, and workflow checks; synchronizes the environment; builds fresh distributions; and runs core, documentation, README, metadata, installed-package, and installed-hook checks. `_check-pr-web` runs hosted Python and JavaScript checks and browser journeys, then builds the container image; the build waits because Docker network changes interrupt Chromium page loads. Maintain the shared check lists in these targets rather than duplicating them in workflow YAML.
 
 Local execution completes the core phase before starting the hosted phase so dependency synchronization cannot race with tests. The PR checkpoint builds into a temporary directory that is removed on completion or failure; existing `dist/` contents are untouched. Release publication retains its validated artifacts for upload. The CI matrix runs in isolated jobs and adds platform/version coverage and a container health probe.
 
