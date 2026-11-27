@@ -33,15 +33,21 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version-file: .python-version
+      - name: Read the uv version pinned by the Docker image
+        id: uv
+        run: python scripts/check_toolchain.py
       - name: Set up the pinned uv version
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
-          version-file: .tool-versions
+          version: ${{ steps.uv.outputs.version }}
       - name: Validate the workspace lock and prepare pinned tools
+        env:
+          UV_VERSION: ${{ steps.uv.outputs.version }}
         run: |
           uv lock --check
           python - <<'PY'
           import json
+          import os
           import re
           import tomllib
           from pathlib import Path
@@ -55,10 +61,10 @@ jobs:
           print(f'Scanning {len(registry)} locked third-party package versions across platforms.')
 
           tools = {'actionlint': ('Go', 'github.com/rhysd/actionlint', 'v'), 'uv': ('PyPI', 'uv', '')}
-          pins = {}
+          pins = {'uv': os.environ['UV_VERSION']}
           for line in Path('.tool-versions').read_text().splitlines():
               fields = line.split('#', 1)[0].split()
-              if fields and fields[0] in tools:
+              if fields and fields[0] in tools.keys() - {'uv'}:
                   assert len(fields) == 2 and fields[0] not in pins, f'Invalid or duplicate tool pin: {line}'
                   pins[fields[0]] = fields[1]
           entries = []
@@ -100,7 +106,7 @@ jobs:
         if: >-
           ${{ !cancelled() && !github.event.repository.private && hashFiles('osv-scanner.sarif') != '' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: osv-scanner.sarif
           category: python-dependencies
