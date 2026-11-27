@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addressFor, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
+  MAX_STATE_DEPTH, addressFor, isDisplayableSession, capturedValues, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -125,6 +125,14 @@ test("empty source fields and queries preserve their documented defaults", () =>
   assert.deepEqual(valuesFromQuery(new URLSearchParams("root=")), { root: "" });
   assert.deepEqual(valuesFromQuery(new URLSearchParams("document=")), { document: "" });
   assert.equal(displayPath({ git_bytes: "" }), "");
+});
+
+test("saved fragments beyond the depth bound decode to null instead of failing later", () => {
+  const nest = (depth) => { let value = 0; for (let i = 0; i < depth; i++) value = { a: value }; return value; };
+  assert.deepEqual(decodeState(encodeState(nest(MAX_STATE_DEPTH))), nest(MAX_STATE_DEPTH));
+  assert.equal(decodeState(encodeState(nest(MAX_STATE_DEPTH + 1))), null);
+  const deep = btoa('{"a":'.repeat(100_000) + "0" + "}".repeat(100_000));
+  assert.equal(decodeState(deep), null);
 });
 
 test("saved fragments reject scalar JSON and invalid UTF-8", () => {
@@ -279,6 +287,51 @@ test("incomplete preview responses cannot replace the accepted draft", async () 
     const candidate = result === null ? null : data;
     assert.throws(() => preparePreview(candidate, "https://example.org"), /previous tree is unchanged/);
   }
+});
+
+test("synthetic responses cannot point the repository link or history elsewhere", async () => {
+  const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
+  const original = Object.values(EXAMPLES)[0];
+  const forgeries = [
+    data => { data.repository.url = "javascript:alert(1)"; },
+    data => { data.repository.url = "https://github.com.example/x"; },
+    data => { data.repository.url = `https://github.com/${data.repository.owner}/other`; },
+    data => { data.permalink = `https://elsewhere.example//evil.example/${data.repository.owner}`; },
+    data => { data.permalink = "//evil.example/path"; },
+    data => { data.permalink = "javascript:alert(1)"; },
+    data => { data.permalink = "http://["; },
+    data => { data.permalink = `/${data.repository.owner}/other@${data.ref.commit}`; },
+    data => {
+      data.repository.owner = "";
+      data.repository.url = `https://github.com//${data.repository.name}`;
+      data.permalink = `https://x.example//${data.repository.name}@${data.ref.commit}`;
+    },
+    data => { data.ref.commit = "HEAD"; data.permalink = data.permalink.replace(/@[0-9a-f]{40}/, "@HEAD"); },
+  ];
+  for (const forge of forgeries) {
+    const data = structuredClone(original);
+    forge(data);
+    assert.throws(() => preparePreview(data, "https://example.org"), (error) => error.constructor === Error && /previous tree is unchanged/.test(error.message), String(forge));
+  }
+  const absolute = structuredClone(original);
+  absolute.permalink = `https://treestamp.reponomics.org${original.permalink}`;
+  assert.ok(preparePreview(absolute, "https://preview.example").address.startsWith(original.permalink));
+});
+
+test("captured sessions need displayable source paths and settings", async () => {
+  const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
+  const state = Object.values(EXAMPLES)[0].state;
+  assert.equal(isDisplayableSession(state), true);
+  for (const value of [null, {}, [], "x", { source: {} }, { source: state.source, curation: {} }]) {
+    assert.equal(isDisplayableSession(value), false);
+  }
+  for (const root of [null, undefined, 1, {}, { git_bytes: 7 }, { git_bytes: "f" }]) {
+    const saved = structuredClone(state);
+    saved.curation.settings.root = root;
+    assert.equal(isDisplayableSession(saved), false, JSON.stringify(root));
+    assert.equal(capturedValues(saved), null, JSON.stringify(root));
+  }
+  assert.deepEqual(capturedValues(state), valuesFromSettings(state.curation.settings));
 });
 
 test("preview byte paths retain identity while rows receive DOM keys", async () => {

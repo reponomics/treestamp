@@ -90,12 +90,26 @@ export function encodeState(state) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+// Deeper states would overflow JSON.stringify when the session is restored.
+export const MAX_STATE_DEPTH = 32;
+
+function withinDepth(value) {
+  const pending = [[value, 0]];
+  while (pending.length) {
+    const [item, depth] = pending.pop();
+    if (item === null || typeof item !== "object") continue;
+    if (depth >= MAX_STATE_DEPTH) return false;
+    for (const child of Object.values(item)) pending.push([child, depth + 1]);
+  }
+  return true;
+}
+
 export function decodeState(text) {
   try {
     const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
     const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && withinDepth(parsed) ? parsed : null;
   } catch (_) {
     return null;
   }
@@ -120,6 +134,20 @@ function validPath(value) {
   return typeof value === "string" || Boolean(value && typeof value.git_bytes === "string" && /^(?:[0-9a-f]{2})+$/.test(value.git_bytes));
 }
 
+function validSettings(settings) {
+  return Boolean(settings) && ["unicode", "ascii"].includes(settings.style) && typeof settings.show_counts === "boolean"
+    && (settings.attribution === undefined || typeof settings.attribution === "boolean") && validPath(settings.root);
+}
+
+export function isDisplayableSession(saved) {
+  const source = saved?.source;
+  return Boolean(source && validPath(source.root) && validPath(source.document) && validSettings(saved.curation?.settings));
+}
+
+export function capturedValues(saved) {
+  return isDisplayableSession(saved) ? valuesFromSettings(saved.curation.settings) : null;
+}
+
 function validRow(row) {
   return row && validPath(row.path) && typeof row.name === "string"
     && ["dir", "file", "symlink", "gitlink"].includes(row.kind)
@@ -134,20 +162,37 @@ function validatePreviewOutput(data) {
 
 function validatePreviewSettings(data) {
   const paths = data?.state?.curation;
-  const settings = paths?.settings;
-  if (!settings || !["unicode", "ascii"].includes(settings.style) || typeof settings.show_counts !== "boolean"
-      || (settings.attribution !== undefined && typeof settings.attribution !== "boolean")
-      || !validPath(settings.root) || !validPath(data.root) || !validPath(data.document)
+  if (!validSettings(paths?.settings) || !validPath(data.root) || !validPath(data.document)
       || ![paths.expanded, paths.hidden, paths.annotations].every(Array.isArray)) {
     throw new Error("The replacement tree has invalid editing settings. Your previous tree is unchanged.");
   }
 }
 
+const INCOMPLETE = "The replacement tree is incomplete. Your previous tree is unchanged.";
+
 function validatePreviewSource(data) {
   if (!data.repository || ![data.repository.owner, data.repository.name, data.repository.url, data.ref?.commit, data.permalink].every(value => typeof value === "string")
       || !Array.isArray(data.rows) || !data.rows.length || !data.rows.every(validRow)) {
-    throw new Error("The replacement tree is incomplete. Your previous tree is unchanged.");
+    throw new Error(INCOMPLETE);
   }
+}
+
+const GITHUB_OWNER = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
+const GITHUB_REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
+const COMMIT_ID = /^[0-9a-f]{40}$/;
+
+// A public base URL makes the permalink absolute, so only its query is used.
+function sessionAddress(data, origin) {
+  const { owner, name, url } = data.repository;
+  const commit = data.ref.commit;
+  let target;
+  try { target = new URL(data.permalink, origin); } catch (_) { throw new Error(INCOMPLETE); }
+  const path = `/${owner}/${name}@${commit}`;
+  if (!GITHUB_OWNER.test(owner) || !GITHUB_REPOSITORY_NAME.test(name) || !COMMIT_ID.test(commit)
+      || url !== `https://github.com/${owner}/${name}` || target.pathname !== path) {
+    throw new Error(INCOMPLETE);
+  }
+  return `${path}${target.search}#s=${encodeState(data.state)}`;
 }
 
 export function preparePreview(data, origin) {
@@ -156,7 +201,7 @@ export function preparePreview(data, origin) {
   validatePreviewSource(data);
   return {
     rows: data.rows.map(row => ({ ...row, identity: row.path, path: pathKey(row.path) })),
-    address: addressFor(data.permalink, data.state, origin),
+    address: sessionAddress(data, origin),
   };
 }
 

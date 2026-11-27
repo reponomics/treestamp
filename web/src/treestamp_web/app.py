@@ -73,6 +73,10 @@ def _package_version() -> str:
         return "unknown"
 
 
+def _json_safe_text(text: str) -> str:
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
+
+
 def _error(
     status: int,
     code: str,
@@ -80,10 +84,12 @@ def _error(
     retry_after: int | None = None,
     extra: dict[str, object] | None = None,
 ) -> JSONResponse:
-    message = message.encode("utf-8", "backslashreplace").decode("utf-8")
-    error: dict[str, object] = {"code": code, "message": message}
+    error: dict[str, object] = {"code": code, "message": _json_safe_text(message)}
     if extra:
-        error.update(extra)
+        error.update(
+            (key, _json_safe_text(value) if isinstance(value, str) else value)
+            for key, value in extra.items()
+        )
     headers = {}
     if retry_after is not None:
         error["retry_after"] = retry_after

@@ -70,6 +70,7 @@ Preserve exact path identity, frozen editing snapshots, and draft recovery on fa
 | `make web-test` | Hosted Python suite |
 | `make web-browser-test` | Browser journeys |
 | `make web-js-test` | Pure JavaScript logic; also `npm --prefix web test` |
+| `make test-properties` | Generated (Hypothesis) tests in the core and hosted suites; `make test-properties-extended` raises the example budget |
 | `make ci` | Core lint, formatting, types, and coverage gate |
 | `make web-ci` | Hosted lint, formatting, types, Python coverage, and JavaScript logic coverage |
 | `make docs-check` | Local document destinations and packaged README URLs; excludes remote availability and fragment anchors |

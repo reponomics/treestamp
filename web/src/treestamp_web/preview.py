@@ -551,6 +551,18 @@ def _check_plain_document(content: bytes, document: str) -> None:
         )
 
 
+def _require_utf8_region(region: str, document: str) -> None:
+    try:
+        region.encode("utf-8")
+    except UnicodeEncodeError:
+        raise PreviewError(
+            422,
+            "curation",
+            f"The treestamp in {_display(document)} keeps bytes that are not "
+            "UTF-8 text.",
+        ) from None
+
+
 def _loaded_document(
     content: bytes, request: PreviewRequest
 ) -> tuple[Artifact, bytes] | None:
@@ -861,6 +873,7 @@ class PreviewService:
                 assert envelope.baseline is not None
                 content = prepare_content(printed, target.root, envelope.baseline)
                 region = extract_region(content).decode("utf-8-sig", "surrogateescape")
+                _require_utf8_region(region, document)
             else:
                 region = render_region(printed)
             rendered_tree = render_tree(printed.tree, printed.settings)
