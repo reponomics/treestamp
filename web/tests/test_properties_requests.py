@@ -41,6 +41,7 @@ from treestamp_web.preview import (
 )
 
 from .conftest import Clock, Repo, make_config
+from .json_strategies import json_values, mutations
 
 Key = tuple[str, str, tuple[tuple[str, str], ...], str]
 Recorded = tuple[int, dict[str, str], bytes]
@@ -185,79 +186,6 @@ def placement_body(opening: dict[str, Any], decisions: list[Any]) -> dict[str, A
     body = operation_body(opening, {})
     del body["op"]
     return {**body, "decisions": decisions}
-
-
-json_scalars = st.one_of(
-    st.none(),
-    st.booleans(),
-    st.integers(-(2**64), 2**64),
-    st.floats(),
-    st.text(max_size=12),
-    st.sampled_from(
-        ("", ".", "..", "/", "a/../b", "sub", "top.txt", "\x00", "\udcff", "f" * 40)
-    ),
-)
-json_values = st.recursive(
-    json_scalars,
-    lambda children: st.one_of(
-        st.lists(children, max_size=4),
-        st.dictionaries(
-            st.one_of(
-                st.text(max_size=8),
-                st.sampled_from(("git_bytes", "path", "type", "text")),
-            ),
-            children,
-            max_size=4,
-        ),
-    ),
-    max_leaves=10,
-)
-
-
-def _pointers(
-    value: object, prefix: tuple[object, ...] = ()
-) -> Iterator[tuple[object, ...]]:
-    yield prefix
-    if isinstance(value, dict):
-        for key, child in value.items():
-            yield from _pointers(child, (*prefix, key))
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            yield from _pointers(child, (*prefix, index))
-
-
-@dataclass(frozen=True)
-class Mutation:
-    """Replace, delete, or add one member somewhere in a valid request."""
-
-    pointer: tuple[object, ...]
-    kind: str
-    value: object
-
-    def apply(self, body: dict[str, Any]) -> Any:
-        if not self.pointer:
-            return self.value if self.kind == "replace" else body
-        result = deepcopy(body)
-        parent: Any = result
-        for step in self.pointer[:-1]:
-            parent = parent[step]
-        last = self.pointer[-1]
-        if self.kind == "replace":
-            parent[last] = self.value
-        elif self.kind == "delete":
-            del parent[last]
-        elif isinstance(parent, dict):
-            parent["unexpected"] = self.value
-        return result
-
-
-def mutations(body: dict[str, Any]) -> st.SearchStrategy[Mutation]:
-    return st.builds(
-        Mutation,
-        st.sampled_from(list(_pointers(body))),
-        st.sampled_from(("replace", "delete", "add")),
-        json_values,
-    )
 
 
 def _domain_rejection(call: Callable[[object], object], value: object) -> None:
