@@ -303,6 +303,13 @@ test("synthetic responses cannot point the repository link or history elsewhere"
     data => { data.permalink = "javascript:alert(1)"; },
     data => { data.permalink = "http://["; },
     data => { data.permalink = `/${data.repository.owner}/other@${data.ref.commit}`; },
+    data => {
+      // Every field agrees, but an empty owner would make the address protocol-relative.
+      data.repository.owner = "";
+      data.repository.url = `https://github.com//${data.repository.name}`;
+      data.permalink = `https://x.example//${data.repository.name}@${data.ref.commit}`;
+    },
+    data => { data.ref.commit = "HEAD"; data.permalink = data.permalink.replace(/@[0-9a-f]{40}/, "@HEAD"); },
   ];
   for (const forge of forgeries) {
     const data = structuredClone(original);

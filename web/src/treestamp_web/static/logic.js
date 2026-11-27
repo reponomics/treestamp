@@ -176,17 +176,25 @@ function validatePreviewSource(data) {
   }
 }
 
-// The repository link and the history address are derived from the response's
+// The identities the service accepts, as in links.py and the draft store.
+const OWNER = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
+const NAME = /^[A-Za-z0-9_.-]+$/;
+const COMMIT = /^[0-9a-f]{40}$/;
+
+// The repository link and the history address are built from the response's
 // own identity, so a malformed response cannot point either somewhere else.
-// The permalink's origin is ignored: a public base URL makes it absolute.
+// Only the permalink's query is used: a public base URL makes it absolute.
 function sessionAddress(data, origin) {
   const { owner, name, url } = data.repository;
+  const commit = data.ref.commit;
   let target;
   try { target = new URL(data.permalink, origin); } catch (_) { throw new Error(INCOMPLETE); }
-  if (url !== `https://github.com/${owner}/${name}` || target.pathname !== `/${owner}/${name}@${data.ref.commit}`) {
+  const path = `/${owner}/${name}@${commit}`;
+  if (!OWNER.test(owner) || !NAME.test(name) || !COMMIT.test(commit)
+      || url !== `https://github.com/${owner}/${name}` || target.pathname !== path) {
     throw new Error(INCOMPLETE);
   }
-  return addressFor(data.permalink, data.state, origin);
+  return `${path}${target.search}#s=${encodeState(data.state)}`;
 }
 
 export function preparePreview(data, origin) {
