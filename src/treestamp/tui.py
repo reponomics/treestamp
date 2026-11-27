@@ -14,12 +14,14 @@ from textual.binding import Binding
 from textual.widgets import Label, ListItem, ListView, Static
 
 from treestamp.document import ATTRIBUTION_URL
-from treestamp.errors import TreestampError
+from treestamp.errors import MarkerError, TreestampError
+from treestamp.model import TEXT_STYLES
 from treestamp.tui_dialogs import (
     ConfirmScreen,
     PreviewScreen,
     PromptScreen,
 )
+from treestamp.tui_export import SvgExportScreen
 from treestamp.tui_reconcile import PlacementChoiceScreen, ReconcileScreen
 from treestamp.tui_rows import Cursor as Cursor
 from treestamp.tui_rows import row_label as _row_label
@@ -58,12 +60,13 @@ _HELP = (
     "H               Show or conceal hidden entries in the editor",
     "                This does not change which entries are printed.",
     "c               Show or hide counts on collapsed directories",
-    "s               Switch between Unicode, ASCII, and list styles",
+    "s               Switch between Unicode and ASCII styles",
     "t               Include or remove the Maintained with treestamp trailer",
     "",
     "OUTPUT",
     "v               Preview the printed tree",
-    "y               Copy the complete treestamp",
+    "y               Copy the complete Markdown treestamp",
+    "e               Export SVG to a file or clipboard",
     "p               Print the complete treestamp and exit",
     "",
     "?               Show this help",
@@ -80,8 +83,8 @@ _HELP = (
     "Collapsing a folder preserves its curation during this session.",
     "Reopening restores only printed rows and recorded hiding.",
 )
-STYLES = ("unicode", "ascii", "list")
-STYLE_LABELS = {"unicode": "Unicode", "ascii": "ASCII", "list": "List"}
+STYLES = TEXT_STYLES
+STYLE_LABELS = {"unicode": "Unicode", "ascii": "ASCII"}
 
 
 def _toggle_counts(session: TreeSession) -> str:
@@ -128,7 +131,8 @@ class TreestampApp(App[bool]):
         Binding("s", "style", "Tree style"),
         Binding("t", "attribution", "Attribution trailer"),
         Binding("v", "preview", "Preview tree"),
-        Binding("y", "copy", "Copy treestamp"),
+        Binding("y", "copy", "Copy Markdown"),
+        Binding("e", "svg_export", "Export SVG"),
         Binding("w", "document_write", "Write to document"),
         Binding("q,escape", "quit", "Quit"),
         Binding("p", "print", "Print and exit"),
@@ -161,7 +165,7 @@ class TreestampApp(App[bool]):
         self.status_widget = Static("", markup=False, id="status")
         self.summary_widget = Static("", id="summary")
         self.document_controls = Static(
-            "[bold]Document[/] w Write to document", classes="controls"
+            "Document: w Write to document", markup=False, classes="controls"
         )
         self.document_controls.display = self.editor.state.document_path is not None
         self._rebuilding = False
@@ -183,7 +187,8 @@ class TreestampApp(App[bool]):
         yield self.summary_widget
         yield self.document_controls
         yield Static(
-            "[bold]Output[/]   v Preview  y Copy  p Print & exit    ? Help  q Quit",
+            "[bold]Output[/]   v Preview  y Copy Markdown  e Export SVG  "
+            "p Print & exit    ? Help  q Quit",
             classes="controls",
         )
 
@@ -237,6 +242,15 @@ class TreestampApp(App[bool]):
         files, dirs = self.session.hidden_stats()
         self.attribution_widget.display = self.session.settings.attribution
         self.document_controls.display = self.editor.state.document_path is not None
+        if self.editor.state.document_path is not None:
+            relative = self.editor.state.document_path.relative_to(
+                self.editor.state.snapshot.repo
+            )
+            container = self.editor.state.source_format.upper()
+            self.document_controls.update(
+                f"Document ({container}): {_safe_text(str(relative))} "
+                "| w Write to document"
+            )
         self.summary_widget.update(
             "[bold]View[/]     "
             f"c Counts: {'on' if self.session.show_counts else 'off'}  "
@@ -363,6 +377,13 @@ class TreestampApp(App[bool]):
         except (TreestampError, OSError) as exc:
             self._set_status(f"Cannot copy treestamp: {exc}")
             return
+        try:
+            self._set_status(self._copy_text(text, "the treestamp"))
+        except (TreestampError, OSError, ValueError) as exc:
+            self._set_status(str(exc))
+
+    def _copy_text(self, text: str, label: str) -> str:
+        """Report native delivery separately from an unacknowledged OSC 52 request."""
         lines = text.count("\n")
         command = _clipboard_command()
         if command is not None:
@@ -371,15 +392,25 @@ class TreestampApp(App[bool]):
                     command, input=text.encode("utf-8"), check=True, timeout=5
                 )
             except (OSError, subprocess.SubprocessError) as exc:
-                self._set_status(f"Cannot copy with {command[0]}: {exc}")
-                return
-            self._set_status(f"Copied the treestamp ({lines} lines) with {command[0]}.")
-            return
+                raise MarkerError(f"Cannot copy with {command[0]}: {exc}") from exc
+            return f"Copied {label} ({lines} lines) with {command[0]}."
+        if len(text.encode("utf-8")) > 100_000:
+            raise MarkerError(
+                "Clipboard output exceeds the 100 KB terminal transport limit"
+            )
         self.copy_to_clipboard(text)
-        self._set_status(
-            f"Sent the treestamp ({lines} lines) to the terminal's clipboard; "
+        return (
+            f"Sent {label} ({lines} lines) to the terminal's clipboard; "
             "paste to confirm your terminal supports it."
         )
+
+    def action_svg_export(self) -> None:
+        self.push_screen(
+            SvgExportScreen(self.editor, self._copy_text), self._after_export
+        )
+
+    def _after_export(self, message: str | None) -> None:
+        self._set_status(message or "SVG export cancelled; draft retained.")
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "document_write":

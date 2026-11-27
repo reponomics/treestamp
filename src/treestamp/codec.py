@@ -1,8 +1,8 @@
 """Print and read tree rows without repository access.
 
-Names remain literal except for control/byte escapes and list-style Markdown.
+Names remain literal except for control/byte escapes; document trees are fenced.
 A fixed delimiter separates annotations. Exceptional full path registrations
-resolve names containing that delimiter before interpreting row suffixes.
+resolve names containing reserved row syntax before interpreting row suffixes.
 Before returning output, check
 that parsing preserves the authored paths, kinds, structure, and annotations.
 Counts and targets are regenerated facts, not saved curation.
@@ -21,6 +21,8 @@ from treestamp.model import (
     KIND_FILE,
     KIND_GITLINK,
     KIND_SYMLINK,
+    LIST_STYLE_REMOVED,
+    TEXT_STYLES,
     Node,
     Settings,
     normalize_annotation,
@@ -42,13 +44,6 @@ _CONTROL = re.compile(r"[\\\x00-\x1f\x7f-\x9f\u2028\u2029\udc80-\udcff]")
 _NAMED_ESCAPES = {"\\": "\\\\", "\n": "\\n", "\t": "\\t", "\r": "\\r"}
 _NAMED_CHARACTERS = {sequence: char for char, sequence in _NAMED_ESCAPES.items()}
 _ESCAPE = re.compile(r"\\(?:[\\ntr]|x[0-9a-f]{2}|u[0-9a-f]{4})")
-
-# Escape Markdown syntax in list-row names, including backslashes for reversibility.
-# CommonMark leaves intraword underscores literal; block prefixes need escaping
-# only at the start of an item. Fenced styles do not use Markdown escapes.
-_MARKDOWN = re.compile(r"[`*\[\]<>&~\\]|(?<![0-9A-Za-z])_|_(?![0-9A-Za-z])")
-_MARKDOWN_BLOCK = re.compile(r"\A(?:[#+-]|\d{1,9}[.)])(?= |\Z)|\A>")
-_MARKDOWN_ESCAPED = re.compile(r"\\([!-/:-@\[-`{-~])")
 
 _COUNT = re.compile(r" \((\d+) (files?|folders?)(?:, (\d+) folders?)?\)")
 
@@ -78,17 +73,8 @@ def _unescape(text: str) -> str:
     return _ESCAPE.sub(character, text)
 
 
-def _markdown(text: str) -> str:
-    text = _MARKDOWN.sub(lambda match: "\\" + match[0], text)
-    block = _MARKDOWN_BLOCK.match(text)
-    if block:
-        last = block.end() - 1
-        text = text[:last] + "\\" + text[last:]
-    return text
-
-
-def _display(text: str, markdown: bool) -> str:
-    """Print a name or target: escaped onto one line, and inert in Markdown."""
+def _display(text: str) -> str:
+    """Print a name or target escaped onto one literal line."""
     trailing = len(text) - len(text.rstrip())
     body = text[:-trailing] if trailing else text
     suffix = text[-trailing:] if trailing else ""
@@ -96,13 +82,7 @@ def _display(text: str, markdown: bool) -> str:
         f"\\x{ord(char):02x}" if ord(char) < 128 else f"\\u{ord(char):04x}"
         for char in suffix
     )
-    return _markdown(text) if markdown else text
-
-
-def _read(text: str, markdown: bool) -> str:
-    if markdown:
-        text = _MARKDOWN_ESCAPED.sub(r"\1", text)
-    return _unescape(text)
+    return text
 
 
 def format_counts(files: int | None, dirs: int | None) -> str:
@@ -115,14 +95,14 @@ def format_counts(files: int | None, dirs: int | None) -> str:
     return f"({', '.join(parts)})" if parts else ""
 
 
-def _row_head(node: Node, *, markdown: bool = False) -> str:
-    text = "." if not node.path else _display(node.name, markdown)
+def _row_head(node: Node) -> str:
+    text = "." if not node.path else _display(node.name)
     if node.is_dir:
         text += "/"
     elif node.kind == KIND_GITLINK:
         text += f" {GITLINK_TAG}"
     elif node.kind == KIND_SYMLINK:
-        target = "null" if node.target is None else _display(node.target, markdown)
+        target = "null" if node.target is None else _display(node.target)
         text += f" {SYMLINK_ARROW} {target}"
     counts = format_counts(node.files, node.dirs)
     if counts:
@@ -130,17 +110,26 @@ def _row_head(node: Node, *, markdown: bool = False) -> str:
     return text
 
 
+def _needs_registration(name: str) -> bool:
+    """Reserve exact identities independently of entry kind or output style."""
+    return (
+        ANNOTATION_DELIMITER in name
+        or f" {SYMLINK_ARROW} " in name
+        or name.endswith(f" {GITLINK_TAG}")
+    )
+
+
 def special_paths(tree: Node, root: str = ".") -> dict[int, str]:
     """Map printed row indices to exact repository-relative special identities."""
     return {
         row: repo_path(node.path, root)
         for row, node in enumerate(tree.walk(), 1)
-        if ANNOTATION_DELIMITER in node.name
+        if _needs_registration(node.name)
     }
 
 
-def _row(node: Node, *, markdown: bool = False) -> str:
-    text = _row_head(node, markdown=markdown)
+def _row(node: Node) -> str:
+    text = _row_head(node)
     annotation = normalize_annotation(node.annotation)
     if annotation:
         text += ANNOTATION_DELIMITER + annotation
@@ -159,30 +148,25 @@ def render_tree_with_paths(
     tree: Node, settings: Settings, *, fenced: bool = False
 ) -> tuple[str, dict[int, str]]:
     """Emit rows and their special-path registrations in the same traversal."""
-    markdown = settings.style == "list"
     validate_tree(tree)
-    rows = [_row(tree, markdown=markdown)]
+    rows = [_row(tree)]
     registered: dict[int, str] = {}
 
-    def visit(node: Node, prefix: str, depth: int) -> None:
+    def visit(node: Node, prefix: str) -> None:
         for index, child in enumerate(node.children):
-            if ANNOTATION_DELIMITER in child.name:
+            if _needs_registration(child.name):
                 registered[len(rows)] = repo_path(child.path, settings.root)
             last = index == len(node.children) - 1
-            if settings.style == "list":
-                rows.append("  " * (depth - 1) + "- " + _row(child, markdown=True))
-                visit(child, "", depth + 1)
-            else:
-                tee, end, pipe = ("├── ", "└── ", "│   ")
-                if settings.style == "ascii":
-                    tee, end, pipe = ("|-- ", "`-- ", "|   ")
-                rows.append(prefix + (end if last else tee) + _row(child))
-                visit(child, prefix + ("    " if last else pipe), depth + 1)
+            tee, end, pipe = ("├── ", "└── ", "│   ")
+            if settings.style == "ascii":
+                tee, end, pipe = ("|-- ", "`-- ", "|   ")
+            rows.append(prefix + (end if last else tee) + _row(child))
+            visit(child, prefix + ("    " if last else pipe))
 
-    visit(tree, "", 1)
+    visit(tree, "")
     text = "\n".join(rows) + "\n"
     _check_rendered_tree(tree, text, settings, registered)
-    if fenced and not markdown:
+    if fenced:
         # These styles prefix every physical row with './' or a connector, so
         # embedded backticks cannot close the fence. New styles own their framing.
         text = f"```sh\n{text}```\n"
@@ -248,7 +232,6 @@ def _parse_row(
     parent: str,
     *,
     root: bool = False,
-    markdown: bool = False,
 ) -> Node:
     head, _, tail = text.partition(ANNOTATION_DELIMITER)
     annotation = normalize_annotation(tail)
@@ -256,10 +239,10 @@ def _parse_row(
         if head not in (".", "./"):  # a hand-written tree may omit the slash
             raise MarkerError("printed tree root must be './'")
         return Node(".", "", KIND_DIR, annotation=annotation)
-    return _parse_entry(head, annotation, parent, markdown=markdown)
+    return _parse_entry(head, annotation, parent)
 
 
-def _parse_entry(head: str, annotation: str, parent: str, *, markdown: bool) -> Node:
+def _parse_entry(head: str, annotation: str, parent: str) -> Node:
     """Read an entry name and its repository facts after splitting the annotation."""
     kind, name, target, counts = KIND_FILE, head, None, {}
     slash = head.find("/")
@@ -269,12 +252,12 @@ def _parse_entry(head: str, annotation: str, parent: str, *, markdown: bool) -> 
     elif arrow != -1:
         kind, name = KIND_SYMLINK, head[:arrow]
         printed = head[arrow + len(SYMLINK_ARROW) + 2 :]
-        target = None if printed == "null" else _read(printed, markdown)
+        target = None if printed == "null" else _unescape(printed)
     elif head.endswith(f" {GITLINK_TAG}"):
         kind, name = KIND_GITLINK, head[: -len(GITLINK_TAG) - 1]
     if not name:
         raise MarkerError("missing tree name")
-    name = _read(name, markdown)
+    name = _unescape(name)
     return Node(
         name,
         f"{parent}/{name}" if parent else name,
@@ -286,8 +269,8 @@ def _parse_entry(head: str, annotation: str, parent: str, *, markdown: bool) -> 
     )
 
 
-_INDENTS = {"list": ("  ",), "ascii": ("|   ", "    "), "unicode": ("│   ", "    ")}
-_CONNECTORS = {"list": ("- ",), "ascii": ("|-- ", "`-- "), "unicode": ("├── ", "└── ")}
+_INDENTS = {"ascii": ("|   ", "    "), "unicode": ("│   ", "    ")}
+_CONNECTORS = {"ascii": ("|-- ", "`-- "), "unicode": ("├── ", "└── ")}
 
 
 def _depth_row(line: str, style: str) -> tuple[int, str]:
@@ -306,23 +289,28 @@ def _depth_row(line: str, style: str) -> tuple[int, str]:
 
 
 def detect_style(text: str, *, fenced: bool = False) -> str:
-    """Infer connectors; an unfenced root-only document denotes list style."""
+    """Infer branch characters and reject the removed Markdown-list representation."""
     lines = text.splitlines()
     if len(lines) > 1:
         if lines[1].startswith("- "):
-            return "list"
+            raise MarkerError(LIST_STYLE_REMOVED)
         if lines[1].startswith(("|-- ", "`-- ")):
             return "ascii"
-        return "unicode"
-    return "unicode" if fenced else "list"
+    elif (
+        lines
+        and not fenced
+        and lines[0].partition(ANNOTATION_DELIMITER)[0] in (".", "./")
+    ):
+        raise MarkerError(LIST_STYLE_REMOVED)
+    return "unicode"
 
 
-def _registered_row(text: str, parent: str, path: str, *, markdown: bool) -> Node:
+def _registered_row(text: str, parent: str, path: str) -> Node:
     """Consume one exact registered name; only its suffix remains to parse."""
     directory, _, name = path.rpartition("/")
     if directory != parent:
         raise MarkerError("special-path parent does not match the row's indentation")
-    printed = _display(name, markdown)
+    printed = _display(name)
     if not text.startswith(printed):
         raise MarkerError("special-path name does not match its registered row")
     suffix = text[len(printed) :]
@@ -330,7 +318,7 @@ def _registered_row(text: str, parent: str, path: str, *, markdown: bool) -> Nod
         ("/", " [gitlink]", " -> ", ANNOTATION_DELIMITER)
     ):
         raise MarkerError("invalid suffix after registered special-path name")
-    node = _parse_row("entry" + suffix, parent, markdown=markdown)
+    node = _parse_row("entry" + suffix, parent)
     if node.name != "entry":
         raise MarkerError("invalid suffix after registered special-path name")
     return replace(node, name=name, path=path)
@@ -345,9 +333,9 @@ def _registrations(
         if type(row) is not int or not 0 < row < row_count:
             raise MarkerError("special-path row must identify an existing non-root row")
         relative = tree_path(path, root)
-        if ANNOTATION_DELIMITER not in relative.rsplit("/", 1)[-1]:
+        if not _needs_registration(relative.rsplit("/", 1)[-1]):
             raise MarkerError(
-                "special_paths must register a name containing the annotation delimiter"
+                "special_paths must register a name containing reserved row syntax"
             )
         if relative in seen:
             raise MarkerError("special_paths contains duplicate paths")
@@ -379,10 +367,11 @@ def parse_tree(
         raise MarkerError("tree is empty")
     if style is None:
         style = detect_style(text, fenced=True)
-    if style not in ("unicode", "ascii", "list"):
+    if style == "list":
+        raise MarkerError(LIST_STYLE_REMOVED)
+    if style not in TEXT_STYLES:
         raise MarkerError(f"unknown tree style: {style!r}")
-    markdown = style == "list"
-    root_node = _parse_row(lines[0], "", root=True, markdown=markdown)
+    root_node = _parse_row(lines[0], "", root=True)
     nodes = {"": root_node}
     children: dict[str, list[str]] = {"": []}
     stack = [root_node]
@@ -391,9 +380,9 @@ def parse_tree(
         parent = _row_parent(stack, depth)
         stack = stack[:depth]
         node = (
-            _registered_row(row, parent.path, registered[index], markdown=markdown)
+            _registered_row(row, parent.path, registered[index])
             if index in registered
-            else _parse_row(row, parent.path, markdown=markdown)
+            else _parse_row(row, parent.path)
         )
         if node.path in nodes:
             raise MarkerError(f"duplicate tree path: {node.path!r}")

@@ -178,19 +178,29 @@ def test_headless_hash_collision_update_and_check_preserve_authored_notes(
     assert destination.read_bytes() == normalized
 
 
-def test_headless_unrepresentable_growth_fails_without_writing(repo: Repo) -> None:
+@pytest.mark.parametrize("name", ["vendor [gitlink]", "odd -> name"])
+def test_headless_growth_preserves_syntax_colliding_file_names(
+    repo: Repo, name: str
+) -> None:
+    from treestamp.document import parse_document
+
+    if ">" in name and os.name == "nt":
+        pytest.skip("Windows file names cannot contain '>'")
     stamped(repo)
     destination = repo.path / "README.md"
     before = cli_bytes(repo, "--print")
     destination.write_bytes(before)
     repo.add("README.md")
-    repo.write("vendor [gitlink]")
-    repo.add("vendor [gitlink]")
-    for command in ("check", "update"):
-        result = cli(repo, command, "README.md", check=False)
-        assert result.returncode == 2
-        assert b"cannot represent" in result.stderr
-        assert destination.read_bytes() == before
+    repo.write(name)
+    repo.add(name)
+    assert cli(repo, "check", "README.md", check=False).returncode == 1
+    assert destination.read_bytes() == before
+    cli(repo, "update", "README.md")
+    saved = parse_document(destination.read_bytes())
+    added = next(node for node in saved.tree.walk() if node.path == name)
+    assert added.name == name and added.kind == "file"
+    assert added.target is None
+    assert cli(repo, "check", "README.md").returncode == 0
     assert not list(repo.path.glob(".treestamp-*"))
 
 
@@ -219,3 +229,23 @@ def test_maintenance_emits_utf8_with_a_legacy_stdout_encoding(
     assert "├──" in drift.stdout.decode("utf-8")
     assert not drift.stderr
     assert destination.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ("load", "README.md", "--print"),
+        ("check", "README.md"),
+        ("update", "README.md"),
+    ],
+)
+def test_retired_list_document_fails_without_rewriting(
+    repo: Repo, command: tuple[str, ...]
+) -> None:
+    stamped(repo)
+    original = b"# Intro\n<!-- treestamp:start -->\n./\n- src/\n<!-- treestamp:end -->\nUnrelated prose.\n"
+    destination = repo.write_bytes("README.md", original)
+    result = cli(repo, *command, check=False)
+    assert result.returncode == 2
+    assert b"list style is no longer supported" in result.stderr
+    assert destination.read_bytes() == original

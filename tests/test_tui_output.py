@@ -122,7 +122,7 @@ def test_print_exits_without_writing(
     asyncio.run(journey())
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("dirty", [False, True])
 @pytest.mark.parametrize("name", ["notes  # draft.md", "notes.md"])
 def test_copy_uses_a_native_tool_or_the_terminal(

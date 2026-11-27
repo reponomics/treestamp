@@ -1,6 +1,6 @@
 # Resolve special filenames by row
 
-Status: implemented in the current source. Special-path registrations identify rows directly; the backtracking resolver and its limits are removed. This note records the original problem and the replacement format.
+Status: implemented in the current source. Special-path registrations identify rows directly; the backtracking resolver and its limits are removed. Registrations also disambiguate filenames containing symlink syntax or ending in the Git-link marker. This note records the original problem and the current format.
 
 ## Original problem
 
@@ -17,6 +17,12 @@ Before row-based resolution, local measurements with the 100-registration ceilin
 | 10 | 400 | 9,832 | 4.570 s |
 
 These were successful local `parse_document` calls, not measurements of a production outage or timings of the current parser. They demonstrated that neither the 100-registration ceiling nor the hosted 1 MiB document cap resolved the backtracking problem. [The hosted service](../web/src/treestamp_web/preview.py) parses documents synchronously inside an asynchronous request handler, so an expensive parse can block other requests on the same worker. Repository size is not the relevant threshold: a README can describe these entries even when they do not exist, because parsing precedes reconciliation with the actual repository tree. Rendering also invokes the parser for its round-trip check, so new trees and edits were exposed to the same backtracking cost.
+
+## Reserved syntax in filenames
+
+Exact-path registration covers three cases in an entry's own name: the annotation delimiter `  # `, the symlink arrow sequence ` -> `, and a terminal Git-link suffix ` [gitlink]`. For example, the ordinary file `odd -> name` must not become a symlink named `odd`, and the ordinary file `vendor [gitlink]` must not become a Git-link entry named `vendor`. These are supported filenames, not reasons to reject an export.
+
+Registration is independent of the selected style and entry kind. A directory or symlink can itself have a syntax-colliding name. The parser consumes the complete registered filename first, then reads only the remaining suffix for the actual kind, target, counts, and annotation. The same rule therefore distinguishes identical displayed heads representing an ordinary file versus a real symlink or Git link. Control and byte escaping continues to apply separately to the displayed name.
 
 ## Format
 
@@ -40,11 +46,11 @@ For example, these registrations identify the following tree:
 
 Row 1 is the file `x  # y` with annotation `z`; row 2 is the directory `x  # y  # z`. Matching registered filename prefixes alone cannot reliably distinguish them. The row association supplies the missing information directly.
 
-`row` is the zero-based index of a physical tree row, with the root at 0. Boundary markers, metadata, and code fences are excluded. Unicode, ASCII, and list styles use the same indexing. Paths remain repository-relative and retain the existing string or `git_bytes` representation.
+`row` is the zero-based index of a physical tree row, with the root at 0. Boundary markers, metadata, and code fences are excluded. Unicode and ASCII styles use the same indexing. Paths remain repository-relative and retain the existing string or `git_bytes` representation.
 
 The array layout above is illustrative. Equivalent TOML formatting is accepted and preserved while the registrations remain unchanged; newly generated or changed arrays use compact wrapping at an 80-character target. Wrapping metadata does not change tree row numbers. See [ADR 0002](adr/0002-formatter-compatible-documents.md).
 
-The parser builds a lookup by row and visits the tree rows once. On a registered row, it validates the full path against the parent established by indentation, matches that path's filename using the current style's escaping, and parses only the suffix as type information, counts, and annotation. It does not try another filename interpretation. Unregistered rows use the ordinary row parser. The parser rejects duplicate row or path registrations, invalid indices (including the root), nonexistent rows, parent or filename mismatches, and registrations whose filenames do not contain the delimiter. Metadata selects an interpretation; it never bypasses validation.
+The parser builds a lookup by row and visits the tree rows once. On a registered row, it validates the full path against the parent established by indentation, matches that path's filename using the current style's escaping, and parses only the suffix as type information, counts, and annotation. It does not try another filename interpretation. Unregistered rows use the ordinary row parser. The parser rejects duplicate row or path registrations, invalid indices (including the root), nonexistent rows, parent or filename mismatches, and registrations whose filenames do not contain any of the reserved syntax described above. Metadata selects an interpretation; it never bypasses validation.
 
 The renderer generates row indices and registrations from the same traversal that emits the rows. The round-trip check still verifies exact identities and facts. Row-based resolution replaces the backtracking resolver, its branch limit, and the 100-registration ceiling. This removes combinatorial identity search; it is not a claim that every parser operation has linear complexity.
 
@@ -52,13 +58,13 @@ The renderer generates row indices and registrations from the same traversal tha
 
 Annotation text is the only part of a tree that may be edited by hand (see the [document format](design.md#document-format)). Annotation edits do not change row indices or registered identities. Treestamp regenerates registrations after expansions, collapses, hiding, reordering, and other generated structural changes.
 
-Only displayed entries whose own names contain the delimiter receive registrations. Hidden entries retain their exact paths in `hidden` instead, and descendants of collapsed directories have no printed rows to register. Ordinary children of specially named directories use the parent identity established by parsing that directory. Regeneration after structural changes updates every affected row index.
+Only displayed entries whose own names contain the reserved syntax receive registrations. Hidden entries retain their exact paths in `hidden` instead, and descendants of collapsed directories have no printed rows to register. Ordinary children of specially named directories use the parent identity established by parsing that directory. Regeneration after structural changes updates every affected row index.
 
-The old path-only registration format is rejected with an explicit regeneration error; there is no backtracking compatibility parser. Recreate these treestamps from the repository using the editor. Documents without special registrations remain valid.
+The old path-only registration format is rejected with an explicit regeneration error; there is no backtracking compatibility parser. Recreate these treestamps from the repository using the editor. Documents without special registrations remain valid. Existing row-indexed annotation-delimiter registrations also remain readable. Older readers that restrict registrations to annotation-delimiter names reject newly generated arrow/Git-link registrations; the record shape is unchanged, but readers must be upgraded before loading those artifacts. Regenerating cannot recover a literal filename from an old unregistered row already interpreted as a different entry kind; recreate that tree from its repository when necessary.
 
 ## Acceptance checks
 
-- Round-trip overlapping registered names, including the file/directory example above, in all three styles and with non-default roots and byte-encoded paths.
+- Round-trip overlapping registered names and all reserved syntax in each supported style, including files, collapsed/expanded directories, symlinks, and Git links, with non-default roots and byte-encoded paths.
 - Preserve identities when only annotations change, including annotations containing the delimiter.
 - Verify that generated structural edits refresh row indices and still round-trip.
 - Reject malformed, stale, duplicate, and old path-only registrations explicitly.

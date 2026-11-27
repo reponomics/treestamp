@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
+from treestamp.artifacts import prepare_artifact_write
 from treestamp.document import (
     Document,
     PreparedWrite,
-    prepare_write,
     validate_source_tree,
 )
 from treestamp.gitio import capture_snapshot
@@ -69,7 +69,11 @@ def prepare_maintenance(source: LoadedSource) -> Maintenance:
     )
     tree = update(document.tree, target.tree, document.settings, hidden=hidden)
     maintained = Document(tree, document.settings, document.hidden)
-    prepared = prepare_write(
-        maintained, previous.path, expected=previous, repository=source.repository
+    assert source.artifact is not None
+    prepared = prepare_artifact_write(
+        replace(source.artifact, document=maintained),
+        previous.path,
+        expected=previous,
+        repository=source.repository,
     )
     return Maintenance(prepared, unmatched_notes(document.tree, tree))

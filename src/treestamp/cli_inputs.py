@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING
 
+from treestamp.artifacts import Artifact, load_artifact
 from treestamp.document import (
     DEFAULT_DOCUMENT_FILE,
     Document,
     DocumentSnapshot,
     extract_region,
-    load_document,
+    render_region,
 )
 from treestamp.errors import MarkerError
 from treestamp.gitio import capture_snapshot, checked_path, document_path, repo_root
@@ -50,18 +51,26 @@ def document_input(value: str | None) -> tuple[Path, Path]:
 class LoadedSource:
     repository: Path
     path: Path
-    document: Document | None
+    artifact: Artifact | None
     saved: DocumentSnapshot | None
+
+    @property
+    def document(self) -> Document | None:
+        return self.artifact.document if self.artifact else None
 
     def region_text(self) -> str:
         """Extract stored bytes without consulting a new source snapshot."""
         assert self.document is not None and self.saved is not None
+        assert self.artifact is not None
+        if self.artifact.format == "svg":
+            return render_region(self.document)
         return extract_region(self.saved.content).decode("utf-8-sig", "surrogateescape")
 
     def editor(self) -> EditorController:
         from treestamp.editor import EditorController
 
         assert self.document is not None and self.saved is not None
+        assert self.artifact is not None
         settings = self.document.settings
         snapshot = capture_snapshot(
             self.repository / settings.root, repository=self.repository
@@ -72,13 +81,16 @@ class LoadedSource:
             document_path=self.path,
             document_snapshot=self.saved,
             loaded_document=self.document,
+            source_format=self.artifact.format,
+            svg_appearance=self.artifact.appearance,
+            artifact_warnings=self.artifact.warnings,
         )
 
 
 def read_source(value: str | None, *, allow_absent: bool = False) -> LoadedSource:
     repository, path = document_input(value)
-    document, saved = load_document(path, allow_absent=allow_absent)
-    return LoadedSource(repository, path, document, saved)
+    artifact, saved = load_artifact(path, allow_absent=allow_absent)
+    return LoadedSource(repository, path, artifact, saved)
 
 
 def new_editor(value: str | None) -> EditorController:

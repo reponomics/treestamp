@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addressFor, decodeState, encodeState, hintFor, pathKey, displayPath,
+  addressFor, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -81,6 +81,17 @@ test("the address keeps path and query on this origin and appends the state", ()
   assert.equal(addressFor("/o/r?root=.", {}, "http://h"), `/o/r?root=.#s=${encodeState({})}`);
 });
 
+
+test("landing errors replace long service messages for known failures only", () => {
+  const message = `service message ${Math.random()}`;
+  for (const code of ["invalid_link", "not_found", "too_large", "upstream_unavailable", "upstream_timeout"]) {
+    const text = entryErrorText(code, message);
+    assert.ok(text && text !== message, code);
+  }
+  for (const code of [`unknown_${Math.random()}`, "", undefined, "toString"]) {
+    assert.equal(entryErrorText(code, message), message);
+  }
+});
 
 test("hints follow the error table", () => {
   assert.match(hintFor("root_not_found", 404), /Choose a folder/);
@@ -169,7 +180,7 @@ test("new source parameters only select repository-relative root and document", 
 
 test("one count toggle edits presentation and retains the selected root", () => {
   const settings = { root: "docs", style: "unicode", show_counts: true };
-  assert.deepEqual(settingsFromValues(settings, { style: "list", show_counts: false }), { root: "docs", style: "list", show_counts: false, attribution: false });
+  assert.deepEqual(settingsFromValues(settings, { style: "ascii", show_counts: false }), { root: "docs", style: "ascii", show_counts: false, attribution: false });
   assert.deepEqual(valuesFromSettings(settings), { ...settings, attribution: false });
 });
 
@@ -244,6 +255,7 @@ test("incomplete preview responses cannot replace the accepted draft", async () 
     data => { delete data.state; },
     data => { delete data.state.curation; },
     data => { data.state.curation.settings.style = "unknown"; },
+    data => { data.state.curation.settings.style = "list"; },
     data => { data.state.curation.settings.show_counts = "true"; },
     data => { data.state.curation.settings.root = { git_bytes: "f" }; },
     data => { data.root = { git_bytes: "zz" }; },

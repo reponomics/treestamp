@@ -167,7 +167,7 @@ def test_records_match_local_snapshot_including_scoped_roots(repo: Repo) -> None
     )
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_region_from_records_is_byte_identical_to_local_write(
     repo: Repo, style: str
 ) -> None:
