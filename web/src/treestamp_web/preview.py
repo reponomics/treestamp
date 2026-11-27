@@ -551,15 +551,19 @@ def _check_plain_document(content: bytes, document: str) -> None:
         )
 
 
-def _check_utf8_region(region: bytes, document: str) -> None:
-    """Authored bytes retained verbatim, such as config comments, are shown as text."""
+def _check_retained_text(region: str, document: str) -> None:
+    """Retained authored bytes, such as a config comment, must be text to be shown.
+
+    Rows are printed afresh with escapes, so only verbatim bytes can fail here.
+    """
     try:
-        region.decode("utf-8-sig")
-    except UnicodeDecodeError:
+        region.encode("utf-8")
+    except UnicodeEncodeError:
         raise PreviewError(
             422,
             "curation",
-            f"The treestamp in {_display(document)} is not valid UTF-8 text.",
+            f"The treestamp in {_display(document)} keeps bytes that are not "
+            "UTF-8 text.",
         ) from None
 
 
@@ -574,7 +578,6 @@ def _loaded_document(
                 if parsed.format == "svg"
                 else extract_region(content, location=request.document)
             )
-            _check_utf8_region(baseline, request.document)
             return parsed, baseline
     except MarkerError as exc:
         raise PreviewError(422, "curation", str(exc)) from None
@@ -874,6 +877,7 @@ class PreviewService:
                 assert envelope.baseline is not None
                 content = prepare_content(printed, target.root, envelope.baseline)
                 region = extract_region(content).decode("utf-8-sig", "surrogateescape")
+                _check_retained_text(region, document)
             else:
                 region = render_region(printed)
             rendered_tree = render_tree(printed.tree, printed.settings)
