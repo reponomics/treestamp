@@ -90,12 +90,27 @@ export function encodeState(state) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+// Saved states nest about five levels. JSON.parse accepts far deeper input, but
+// serializing it again for a request overflows the stack, so refuse it here.
+export const MAX_STATE_DEPTH = 32;
+
+function withinDepth(value) {
+  const pending = [[value, 0]];
+  while (pending.length) {
+    const [item, depth] = pending.pop();
+    if (item === null || typeof item !== "object") continue;
+    if (depth >= MAX_STATE_DEPTH) return false;
+    for (const child of Object.values(item)) pending.push([child, depth + 1]);
+  }
+  return true;
+}
+
 export function decodeState(text) {
   try {
     const binary = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
     const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && withinDepth(parsed) ? parsed : null;
   } catch (_) {
     return null;
   }

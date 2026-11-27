@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addressFor, capturedSession, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
+  MAX_STATE_DEPTH, addressFor, capturedSession, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -125,6 +125,14 @@ test("empty source fields and queries preserve their documented defaults", () =>
   assert.deepEqual(valuesFromQuery(new URLSearchParams("root=")), { root: "" });
   assert.deepEqual(valuesFromQuery(new URLSearchParams("document=")), { document: "" });
   assert.equal(displayPath({ git_bytes: "" }), "");
+});
+
+test("saved fragments beyond the depth bound decode to null instead of failing later", () => {
+  const nest = (depth) => { let value = 0; for (let i = 0; i < depth; i++) value = { a: value }; return value; };
+  assert.deepEqual(decodeState(encodeState(nest(MAX_STATE_DEPTH))), nest(MAX_STATE_DEPTH));
+  assert.equal(decodeState(encodeState(nest(MAX_STATE_DEPTH + 1))), null);
+  const deep = btoa('{"a":'.repeat(100_000) + "0" + "}".repeat(100_000));
+  assert.equal(decodeState(deep), null);
 });
 
 test("saved fragments reject scalar JSON and invalid UTF-8", () => {
