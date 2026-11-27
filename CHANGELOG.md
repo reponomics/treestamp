@@ -1,5 +1,57 @@
 # Changelog
 
+## [2.0.0](https://github.com/reponomics/treestamp/compare/v1.1.0...v2.0.0) (2026-11-27)
+
+Treestamp 2.0 adds editable SVG exports and guided note transfer in the terminal and browser editors, alongside a simpler command interface. This release changes several 1.x commands and retires Markdown-list treestamps; review the migration details before upgrading.
+
+### ⚠ BREAKING CHANGES
+
+* **Markdown-list treestamps are no longer supported.** Recreate them as fenced Unicode or ASCII treestamps before upgrading. There is no automatic list migration. ([#61](https://github.com/reponomics/treestamp/pull/61))
+* **Use explicit `new` and `load` commands.** Replace `treestamp tui` with `treestamp`, and replace top-level `treestamp --load DOCUMENT` or `treestamp tui --load DOCUMENT` with `treestamp load DOCUMENT`. Use `treestamp new DIRECTORY` to create from a directory; use `load` for an existing document. The `export` command retains its own `--load` option. ([#59](https://github.com/reponomics/treestamp/pull/59))
+* **Maintenance uses the staged Git index.** `check` and `update` no longer accept `--target` or `--compare`. Stage additions, deletions, and renames before opening or updating a treestamp. An editor session keeps its captured snapshot until reopened. The default document is now `README.md` in the current directory, rather than the repository-root README. ([#59](https://github.com/reponomics/treestamp/pull/59))
+* **Updates stop rather than silently dropping unmatched notes.** `treestamp update DOCUMENT` exits without writing when annotated paths disappear or change kind. Use `treestamp load DOCUMENT` to transfer those notes, then Write, or explicitly omit unmatched notes with `treestamp update DOCUMENT --skip-notes-transfer`. Matching notes are retained; renames are not inferred. ([#59](https://github.com/reponomics/treestamp/pull/59))
+* **Source selection moves out of the terminal editor.** The old New, Load, and Write new file actions (`N`, `l`, and `n`) are removed. Select the source through the CLI; `w` writes the loaded document and `e` exports a separate SVG. Fresh trees have no document write target: copy or print their Markdown into the desired document. `treestamp load DOCUMENT --print` extracts the saved treestamp without refreshing it; run `update` first when a refresh is wanted. ([#59](https://github.com/reponomics/treestamp/pull/59), [#61](https://github.com/reponomics/treestamp/pull/61))
+
+### Features
+
+#### Guided note transfer
+
+* Both editors help recover annotations after repository changes, with destination selection, skip, undo, and confirmation before replacing an existing note. Transferring a directory also carries descendant notes whose complete relative paths and entry kinds match; conflicts and missing destinations remain individual decisions. Undo reverses the whole transfer, including descendants. ([#59](https://github.com/reponomics/treestamp/pull/59))
+* Terminal transfers remain unsaved until Write. In the browser, Discard changes returns to the accepted state after transfer, preserving transfer decisions. Cancelling or failing to load a replacement source preserves the previously accepted work. ([#59](https://github.com/reponomics/treestamp/pull/59))
+
+#### Editable SVG output
+
+* Export treestamps as SVG from the CLI, terminal editor, or hosted editor, with adaptive, light, and dark themes. SVG files embed the textual treestamp and can be reopened, curated, checked, updated, and exported again as SVG or Markdown. New exports default to adaptive; loaded SVGs retain their theme unless explicitly changed. ([#61](https://github.com/reponomics/treestamp/pull/61))
+* The hosted editor has separate Tree and Export views, with SVG preview, download, and source copying. Export preparation preserves the editing session. ([#61](https://github.com/reponomics/treestamp/pull/61))
+* File exports protect existing artifacts: replacement requires `--replace` on the CLI or confirmation in the terminal editor, and export cannot overwrite its own loaded source. Export also refuses to silently discard unmatched notes. Add README image links yourself after saving the SVG. ([#61](https://github.com/reponomics/treestamp/pull/61))
+
+For example, with an existing `assets` directory, export a saved Markdown treestamp using:
+
+```sh
+treestamp export --load README.md --format svg --output assets/treestamp.svg
+```
+
+Output paths are repository-relative. SVG support applies to treestamp-generated files with valid embedded metadata. Updating regenerates the drawing from that metadata, so manual edits to the SVG drawing are not retained.
+
+#### Browser navigation and draft recovery
+
+* Create a tree from a repository directory or load a document through the file/folder picker. Responsive controls support both desktop and narrow screens. Returning home no longer automatically reopens the editor; Resume restores the accepted draft and its URL. ([#59](https://github.com/reponomics/treestamp/pull/59))
+* Draft restoration preserves the accepted editing baseline, including completed transfer decisions. Resume is temporary convenience rather than durable storage: copy or download your work to save it. The hosted editor does not write repository files or create commits. ([#59](https://github.com/reponomics/treestamp/pull/59), [#61](https://github.com/reponomics/treestamp/pull/61))
+
+### Fixes and hardening
+
+* Preserve literal filenames containing ` -> ` or ending in ` [gitlink]` instead of interpreting them as structural syntax. Upgrade readers before sharing newly generated special-name registrations with older installations. ([#61](https://github.com/reponomics/treestamp/pull/61))
+* Escape terminal control characters in printed source and diagnostics when displaying them in a terminal, while preserving source bytes and newline conventions in redirected output. ([#59](https://github.com/reponomics/treestamp/pull/59))
+* Preserve SVG source newline conventions during maintenance, avoiding spurious changes after CRLF checkout conversion. ([#61](https://github.com/reponomics/treestamp/pull/61))
+
+### Build, CI, and dependencies
+
+* Use the web image's uv pin consistently across local checks, CI, and the tool inventory. Pre-commit now uses the Ruff version installed from `uv.lock`, removing its separate version pin. ([#65](https://github.com/reponomics/treestamp/pull/65))
+* Run browser journeys before building the Docker image, preventing Docker network changes from interrupting Chromium during the shared PR checkpoint. ([#66](https://github.com/reponomics/treestamp/pull/66))
+* Update uv to 0.13.10, Ruff to 0.17.6, FastAPI to 0.165.0, certifi to 2026.11.20, and httpcore2/httpx2 to 2.16.2; refresh pinned GitHub Actions. ([#55](https://github.com/reponomics/treestamp/pull/55), [#57](https://github.com/reponomics/treestamp/pull/57), [#58](https://github.com/reponomics/treestamp/pull/58), [#62](https://github.com/reponomics/treestamp/pull/62), [#63](https://github.com/reponomics/treestamp/pull/63), [#64](https://github.com/reponomics/treestamp/pull/64))
+
+See the [CLI reference](https://github.com/reponomics/treestamp/blob/main/docs/cli-reference.md) for command and migration details, and the [browser workflow guide](https://github.com/reponomics/treestamp/blob/main/docs/ui-flow.md) for source selection, transfer, and export behavior.
+
 ## [1.1.0](https://github.com/reponomics/treestamp/compare/v1.0.1...v1.1.0) (2026-11-14)
 
 
