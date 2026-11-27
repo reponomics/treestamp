@@ -1,6 +1,6 @@
 # ADR 0003: Generated testing plan
 
-Status: accepted with amendments; initial increment in progress. Scope is the existing parsers, session transport, and browser input/rendering boundary, before adding restoration onto a newer repository tree.
+Status: accepted with amendments; initial increment implemented (see [Results](#results-of-the-initial-increment)). Scope is the existing parsers, session transport, and browser input/rendering boundary, before adding restoration onto a newer repository tree.
 
 Review: the proposal was checked against the codec, document, session, hosted request, and browser modules before implementation, and the resulting amendments received an independent review that verified their claims against the code. That review corrected the definition of unrepresentable entries and the browser identity domain, refined the server-state and fabricated-commit requirements, and found two hosted responses that failed with HTTP 500 (both fixed with regressions). [Revision](#revision) lists each amendment.
 
@@ -36,6 +36,22 @@ Construct expected path/kind/annotation facts from the generated source model be
 - Keep Hypothesis's local example database (already ignored), report reproducible failures, and turn minimized discoveries into committed regression examples. CI must not depend on an existing local database or a single fixed seed. Do not upload generated payloads from real user sessions.
 - Catch only the expected rejection types at the relevant boundary. Unexpected exceptions, hangs, or invariant violations fail the run. Do not suppress findings by narrowing generators without establishing that the rejected input is outside the supported contract.
 - Verify at least one property detects a temporary intentional defect, then remove the defect. Run focused properties, relevant regression suites, lint, type checks, lock validation, and documentation checks. Record example budgets and measured runtime.
+
+## Results of the initial increment
+
+Budgets: 100 examples per property in ordinary runs and 1,000 with `HYPOTHESIS_PROFILE=extended`, across 19 generated properties (6 core, 13 hosted, 8 of which are browser-decoding cases). The same files hold deterministic cases: a hosted type-swap sweep, explicit fragment length and depth boundaries, and a tree depth limit. The browser corpus has 11 cases. Measured on one Apple Silicon development machine: the generated tests take about 3 seconds in the core suite and 14 seconds in the hosted suite at the ordinary budget, and about 30 and 75 seconds at the extended budget; the corpus adds about 5 seconds to the browser suite. CI timings will differ.
+
+Defects found and fixed, each with a committed regression:
+
+| Finding | Found by | Fix |
+| --- | --- | --- |
+| A JSON path spelled as escapes of valid UTF-8 bytes (`\udcc2\udc80`) passed validation, then changed identity in documents and transport | Generated document property | `validate_path` accepts only the canonical decoding |
+| A placement conflict on a byte path, and a config comment holding a non-UTF-8 byte, both produced HTTP 500 | Review of the amended plan | Escaped error details; regions that are not UTF-8 are rejected before caching |
+| A captured session with undisplayable settings threw at startup, or on resuming a draft | Read-only inspection, confirmed in Node | Shared captured-session validator |
+| A saved state nested deeply enough to overflow `JSON.stringify` left an unhandled rejection on restore | Generated browser boundary case | `decodeState` refuses states nested beyond 32 levels |
+| A forged permalink could yield a protocol-relative history address, and a forged repository link any URL | Synthetic responses | Both derived from the response's own identity |
+
+Intentional defects, injected one at a time and then removed, were each detected: a shallow startup guard (browser startup property and Playwright regressions), unescaped trailing whitespace in printed names (document property), restore dropping untracked hidden paths (transport property), and a missing envelope revision type check (the hosted type-swap sweep on every run; random mutation found it in about half of extended runs before mutation was biased toward type swaps, which motivated the sweep). A control case shows that the corpus sentinels detect a payload that does execute when CSP is bypassed.
 
 ## Explicit follow-ups and limits
 
