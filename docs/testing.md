@@ -19,14 +19,26 @@ Focused tests provide feedback during development. Relevant complete suites are 
 | Suite | Responsibility |
 | --- | --- |
 | Core Python | CLI behavior, document parsing and transactional writes, Git snapshots, tree maintenance, and headless terminal editor journeys |
-| Hosted Python | HTTP contracts, GitHub acquisition, snapshot and state validation, caching, request budgets, and resource limits |
-| Browser | End-to-end browser interactions against a local service and fake GitHub API, including recovery from rejected requests |
+| Hosted Python | HTTP contracts, GitHub acquisition, snapshot and state validation, caching, request budgets, and resource limits; generated browser-decoding cases, which drive the page's JavaScript modules through Node |
+| Browser | End-to-end browser interactions against a local service and fake GitHub API, including recovery from rejected requests and a fixed corpus of markup payloads |
 | JavaScript logic | Pure browser-side logic without DOM or network dependencies |
 | Installed-package acceptance | Wheel and source-distribution contents, clean installations, CLI commands, terminal editor workflows, and installed repository hooks |
 
 Hosted tests use controlled GitHub responses or local repository fixtures. Bundled examples are checked against the API representation. Tests must not rely on mutable public repository contents for repeatable results.
 
 The CI matrix checks supported Python versions on Linux and Windows. Local validation covers the machine and environment on which it runs. Container build and health checks, dependency scanning, and static analysis complement the behavioral suites; they do not replace them. The [CI workflow](../.github/workflows/ci.yml) defines the execution matrix.
+
+## Generated tests
+
+Generated (property-based) tests use [Hypothesis](https://hypothesis.readthedocs.io/) within the core and hosted suites; [ADR 0003](adr/0003-dynamic-testing-plan.md) records their scope and contracts. They cover document serialization and parsing, session transport, hosted request validation, and browser-side decoding of fragments, routes, queries, and saved drafts. Files are named `test_properties_*.py`; shared strategies live beside them.
+
+Expected results come from the generated model or from an independent oracle, not from the transformation under test. Generators include known unsupported or unrepresentable inputs; the corresponding properties require the documented rejection for exactly those inputs, so narrowing a generator is not a substitute for a contract decision.
+
+Each suite's `conftest.py` registers two profiles derived from Hypothesis's default: `ordinary` (100 examples per property, used by ordinary runs) and `extended` (1,000 examples). Both disable per-example deadlines and use a fresh random seed; the explicit profile overrides the derandomized profile Hypothesis selects automatically under CI. `make test-properties` runs only the generated tests, and `make test-properties-extended` runs them with the extended budget.
+
+A failure prints the minimized example and a `@reproduce_failure` decorator. Hypothesis also replays recent failures from its local `.hypothesis/` database, which is not committed and which CI does not rely on. Turn each minimized discovery into an explicit regression test in the relevant suite.
+
+The browser-decoding cases need Node 24 or later (the version in `.nvmrc`). Without it they are skipped locally and fail when `CI` is set. A persistent worker, `web/tests/js/property_worker.mjs`, evaluates the cases with the page's own modules; it is not collected by `node --test`.
 
 ## Coverage policy
 
@@ -57,5 +69,6 @@ Coverage measures execution, not assertion quality or correctness. Excluded comp
 | Browser layout | Inspection at relevant viewport sizes, alongside functional browser tests |
 | Filesystem failures and concurrent writes | Deterministic failure tests and prepared-write interleavings, with platform-specific checks where needed |
 | Defensive validation | Reachable boundary failures; synthetic internal corruption should be identified as such |
+| Generated tests | Small bounded inputs and a fixed browser corpus; neither establishes resistance to resource exhaustion nor replaces a security review |
 
 The [optional UI review protocol](ui-review.md) describes a bounded visual inspection process. Successful screenshot capture alone is not evidence that the captured views were inspected.
