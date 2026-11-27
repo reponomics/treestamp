@@ -169,8 +169,6 @@ def test_plain_document_load_has_specific_warning_code(
 def test_retained_config_bytes_that_are_not_utf8_are_rejected_before_caching(
     client: TestClient, repo: Repo
 ) -> None:
-    # Found by review of generated testing: equivalent config is retained
-    # verbatim, so an undecodable comment byte reached the JSON response.
     region = (
         b"<!-- treestamp:start -->\n<!-- treestamp:config\n# note \x80\n-->\n\n"
         b"```sh\n./\n\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 top.txt\n```\n"
@@ -189,7 +187,6 @@ def test_retained_config_bytes_that_are_not_utf8_are_rejected_before_caching(
 def test_hand_written_raw_bytes_in_rows_are_printed_afresh_with_escapes(
     client: TestClient, repo: Repo
 ) -> None:
-    # Only retained bytes must be text; rows are re-rendered, so these still open.
     region = (
         b"<!-- treestamp:start -->\n```sh\n./\n"
         b"\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 byte\xff.txt\n```\n"

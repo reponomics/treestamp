@@ -844,7 +844,6 @@ async function resumeSession() {
   const example = exampleAt(pendingDraft.address);
   if (example) { loadExample(example[0]); return; }
   const { owner, repo, sha, saved } = parseRoute(address.pathname, address.hash);
-  // The draft store offers only sessions that capturedValues accepts.
   const values = capturedValues(saved);
   editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };
   fields.url.value = `${owner}/${repo}`;

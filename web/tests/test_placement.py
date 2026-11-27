@@ -375,7 +375,6 @@ def test_placement_conflict_response_carries_its_question(repo: Repo) -> None:
 def test_conflict_question_on_a_byte_path_is_a_conflict_not_server_error(
     repo: Repo,
 ) -> None:
-    # Found by review of generated testing: the question bypassed message escaping.
     tree = tree_from_records([TreeRecord("before.txt", "100644", "blob", "a" * 40)])
     session = TreeSession(tree, Settings())
     session.set_annotation("before.txt", "Moved note")

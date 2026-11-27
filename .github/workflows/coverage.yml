@@ -47,7 +47,6 @@ jobs:
         with:
           version: ${{ steps.uv.outputs.version }}
       - name: Set up Node.js
-        # The hosted suite drives the page's JavaScript modules for generated cases.
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc

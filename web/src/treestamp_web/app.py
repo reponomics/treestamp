@@ -73,8 +73,7 @@ def _package_version() -> str:
         return "unknown"
 
 
-def _json_text(text: str) -> str:
-    """Escape undecodable path bytes, which JSON responses cannot encode."""
+def _json_safe_text(text: str) -> str:
     return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
@@ -85,10 +84,10 @@ def _error(
     retry_after: int | None = None,
     extra: dict[str, object] | None = None,
 ) -> JSONResponse:
-    error: dict[str, object] = {"code": code, "message": _json_text(message)}
+    error: dict[str, object] = {"code": code, "message": _json_safe_text(message)}
     if extra:
         error.update(
-            (key, _json_text(value) if isinstance(value, str) else value)
+            (key, _json_safe_text(value) if isinstance(value, str) else value)
             for key, value in extra.items()
         )
     headers = {}

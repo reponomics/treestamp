@@ -284,8 +284,6 @@ def test_byte_paths_in_metadata_round_trip(document: Document, tmp_path: Path) -
 
 
 def test_escapes_of_utf8_text_in_a_row_are_rejected_with_the_text_to_use() -> None:
-    # Printers escape only undecodable bytes; escapes of valid UTF-8 would name a
-    # path that Git can never report, so reading them is an error, not a mismatch.
     content = (
         "<!-- treestamp:start -->\n```sh\n./\n└── caf\\xc3\\xa9\n```\n"
         "<!-- treestamp:end -->\n"

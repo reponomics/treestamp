@@ -1,13 +1,4 @@
-"""Markup in names, notes, errors, and links stays literal text on every surface.
-
-A small fixed corpus, not a fuzzer: HTML, SVG, and event-handler payloads are
-committed as paths and notes in their own fixture repository, served through
-the local service and fake GitHub. Each journey checks for literal text and
-for the absence of attacker-created elements and attributes, executed
-sentinels, dialogs, unexpected requests, and navigation. Rendering journeys
-also run with the Content Security Policy bypassed in the test browser, so
-safe rendering does not depend on that header.
-"""
+"""Markup in names, notes, errors, and links stays literal text on every surface."""
 
 from __future__ import annotations
 
@@ -21,7 +12,14 @@ import pytest
 from .conftest import Fixture, _git, service
 
 pytest.importorskip("playwright.sync_api")
-from playwright.sync_api import Browser, Page, Request, Route, expect  # noqa: E402
+from playwright.sync_api import (  # noqa: E402
+    Browser,
+    Dialog,
+    Page,
+    Request,
+    Route,
+    expect,
+)
 
 pytestmark = pytest.mark.browser
 
@@ -41,7 +39,6 @@ NOTES = {
     f"old/{MOVED}": f"moved {ATTRIBUTE}",
 }
 
-# Attacker-created attributes or elements; the page's own markup has none.
 FOREIGN_MARKUP = """() => [...document.querySelectorAll("*")].flatMap((node) => [
   ...[...node.attributes]
     .filter((a) => /^on/i.test(a.name)
@@ -69,7 +66,6 @@ def _index(path: Path, entries: dict[str, bytes]) -> None:
 
 
 def build_corpus_fixture(path: Path) -> Fixture:
-    """Payload paths exist only in Git; filesystems cannot hold every such name."""
     from treestamp.document import Document, render_region
     from treestamp.model import Entry, Settings, build_tree
     from treestamp.session import TreeSession
@@ -106,9 +102,7 @@ def corpus_service(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     yield from service.__wrapped__(fixture)
 
 
-class Guard:
-    """Record evidence of script execution, dialogs, stray requests, and errors."""
-
+class InjectionGuard:
     def __init__(self, page: Page, base: str) -> None:
         self.page, self.base = page, base
         self.errors: list[str] = []
@@ -118,9 +112,9 @@ class Guard:
         page.on("dialog", self._dialog)
         page.on("request", self._request)
 
-    def _dialog(self, dialog: object) -> None:
-        self.dialogs.append(dialog.message)  # type: ignore[attr-defined]
-        dialog.dismiss()  # type: ignore[attr-defined]
+    def _dialog(self, dialog: Dialog) -> None:
+        self.dialogs.append(dialog.message)
+        dialog.dismiss()
 
     def _request(self, request: Request) -> None:
         url = urlsplit(request.url)
@@ -150,11 +144,11 @@ def corpus_page(request: pytest.FixtureRequest, browser: Browser) -> Iterator[Pa
 def test_editor_placement_and_markdown_render_payloads_as_text(
     corpus_page: Page, corpus_service: str
 ) -> None:
-    page, guard = corpus_page, Guard(corpus_page, corpus_service)
+    page, guard = corpus_page, InjectionGuard(corpus_page, corpus_service)
     page.goto(f"{corpus_service}/fixture/repo?root=.&document=README.md")
     expect(page.locator("#placement-dialog")).to_be_visible()
     expect(page.locator("#placement-source")).to_have_text("old/")
-    page.keyboard.press("s")  # skip the folder; its annotated entry follows
+    page.locator("#placement-skip").click()
     expect(page.locator("#placement-source")).to_have_text(MOVED)
     expect(page.locator("#placement-note")).to_contain_text(f"moved {ATTRIBUTE}")
     page.locator(f'#placement-rows [data-path="{KEEP}"]').click()
@@ -173,7 +167,7 @@ def test_editor_placement_and_markdown_render_payloads_as_text(
 def test_source_browser_lists_payload_names_as_text(
     corpus_page: Page, corpus_service: str
 ) -> None:
-    page, guard = corpus_page, Guard(corpus_page, corpus_service)
+    page, guard = corpus_page, InjectionGuard(corpus_page, corpus_service)
     page.goto(corpus_service + "/")
     page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
@@ -196,7 +190,7 @@ def test_source_browser_lists_payload_names_as_text(
 def test_query_errors_render_payloads_as_text(
     corpus_page: Page, corpus_service: str, query: str, shown: str
 ) -> None:
-    page, guard = corpus_page, Guard(corpus_page, corpus_service)
+    page, guard = corpus_page, InjectionGuard(corpus_page, corpus_service)
     page.goto(f"{corpus_service}/fixture/repo?{query}")
     expect(page.locator("#error-message")).to_contain_text(shown)
     guard.check()
@@ -205,7 +199,7 @@ def test_query_errors_render_payloads_as_text(
 def test_script_scheme_input_and_routes_do_not_navigate(
     page: Page, corpus_service: str
 ) -> None:
-    guard = Guard(page, corpus_service)
+    guard = InjectionGuard(page, corpus_service)
     page.goto(corpus_service + "/")
     page.locator("#entry-url").fill(SCRIPT_URL)
     page.locator("#entry-create").click()
@@ -220,15 +214,13 @@ def test_script_scheme_input_and_routes_do_not_navigate(
 def test_synthetic_repository_link_cannot_become_a_script_url(
     page: Page, corpus_service: str
 ) -> None:
-    # Synthetic: the service builds this link from validated identifiers, so a
-    # forged response is an input to the page, not demonstrated reachability.
     def forge(route: Route) -> None:
         response = route.fetch()
         data = response.json()
         data["repository"]["url"] = SCRIPT_URL
         route.fulfill(response=response, json=data)
 
-    guard = Guard(page, corpus_service)
+    guard = InjectionGuard(page, corpus_service)
     page.route("**/api/preview*", forge)
     page.goto(f"{corpus_service}/fixture/repo?root=.")
     expect(page.locator("#error-message")).to_contain_text("could not display")
@@ -240,10 +232,9 @@ def test_synthetic_repository_link_cannot_become_a_script_url(
 def test_sentinels_detect_execution_when_csp_is_bypassed(
     browser: Browser, corpus_service: str
 ) -> None:
-    """Control: the checks above would notice a payload that did run."""
     context = browser.new_context(bypass_csp=True)
     page = context.new_page()
-    guard = Guard(page, corpus_service)
+    guard = InjectionGuard(page, corpus_service)
     page.goto(corpus_service + "/")
     page.evaluate("html => document.body.insertAdjacentHTML('beforeend', html)", IMG)
     page.wait_for_function("window.__xss === 1")

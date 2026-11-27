@@ -1,8 +1,4 @@
-"""Generated curation: rejected edits, JSON transport, and restored behavior.
-
-The original session is the oracle for its restored copy. Documents omit some
-of this state on purpose, so these properties never go through a document.
-"""
+"""Generated curation: rejected edits, JSON transport, and restored behavior."""
 
 from __future__ import annotations
 
@@ -28,13 +24,12 @@ from .property_strategies import annotation_texts, names, symlink_targets
 
 
 @st.composite
-def _leaves(draw: st.DrawFn, prefix: str, depth: int) -> list[Entry]:
-    """Every generated directory has a tracked descendant, as in a Git tree."""
+def _tracked_leaves(draw: st.DrawFn, prefix: str, depth: int) -> list[Entry]:
     entries: list[Entry] = []
     for name in draw(st.lists(names, min_size=1, max_size=3, unique=True)):
         path = f"{prefix}/{name}" if prefix else name
         if depth and draw(st.booleans()):
-            entries += draw(_leaves(path, depth - 1))
+            entries += draw(_tracked_leaves(path, depth - 1))
             continue
         kind = draw(st.sampled_from((KIND_FILE, KIND_SYMLINK, KIND_GITLINK)))
         target = draw(symlink_targets) if kind == KIND_SYMLINK else None
@@ -42,7 +37,7 @@ def _leaves(draw: st.DrawFn, prefix: str, depth: int) -> list[Entry]:
     return entries
 
 
-targets = _leaves("", 2).map(build_tree)
+targets = _tracked_leaves("", 2).map(build_tree)
 
 OPERATIONS = (
     "toggle",
@@ -74,7 +69,6 @@ class Operation:
 
 
 def operations(target_paths: list[str]) -> st.SearchStrategy[list[Operation]]:
-    # Untracked and alias paths exercise rejection and "." normalization.
     paths = st.one_of(st.sampled_from([*target_paths, "."]), names)
     operation = st.builds(
         Operation, st.sampled_from(OPERATIONS), paths, annotation_texts
@@ -83,7 +77,6 @@ def operations(target_paths: list[str]) -> st.SearchStrategy[list[Operation]]:
 
 
 def observable(session: TreeSession) -> tuple[object, ...]:
-    """Everything a later edit, display, or write could depend on."""
     rows = []
     for reveal in (False, True):
         session.show_hidden = reveal
@@ -151,7 +144,6 @@ def captured_states(draw: st.DrawFn) -> tuple[Node, SessionState]:
     tracked = [node for node in target.walk()]
     directories = [node.path for node in tracked if node.is_dir]
     expanded = draw(st.sets(st.sampled_from(directories))) if directories else set()
-    # Hidden paths may name entries that are no longer tracked, as documents can.
     hidden = draw(
         st.sets(
             st.one_of(st.sampled_from([n.path for n in tracked]), names), max_size=4

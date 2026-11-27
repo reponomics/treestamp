@@ -167,7 +167,6 @@ def test_failed_network_restore_can_be_replaced_by_a_fresh_load(
 def test_draft_whose_settings_cannot_be_displayed_is_never_offered(
     page: Page, service: str
 ) -> None:
-    # Regression: such a draft was offered, and resuming it threw.
     curate(page, service)
     record = json.loads(
         page.evaluate("localStorage.getItem('treestamp.current-draft')")

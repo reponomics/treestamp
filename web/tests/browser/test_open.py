@@ -85,7 +85,6 @@ def decode_state(fragment: str) -> dict:
 def test_captured_link_with_undisplayable_settings_is_reported_not_thrown(
     page: Page, service: str, root: object
 ) -> None:
-    # Regression: the startup guard accepted this state, then filling the form threw.
     page.goto(f"{service}/fixture/repo?root=.")
     expect(page.locator("#rows .row")).to_have_count(9)
     address, _, fragment = page.url.partition("#s=")

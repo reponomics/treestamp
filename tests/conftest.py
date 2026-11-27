@@ -10,15 +10,11 @@ from pathlib import Path
 import pytest
 from hypothesis import settings
 
-# Generated tests: ordinary runs and `make test-properties-extended`. Explicit
-# randomization overrides Hypothesis's derandomized profile for CI, so CI runs
-# do not depend on one fixed seed; deriving from the default profile keeps
-# local and CI settings otherwise identical. Deadlines would be wall-clock
-# assertions.
-_BASE = settings.get_profile("default")
+# derandomize=False overrides the fixed-seed profile Hypothesis loads under CI.
+_HYPOTHESIS_DEFAULT = settings.get_profile("default")
 settings.register_profile(
     "ordinary",
-    _BASE,
+    _HYPOTHESIS_DEFAULT,
     max_examples=100,
     deadline=None,
     derandomize=False,
@@ -26,7 +22,7 @@ settings.register_profile(
 )
 settings.register_profile(
     "extended",
-    _BASE,
+    _HYPOTHESIS_DEFAULT,
     max_examples=1000,
     deadline=None,
     derandomize=False,

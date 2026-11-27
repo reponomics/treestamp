@@ -551,11 +551,7 @@ def _check_plain_document(content: bytes, document: str) -> None:
         )
 
 
-def _check_retained_text(region: str, document: str) -> None:
-    """Retained authored bytes, such as a config comment, must be text to be shown.
-
-    Rows are printed afresh with escapes, so only verbatim bytes can fail here.
-    """
+def _require_utf8_region(region: str, document: str) -> None:
     try:
         region.encode("utf-8")
     except UnicodeEncodeError:
@@ -877,7 +873,7 @@ class PreviewService:
                 assert envelope.baseline is not None
                 content = prepare_content(printed, target.root, envelope.baseline)
                 region = extract_region(content).decode("utf-8-sig", "surrogateescape")
-                _check_retained_text(region, document)
+                _require_utf8_region(region, document)
             else:
                 region = render_region(printed)
             rendered_tree = render_tree(printed.tree, printed.settings)

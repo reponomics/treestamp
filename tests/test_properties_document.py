@@ -1,20 +1,17 @@
-"""Generated documents: serialization, parsing, and bytes outside the managed region.
-
-Expected facts come from the generated model, never from rendering it. The
-renderer's own roundtrip check is part of the code under test, so a supported
-model that fails to render is a failure, not a skipped example.
-"""
+"""Generated documents: serialization, parsing, and bytes outside the region."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 import pytest
 from hypothesis import assume, event, given
 from hypothesis import strategies as st
 
 from treestamp.document import (
+    _BOUNDARY,
     END_MARKER,
     START_MARKER,
     Document,
@@ -46,32 +43,30 @@ Fact = tuple[str, str, "str | None", str, "int | None", "int | None"]
 
 
 @dataclass(frozen=True)
-class Spec:
-    """One generated row; a directory without children is printed collapsed."""
-
+class GeneratedEntry:
     name: str
     kind: str
     annotation: str = ""
     target: str | None = None
-    children: tuple[Spec, ...] = ()
+    children: tuple[GeneratedEntry, ...] = ()
     files: int | None = None
     dirs: int | None = None
-    hidden: tuple[str, ...] = ()  # names hidden beneath an expanded directory
+    hidden_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class Model:
     root_annotation: str
-    children: tuple[Spec, ...]
+    children: tuple[GeneratedEntry, ...]
     root_hidden: tuple[str, ...]
     root: str
     style: str
     show_counts: bool
     attribution: bool
-    nodes: list[tuple[str, Spec]] = field(compare=False, default_factory=list)
+    nodes: list[tuple[str, GeneratedEntry]] = field(compare=False, default_factory=list)
 
     def __post_init__(self) -> None:
-        def visit(children: tuple[Spec, ...], parent: str) -> None:
+        def visit(children: tuple[GeneratedEntry, ...], parent: str) -> None:
             for spec in children:
                 path = f"{parent}/{spec.name}" if parent else spec.name
                 self.nodes.append((path, spec))
@@ -88,14 +83,18 @@ class Model:
 
     def hidden(self) -> frozenset[str]:
         paths = [(name, "") for name in self.root_hidden]
-        paths += [(name, path) for path, spec in self.nodes for name in spec.hidden]
+        paths += [
+            (name, path) for path, spec in self.nodes for name in spec.hidden_names
+        ]
         return frozenset(
             repo_path(f"{parent}/{name}" if parent else name, self.root)
             for name, parent in paths
         )
 
     def document(self) -> Document:
-        def build(children: tuple[Spec, ...], parent: str) -> tuple[Node, ...]:
+        def build(
+            children: tuple[GeneratedEntry, ...], parent: str
+        ) -> tuple[Node, ...]:
             nodes = []
             for spec in children:
                 path = f"{parent}/{spec.name}" if parent else spec.name
@@ -121,10 +120,24 @@ class Model:
 
     def facts(self) -> list[Fact]:
         rows: list[Fact] = [
-            ("", KIND_DIR, None, _note(self.root_annotation), None, None)
+            (
+                "",
+                KIND_DIR,
+                None,
+                _normalized_annotation(self.root_annotation),
+                None,
+                None,
+            )
         ]
         rows += [
-            (path, s.kind, s.target, _note(s.annotation), s.files, s.dirs)
+            (
+                path,
+                s.kind,
+                s.target,
+                _normalized_annotation(s.annotation),
+                s.files,
+                s.dirs,
+            )
             for path, s in self.nodes
         ]
         return rows
@@ -140,8 +153,7 @@ class Model:
         )
 
 
-def _note(text: str) -> str:
-    """Tabs occupy two spaces; nothing else in an annotation changes."""
+def _normalized_annotation(text: str) -> str:
     return text.replace("\t", "  ")
 
 
@@ -173,25 +185,31 @@ def _hidden_names(taken: set[str]) -> st.SearchStrategy[tuple[str, ...]]:
 
 
 @st.composite
-def _spec(draw: st.DrawFn, depth: int, show_counts: bool) -> Spec:
+def _spec(draw: st.DrawFn, depth: int, show_counts: bool) -> GeneratedEntry:
     name = draw(names)
     kind = draw(st.sampled_from((KIND_FILE, KIND_DIR, KIND_SYMLINK, KIND_GITLINK)))
     annotation = draw(annotation_texts)
     if kind == KIND_SYMLINK:
-        return Spec(name, kind, annotation, target=draw(symlink_targets))
+        return GeneratedEntry(name, kind, annotation, target=draw(symlink_targets))
     if kind != KIND_DIR:
-        return Spec(name, kind, annotation)
+        return GeneratedEntry(name, kind, annotation)
     children = draw(_children(depth - 1, show_counts)) if depth else ()
     if children:
         taken = {child.name for child in children}
-        return Spec(
-            name, kind, annotation, children=children, hidden=draw(_hidden_names(taken))
+        return GeneratedEntry(
+            name,
+            kind,
+            annotation,
+            children=children,
+            hidden_names=draw(_hidden_names(taken)),
         )
     files, dirs = draw(_counts) if show_counts else (None, None)
-    return Spec(name, kind, annotation, files=files, dirs=dirs)
+    return GeneratedEntry(name, kind, annotation, files=files, dirs=dirs)
 
 
-def _children(depth: int, show_counts: bool) -> st.SearchStrategy[tuple[Spec, ...]]:
+def _children(
+    depth: int, show_counts: bool
+) -> st.SearchStrategy[tuple[GeneratedEntry, ...]]:
     return st.lists(
         _spec(depth, show_counts), max_size=3, unique_by=lambda spec: spec.name
     ).map(tuple)
@@ -214,13 +232,9 @@ def models(draw: st.DrawFn) -> Model:
 
 
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-# The region finder's own boundary rule (document._BOUNDARY).
-_BOUNDARY = re.compile(r"^[ \t]*<!--[ \t]*treestamp:(?:start|end)")
 
 
-def _plain_markdown_line(line: str) -> bool:
-    # Outside the managed region these lines would open a fence or be read as a
-    # boundary marker; both are Markdown structure, not ordinary prose.
+def _is_prose_line(line: str) -> bool:
     return not _FENCE.match(line) and not _BOUNDARY.match(line.lstrip("\ufeff"))
 
 
@@ -235,11 +249,20 @@ prose_lines = (
         max_size=12,
     )
     .map("".join)
-    .filter(_plain_markdown_line)
+    .filter(_is_prose_line)
 )
 
-# A fenced example of a treestamp, which the region finder must ignore.
-FENCED_EXAMPLE = ["```markdown", START_MARKER, "./", END_MARKER, "```"]
+FENCED_TREESTAMP_EXAMPLE = ["```markdown", START_MARKER, "./", END_MARKER, "```"]
+
+
+class FileBytes(NamedTuple):
+    before: bytes
+    region: bytes
+    after: bytes
+
+
+def _raw(text: str) -> bytes:
+    return text.encode("utf-8", "surrogateescape")
 
 
 @dataclass(frozen=True)
@@ -252,9 +275,11 @@ class Framing:
     fenced_example: bool
     final_newline: bool
 
-    def wrap(self, region: str) -> tuple[bytes, bytes, bytes]:
-        """Return the bytes before, of, and after the region, as a file has them."""
-        lines = [*self.prefix, *(FENCED_EXAMPLE if self.fenced_example else [])]
+    def file_bytes(self, region: str) -> FileBytes:
+        lines = [
+            *self.prefix,
+            *(FENCED_TREESTAMP_EXAMPLE if self.fenced_example else []),
+        ]
         before = ("\ufeff" if self.bom else "") + "".join(
             line + self.prose_eol for line in lines
         )
@@ -265,8 +290,7 @@ class Framing:
         elif self.suffix:
             after = after.removeprefix(self.prose_eol)
             after += self.prose_eol if self.final_newline else ""
-        encode = lambda text: text.encode("utf-8", "surrogateescape")  # noqa: E731
-        return encode(before), encode(body), encode(after)
+        return FileBytes(_raw(before), _raw(body), _raw(after))
 
 
 framings = st.builds(
@@ -300,7 +324,7 @@ def test_updates_preserve_every_byte_outside_the_region(
     model: Model, replacement: Model, framing: Framing
 ) -> None:
     assume(not model.unrepresentable and not replacement.unrepresentable)
-    before, region, after = framing.wrap(render_region(model.document()))
+    before, region, after = framing.file_bytes(render_region(model.document()))
     content = before + region + after
     _assert_matches(parse_document(content), model)
     assert prepare_content(model.document(), model.root, content) == content
@@ -364,7 +388,9 @@ def test_unsupported_entries_are_rejected_as_document_errors(
         ("link", KIND_SYMLINK, None, "", True),
         ("link", KIND_SYMLINK, "a  # b", "", False),
         ("link", KIND_SYMLINK, " # x", "", False),
-        ("link", KIND_SYMLINK, "  # ", "", True),  # its trailing space is escaped
+        pytest.param(
+            "link", KIND_SYMLINK, "  # ", "", True, id="trailing-space-escaped"
+        ),
         ("link", KIND_SYMLINK, "t  #", "note", False),
         ("link", KIND_SYMLINK, " #", "note", False),
         ("link", KIND_SYMLINK, "", "note", True),
@@ -373,8 +399,10 @@ def test_unsupported_entries_are_rejected_as_document_errors(
         ("x -", KIND_SYMLINK, "t", "", True),
         ("x ->", KIND_GITLINK, None, "", False),
         ("x  #", KIND_GITLINK, None, "", False),
-        ("a -> b", KIND_GITLINK, None, "", True),  # registered special name
-        ("a  # b", KIND_SYMLINK, "t", "note", True),  # registered special name
+        pytest.param("a -> b", KIND_GITLINK, None, "", True, id="registered-arrow"),
+        pytest.param(
+            "a  # b", KIND_SYMLINK, "t", "note", True, id="registered-delimiter"
+        ),
         ("a  #", KIND_FILE, None, "note", False),
         ("a  #", KIND_FILE, None, "", True),
         ("a #", KIND_FILE, None, "note", True),
@@ -384,7 +412,6 @@ def test_unsupported_entries_are_rejected_as_document_errors(
 def test_documented_representability_cases(
     name: str, kind: str, target: str | None, annotation: str, representable: bool
 ) -> None:
-    """Each rule in docs/adr/0003, for both the predicate and the renderer."""
     assert is_unrepresentable_row(name, kind, target, annotation) is not representable
     entry = Node(name, name, kind, target=target, annotation=annotation)
     document = Document(Node(".", "", KIND_DIR, (entry,)))

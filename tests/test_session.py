@@ -301,8 +301,6 @@ def test_byte_paths_survive_json_transport() -> None:
 
 
 def test_json_spelling_of_utf8_bytes_as_escapes_is_rejected() -> None:
-    # Found by generated tests: JSON can carry lone surrogates, and these two
-    # escape the bytes of U+0080, so a document or transport would rename them.
     state = SessionState.from_dict(json.loads('{"hidden": ["\\udcc2\\udc80"]}'))
     with pytest.raises(MarkerError, match="invalid path encoding"):
         TreeSession.restore(build_tree([Entry("readme")]), state)

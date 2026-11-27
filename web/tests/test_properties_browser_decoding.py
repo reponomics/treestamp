@@ -1,10 +1,4 @@
-"""Generated browser decoding cases against the page's own logic.js and draft.js.
-
-Hypothesis generates the cases here; a persistent Node worker
-(tests/js/property_worker.mjs) evaluates them with the real modules, so no
-decoder is reimplemented in Python. Requires Node 24 or later: skipped locally
-without it, and a failure when CI is set.
-"""
+"""Generated browser decoding cases against the page's own logic.js and draft.js."""
 
 from __future__ import annotations
 
@@ -31,7 +25,8 @@ from .json_strategies import strict_json_values
 
 WORKER = Path(__file__).parent / "js" / "property_worker.mjs"
 REQUIRED_NODE = 24
-RESPONSE_TIMEOUT = 60.0  # seconds; a process timeout for hangs, not a deadline
+RESPONSE_TIMEOUT_SECONDS = 60.0
+WORKER_EXITED = ""
 ORIGIN = "https://treestamp.invalid"
 COMMIT = "a" * 40
 
@@ -52,9 +47,7 @@ def _node() -> str:
     pytest.skip(reason)
 
 
-class Worker:
-    """One Node process; restarted if it exits, failed on a hang."""
-
+class NodeWorker:
     def __init__(self, node: str) -> None:
         self._node = node
         self._start()
@@ -67,8 +60,7 @@ class Worker:
             encoding="utf-8",
         )
         self._lines: queue.Queue[str] = queue.Queue()
-        # Each process has its own queue, so a late reply from a replaced
-        # worker can never be read as an answer from its successor.
+        # A per-process queue keeps a replaced worker's late reply from its successor.
         threading.Thread(
             target=_forward, args=(self._process.stdout, self._lines), daemon=True
         ).start()
@@ -81,10 +73,10 @@ class Worker:
         try:
             self._process.stdin.write(request + "\n")
             self._process.stdin.flush()
-            line = self._lines.get(timeout=RESPONSE_TIMEOUT)
+            line = self._lines.get(timeout=RESPONSE_TIMEOUT_SECONDS)
         except (BrokenPipeError, queue.Empty):
-            line = ""
-        if not line:
+            line = WORKER_EXITED
+        if line == WORKER_EXITED:
             self.close()
             self._start()
             raise AssertionError(f"the Node worker did not answer {name}")
@@ -93,13 +85,11 @@ class Worker:
         return response
 
     def value(self, name: str, *args: object) -> Any:
-        """Return the call's result; any exception is a failure."""
         response = self.call(name, *args)
         assert response["ok"], f"{name} threw {response['error']}"
         return response["value"]
 
     def close(self) -> None:
-        """End of input stops the worker; kill it only if it does not exit."""
         assert self._process.stdin is not None and self._process.stdout is not None
         with contextlib.suppress(BrokenPipeError):
             self._process.stdin.close()
@@ -112,38 +102,34 @@ class Worker:
 
 
 def _forward(stream: Any, lines: queue.Queue[str]) -> None:
-    # close() may close the stream of a killed worker while this thread reads it.
+    # close() can close the stream while this thread reads it.
     with contextlib.suppress(ValueError, OSError):
         for line in stream:
             lines.put(line)
-    lines.put("")  # the worker exited
+    lines.put(WORKER_EXITED)
 
 
 @pytest.fixture(scope="module")
-def worker() -> Iterator[Worker]:
-    running = Worker(_node())
+def worker() -> Iterator[NodeWorker]:
+    running = NodeWorker(_node())
     yield running
     running.close()
 
 
-def controlled(response: dict[str, Any]) -> bool:
-    """A result, or an Error with a user-facing message; TypeError is a failure."""
+def is_result_or_user_error(response: dict[str, Any]) -> bool:
     return response["ok"] or response["error"]["type"] == "Error"
 
 
 def same_json(left: object, right: object) -> bool:
-    """Compare as JSON, where true and 1 differ; key order is not significant."""
     return json.dumps(left, sort_keys=True) == json.dumps(right, sort_keys=True)
 
 
 def fragment(state: object) -> str:
-    """Encode a state as the page does: JSON, UTF-8, then unpadded base64url."""
     data = json.dumps(state, ensure_ascii=True).encode("ascii")
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
 
-def captured_state(worker: Worker) -> dict[str, Any]:
-    """A service-shaped captured session for the link's own owner, repo, and commit."""
+def captured_state(worker: NodeWorker) -> dict[str, Any]:
     state: dict[str, Any] = worker.value("example")["state"]
     state["source"].update(owner="o", repo="r", commit=COMMIT)
     return state
@@ -153,14 +139,12 @@ def mutations(body: dict[str, Any]) -> st.SearchStrategy[Any]:
     return _mutations(body, strict_json_values)
 
 
-# Identity domain: JSON without -0 or non-finite numbers; integers stay within
-# the range both Python and JavaScript represent exactly. Lone surrogates are in.
-_SAFE = 2**53 - 1
+_MAX_SAFE_INTEGER = 2**53 - 1
 identity_values = st.recursive(
     st.one_of(
         st.none(),
         st.booleans(),
-        st.integers(-_SAFE, _SAFE),
+        st.integers(-_MAX_SAFE_INTEGER, _MAX_SAFE_INTEGER),
         st.text(st.characters(codec=None), max_size=8),
         st.sampled_from(("\ud800", "\udfff\ud800", "\U0001f600", "__proto__")),
     ),
@@ -184,7 +168,7 @@ base64ish = st.one_of(
 
 
 @given(identity_values.map(lambda value: {"value": value}))
-def test_supported_states_survive_the_fragment(worker: Worker, state: Any) -> None:
+def test_supported_states_survive_the_fragment(worker: NodeWorker, state: Any) -> None:
     assert same_json(worker.value("roundTripState", state), state)
     route = worker.value("parseRoute", f"/o/r@{COMMIT}", "#s=" + fragment(state))
     expected = {"owner": "o", "repo": "r", "sha": COMMIT, "saved": state}
@@ -193,7 +177,7 @@ def test_supported_states_survive_the_fragment(worker: Worker, state: Any) -> No
 
 @given(base64ish)
 def test_arbitrary_fragments_decode_to_objects_or_null(
-    worker: Worker, text: str
+    worker: NodeWorker, text: str
 ) -> None:
     decoded = worker.value("decodeState", text)
     assert decoded is None or isinstance(decoded, dict)
@@ -205,7 +189,9 @@ def test_arbitrary_fragments_decode_to_objects_or_null(
     ),
     st.one_of(st.text(max_size=20), base64ish.map("#s=".__add__)),
 )
-def test_routes_parse_without_exceptions(worker: Worker, path: str, hash: str) -> None:
+def test_routes_parse_without_exceptions(
+    worker: NodeWorker, path: str, hash: str
+) -> None:
     route = worker.value("parseRoute", path, hash)
     if route is not None:
         assert route["sha"] is None or re.fullmatch("[0-9a-f]{40}", route["sha"])
@@ -213,14 +199,14 @@ def test_routes_parse_without_exceptions(worker: Worker, path: str, hash: str) -
 
 
 @given(st.text(max_size=40))
-def test_queries_accept_only_document_options(worker: Worker, query: str) -> None:
+def test_queries_accept_only_document_options(worker: NodeWorker, query: str) -> None:
     response = worker.call("valuesFromQuery", query)
-    assert controlled(response), response
+    assert is_result_or_user_error(response), response
     if response["ok"]:
         assert set(response["value"]) <= {"root", "document"}
 
 
-def _mutated_state(worker: Worker, data: st.DataObject) -> object:
+def _mutated_state(worker: NodeWorker, data: st.DataObject) -> object:
     state = captured_state(worker)
     return data.draw(
         st.one_of(st.just(state), mutations(state).map(lambda m: m.apply(state)))
@@ -229,7 +215,7 @@ def _mutated_state(worker: Worker, data: st.DataObject) -> object:
 
 @given(st.data())
 def test_links_with_malformed_sessions_never_throw_at_startup(
-    worker: Worker, data: st.DataObject
+    worker: NodeWorker, data: st.DataObject
 ) -> None:
     saved = _mutated_state(worker, data)
     shown = worker.value("startup", f"/o/r@{COMMIT}", "#s=" + fragment(saved))
@@ -250,7 +236,7 @@ _locations = st.fixed_dictionaries(
 
 @given(st.data(), _locations)
 def test_stored_drafts_never_throw_and_offer_only_usable_sessions(
-    worker: Worker, data: st.DataObject, location: dict[str, str]
+    worker: NodeWorker, data: st.DataObject, location: dict[str, str]
 ) -> None:
     saved = _mutated_state(worker, data)
     address = f"/o/r@{COMMIT}?root=.&document=#s={fragment(saved)}"
@@ -271,7 +257,7 @@ def test_stored_drafts_never_throw_and_offer_only_usable_sessions(
 
 @given(st.data())
 def test_valid_drafts_round_trip_through_storage(
-    worker: Worker, data: st.DataObject
+    worker: NodeWorker, data: st.DataObject
 ) -> None:
     state = captured_state(worker)
     state["curation"]["annotations"] = [
@@ -288,13 +274,12 @@ def test_valid_drafts_round_trip_through_storage(
 
 @given(st.data())
 def test_synthetic_responses_are_adopted_or_refused_in_a_controlled_way(
-    worker: Worker, data: st.DataObject
+    worker: NodeWorker, data: st.DataObject
 ) -> None:
-    # Synthetic: forged service responses, not demonstrated reachable inputs.
     response = worker.value("example")
     candidate = data.draw(mutations(response)).apply(response)
     result = worker.call("preparePreview", candidate, ORIGIN)
-    assert controlled(result), result["error"]
+    assert is_result_or_user_error(result), result["error"]
     if result["ok"]:
         assert urljoin(ORIGIN + "/", result["value"]["address"]).startswith(
             ORIGIN + "/"
@@ -315,8 +300,7 @@ _DEPTH = 100_000
     ],
     ids=["deep-arrays", "deep-objects", "unclosed", "long-garbage", "long-state"],
 )
-def test_fragment_length_and_depth_boundaries(worker: Worker, text: str) -> None:
-    # The service's request limit does not protect decoding before a request.
+def test_fragment_length_and_depth_boundaries(worker: NodeWorker, text: str) -> None:
     encoded = base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
     for candidate in (text, encoded):
         decoded = worker.value("decodeState", candidate)

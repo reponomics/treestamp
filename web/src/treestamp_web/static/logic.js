@@ -90,8 +90,7 @@ export function encodeState(state) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// Saved states nest about five levels. JSON.parse accepts far deeper input, but
-// serializing it again for a request overflows the stack, so refuse it here.
+// Deeper states would overflow JSON.stringify when the session is restored.
 export const MAX_STATE_DEPTH = 32;
 
 function withinDepth(value) {
@@ -140,16 +139,13 @@ function validSettings(settings) {
     && (settings.attribution === undefined || typeof settings.attribution === "boolean") && validPath(settings.root);
 }
 
-// A captured session from a link or a saved draft, before any of it is displayed
-// or adopted. The service validates the rest when the session is restored.
-export function capturedSession(saved) {
+export function isDisplayableSession(saved) {
   const source = saved?.source;
   return Boolean(source && validPath(source.root) && validPath(source.document) && validSettings(saved.curation?.settings));
 }
 
-// The form values startup shows for a captured session, or null if it cannot be shown.
 export function capturedValues(saved) {
-  return capturedSession(saved) ? valuesFromSettings(saved.curation.settings) : null;
+  return isDisplayableSession(saved) ? valuesFromSettings(saved.curation.settings) : null;
 }
 
 function validRow(row) {
@@ -181,21 +177,18 @@ function validatePreviewSource(data) {
   }
 }
 
-// The identities the service accepts, as in links.py and the draft store.
-const OWNER = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
-const NAME = /^[A-Za-z0-9_.-]+$/;
-const COMMIT = /^[0-9a-f]{40}$/;
+const GITHUB_OWNER = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
+const GITHUB_REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
+const COMMIT_ID = /^[0-9a-f]{40}$/;
 
-// The repository link and the history address are built from the response's
-// own identity, so a malformed response cannot point either somewhere else.
-// Only the permalink's query is used: a public base URL makes it absolute.
+// A public base URL makes the permalink absolute, so only its query is used.
 function sessionAddress(data, origin) {
   const { owner, name, url } = data.repository;
   const commit = data.ref.commit;
   let target;
   try { target = new URL(data.permalink, origin); } catch (_) { throw new Error(INCOMPLETE); }
   const path = `/${owner}/${name}@${commit}`;
-  if (!OWNER.test(owner) || !NAME.test(name) || !COMMIT.test(commit)
+  if (!GITHUB_OWNER.test(owner) || !GITHUB_REPOSITORY_NAME.test(name) || !COMMIT_ID.test(commit)
       || url !== `https://github.com/${owner}/${name}` || target.pathname !== path) {
     throw new Error(INCOMPLETE);
   }

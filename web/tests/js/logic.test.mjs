@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  MAX_STATE_DEPTH, addressFor, capturedSession, capturedValues, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
+  MAX_STATE_DEPTH, addressFor, isDisplayableSession, capturedValues, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -290,8 +290,6 @@ test("incomplete preview responses cannot replace the accepted draft", async () 
 });
 
 test("synthetic responses cannot point the repository link or history elsewhere", async () => {
-  // Synthetic: the service builds both from validated identifiers, so these
-  // responses are forged inputs, not demonstrated reachable server behavior.
   const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
   const original = Object.values(EXAMPLES)[0];
   const forgeries = [
@@ -304,7 +302,6 @@ test("synthetic responses cannot point the repository link or history elsewhere"
     data => { data.permalink = "http://["; },
     data => { data.permalink = `/${data.repository.owner}/other@${data.ref.commit}`; },
     data => {
-      // Every field agrees, but an empty owner would make the address protocol-relative.
       data.repository.owner = "";
       data.repository.url = `https://github.com//${data.repository.name}`;
       data.permalink = `https://x.example//${data.repository.name}@${data.ref.commit}`;
@@ -324,14 +321,14 @@ test("synthetic responses cannot point the repository link or history elsewhere"
 test("captured sessions need displayable source paths and settings", async () => {
   const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
   const state = Object.values(EXAMPLES)[0].state;
-  assert.equal(capturedSession(state), true);
+  assert.equal(isDisplayableSession(state), true);
   for (const value of [null, {}, [], "x", { source: {} }, { source: state.source, curation: {} }]) {
-    assert.equal(capturedSession(value), false);
+    assert.equal(isDisplayableSession(value), false);
   }
   for (const root of [null, undefined, 1, {}, { git_bytes: 7 }, { git_bytes: "f" }]) {
     const saved = structuredClone(state);
     saved.curation.settings.root = root;
-    assert.equal(capturedSession(saved), false, JSON.stringify(root));
+    assert.equal(isDisplayableSession(saved), false, JSON.stringify(root));
     assert.equal(capturedValues(saved), null, JSON.stringify(root));
   }
   assert.deepEqual(capturedValues(state), valuesFromSettings(state.curation.settings));

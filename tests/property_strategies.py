@@ -1,10 +1,4 @@
-"""Hypothesis strategies for generated tests of the codec, documents, and sessions.
-
-Names and symlink targets are drawn the way Git supplies them: bytes decoded with
-``surrogateescape``, so undecodable bytes appear as U+DC80..U+DCFF. Crafted
-fragments that collide with row syntax are mixed in, because random text rarely
-produces them.
-"""
+"""Hypothesis strategies for the codec, document, and session properties."""
 
 from __future__ import annotations
 
@@ -20,8 +14,7 @@ from treestamp.model import (
 ARROW = " -> "
 GITLINK_SUFFIX = " [gitlink]"
 
-# Row syntax, quoting, markup, and escapes that random text seldom reaches.
-NAME_FRAGMENTS = (
+RARE_FRAGMENTS = (
     ANNOTATION_DELIMITER,
     " -> ",
     " ->",
@@ -31,7 +24,7 @@ NAME_FRAGMENTS = (
     " [gitlink]",
     " (1 file)",
     " (2 files, 3 folders)",
-    "/",  # filtered from names below; kept for targets
+    "/",
     "\\",
     "\\x41",
     "\\u0041",
@@ -69,13 +62,12 @@ def _from_bytes(data: bytes) -> str:
     return data.decode("utf-8", "surrogateescape")
 
 
-def canonical(text: str) -> str:
-    """Decode text as Git would: joined escaped bytes may form valid UTF-8."""
+def git_decoded(text: str) -> str:
     return _from_bytes(text.encode("utf-8", "surrogateescape"))
 
 
 _text_piece = st.one_of(
-    st.sampled_from(NAME_FRAGMENTS),
+    st.sampled_from(RARE_FRAGMENTS),
     st.text(st.characters(codec="utf-8", exclude_characters="\x00/"), max_size=4),
     st.binary(min_size=1, max_size=4).map(_from_bytes),
 )
@@ -85,29 +77,27 @@ def _valid_name(name: str) -> bool:
     return name not in ("", ".", "..") and "/" not in name and "\x00" not in name
 
 
-# Row syntax at the end of a name or target is where the printed format is
-# ambiguous, so it is drawn deliberately rather than left to chance.
 ROW_SYNTAX_ENDINGS = (" ->", " -> ", "  #", "  # ", " #", " # ", " [gitlink]")
 _simple = st.text("abcdefghij0123456789._-", min_size=1, max_size=6)
-_syntax_ending = st.tuples(_simple, st.sampled_from(ROW_SYNTAX_ENDINGS)).map("".join)
+_ending_in_row_syntax = st.tuples(_simple, st.sampled_from(ROW_SYNTAX_ENDINGS)).map(
+    "".join
+)
 
 names = st.one_of(
     _simple,
-    _syntax_ending,
-    st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(canonical),
+    _ending_in_row_syntax,
+    st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(git_decoded),
 ).filter(_valid_name)
 
-# Targets are blob contents, so any surrogateescape-decoded bytes are possible.
 symlink_targets = st.one_of(
     st.none(),
     st.sampled_from(("null", "a  # b", "  # ", " # x", " #", "../x", "")),
-    _syntax_ending,
+    _ending_in_row_syntax,
     st.tuples(st.sampled_from(ROW_SYNTAX_ENDINGS), _simple).map("".join),
-    st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(canonical),
+    st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(git_decoded),
     st.binary(max_size=8).map(_from_bytes),
 )
 
-# Annotations are user text: printable characters and tabs, on one line.
 annotation_texts = st.one_of(
     st.just(""),
     st.lists(
@@ -127,12 +117,8 @@ repository_roots = st.one_of(
 )
 
 
-def _shown(text: str) -> str:
-    """Spacing of a printed name or target: trailing whitespace is escaped.
-
-    Other escapes replace control characters and backslashes with backslash
-    sequences, which can neither form nor break an arrow or a delimiter.
-    """
+def _printed_spacing(text: str) -> str:
+    """Other escapes can neither form nor break an arrow or a delimiter."""
     body = text.rstrip()
     return body + "\\" * (len(text) - len(body))
 
@@ -140,18 +126,17 @@ def _shown(text: str) -> str:
 def is_unrepresentable_row(
     name: str, kind: str, target: str | None, annotation: str
 ) -> bool:
-    """A test-owned reading of the printed row grammar (docs/adr/0003).
+    """Rows split at the first delimiter and symlinks at the first arrow.
 
-    Rows split at the first annotation delimiter, and symlinks at the first
-    arrow. Registered special names are consumed before either split.
+    Registered special names are consumed before either split.
     """
     registered = (
         ANNOTATION_DELIMITER in name or ARROW in name or name.endswith(GITLINK_SUFFIX)
     )
-    printed_name = "entry" if registered else _shown(name)
+    printed_name = "entry" if registered else _printed_spacing(name)
     suffix = {KIND_DIR: "/", KIND_GITLINK: GITLINK_SUFFIX}.get(kind, "")
     if kind == KIND_SYMLINK:
-        printed_target = "null" if target is None else _shown(target)
+        printed_target = "null" if target is None else _printed_spacing(target)
         if target is not None and printed_target == "null":
             return True
         suffix = ARROW + printed_target

@@ -1,6 +1,6 @@
 // One accepted editing session for a short return journey in this browser.
 // Snapshot availability still belongs to the service; this is not a backup.
-import { capturedSession, parseRoute, valuesFromQuery } from "./logic.js";
+import { isDisplayableSession, parseRoute, valuesFromQuery } from "./logic.js";
 
 export const DRAFT_KEY = "treestamp.current-draft";
 const LOCAL_ORIGIN = "https://treestamp.invalid";
@@ -19,7 +19,7 @@ function capturedRoute(address) {
   const url = localSessionURL(address);
   if (!url) return null;
   const route = parseRoute(url.pathname, url.hash);
-  if (!capturedSession(route?.saved)) return null;
+  if (!isDisplayableSession(route?.saved)) return null;
   const source = route.saved.source;
   if (source.owner !== route.owner || source.repo !== route.repo || source.commit !== route.sha) return null;
   return route;

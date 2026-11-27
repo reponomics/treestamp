@@ -36,9 +36,7 @@ def _json(floats: st.SearchStrategy[float]) -> st.SearchStrategy[object]:
     )
 
 
-# Python's JSON parser, like the service's, also accepts NaN and Infinity.
-json_values = _json(st.floats())
-# Standard JSON, as browsers produce and parse it.
+lenient_json_values = _json(st.floats())
 strict_json_values = _json(st.floats(allow_nan=False, allow_infinity=False))
 
 
@@ -89,15 +87,13 @@ class Mutation:
         return result["body"]
 
 
-# One value of each JSON type, to swap a member's type outright.
-TYPE_CONFUSION = (None, True, -1, 1.5, "", "x", [], {})
+TYPE_SWAP_VALUES = (None, True, -1, 1.5, "", "x", [], {})
 
 
 def mutations(
-    body: dict[str, Any], values: st.SearchStrategy[object] = json_values
+    body: dict[str, Any], values: st.SearchStrategy[object] = lenient_json_values
 ) -> st.SearchStrategy[Mutation]:
-    # Choosing a depth first keeps the few top-level and envelope fields from
-    # being outnumbered by repeated list items.
+    # Sampling a depth first keeps top-level fields from being outnumbered.
     by_depth: dict[int, list[tuple[object, ...]]] = {}
     for pointer in pointers(body):
         by_depth.setdefault(len(pointer), []).append(pointer)
@@ -108,5 +104,5 @@ def mutations(
         Mutation,
         chosen,
         st.sampled_from(("replace", "replace", "delete", "add")),
-        st.one_of(st.sampled_from(TYPE_CONFUSION), values),
+        st.one_of(st.sampled_from(TYPE_SWAP_VALUES), values),
     )

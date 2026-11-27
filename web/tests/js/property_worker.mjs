@@ -1,6 +1,5 @@
-// Answers generated browser-decoding cases from web/tests/test_properties_browser_decoding.py.
-// One JSON request per line on stdin, one ASCII JSON response per line on stdout.
-// Not a *.test.mjs file, so `node --test` does not collect it.
+// Evaluates cases for test_properties_browser_decoding.py: one JSON request per
+// input line, one ASCII JSON response per output line.
 import { createInterface } from "node:readline";
 import {
   capturedValues, decodeState, displayPath, encodeState, parseRoute, pathKey,
@@ -14,7 +13,6 @@ function memoryStorage(value = null) {
   return { getItem: key => entries.get(key) ?? null, setItem: (key, item) => entries.set(key, item) };
 }
 
-// The page's own startup conversion, plus display of the source paths it later shows.
 function display(saved) {
   const values = capturedValues(saved);
   if (!values) return null;
@@ -28,12 +26,10 @@ const CALLS = {
   valuesFromQuery: query => valuesFromQuery(new URLSearchParams(query)),
   pathKey: value => pathKey(value),
   displayPath: value => displayPath(value),
-  // The fragment journey: a link's saved state, as boot() in app.js reads it.
   startup: (pathname, hash) => {
     const route = parseRoute(pathname, hash);
     return { route: route !== null, shown: route?.saved && route.sha ? display(route.saved) : null };
   },
-  // The localStorage journey: a stored record, and the session the user may resume.
   draft: (stored, location) => {
     const storage = memoryStorage(stored);
     const read = readDraft(storage);
@@ -50,7 +46,6 @@ const CALLS = {
     return { saved: saveDraft(address, storage, now), read: readDraft(storage) };
   },
   preparePreview: (data, origin) => preparePreview(data, origin),
-  // A service-shaped preview response, from the page's bundled example.
   example: () => structuredClone(Object.values(EXAMPLES)[0]),
 };
 
@@ -75,7 +70,6 @@ for await (const line of lines) {
   try {
     text = ascii(response);
   } catch (error) {
-    // A value too deep to serialize is reported by kind, not by content.
     text = ascii({ ...response, value: { unserializable: error.constructor.name } });
   }
   process.stdout.write(`${text}\n`);

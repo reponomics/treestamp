@@ -91,7 +91,6 @@ test("saved addresses must be local captured sessions with matching source ident
 });
 
 test("drafts whose settings or source paths cannot be displayed are never offered", () => {
-  // The browser would throw converting these for display before the service saw them.
   const storage = memoryStorage();
   const variants = [
     state => { state.curation.settings.root = null; },
