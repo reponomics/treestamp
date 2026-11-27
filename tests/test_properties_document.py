@@ -214,7 +214,8 @@ def models(draw: st.DrawFn) -> Model:
 
 
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-_BOUNDARY = re.compile(r"^[ \t]*<!--[ \t]*treestamp:")
+# The region finder's own boundary rule (document._BOUNDARY).
+_BOUNDARY = re.compile(r"^[ \t]*<!--[ \t]*treestamp:(?:start|end)")
 
 
 def _plain_markdown_line(line: str) -> bool:
@@ -227,7 +228,9 @@ prose_lines = (
     st.lists(
         st.one_of(
             st.characters(codec="utf-8", exclude_characters="\r\n"),
-            st.sampled_from(("<!-- note -->", "```", "~~~", "  # ", "\udcfe")),
+            st.sampled_from(
+                ("<!-- note -->", "<!-- treestamp:config", "```", "~~~", "\udcfe")
+            ),
         ),
         max_size=12,
     )
@@ -329,18 +332,68 @@ _unsupported_annotations = st.tuples(
 def test_unsupported_entries_are_rejected_as_document_errors(
     model: Model, data: st.DataObject
 ) -> None:
+    assume(not model.unrepresentable)
     document = model.document()
-    entry = data.draw(
+    taken = {child.name for child in document.tree.children}
+    free = names.filter(lambda name: name not in taken)
+    entry, message = data.draw(
         st.one_of(
-            _unsupported_names.map(lambda name: Node(name, name, KIND_FILE)),
-            _unsupported_annotations.map(
-                lambda note: Node("x", "x", KIND_FILE, annotation=note)
+            _unsupported_names.map(
+                lambda name: (
+                    Node(name, name, KIND_FILE),
+                    "invalid relative path|name does not match path|duplicate tree path",
+                )
+            ),
+            st.tuples(free, _unsupported_annotations).map(
+                lambda case: (
+                    Node(case[0], case[0], KIND_FILE, annotation=case[1]),
+                    "annotation must be a single line",
+                )
             ),
         )
     )
     tree = Node(".", "", KIND_DIR, (*document.tree.children, entry))
-    with pytest.raises(MarkerError):
+    with pytest.raises(MarkerError, match=message):
         render_region(Document(tree, document.settings))
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "target", "annotation", "representable"),
+    [
+        ("link", KIND_SYMLINK, "null", "", False),
+        ("link", KIND_SYMLINK, None, "", True),
+        ("link", KIND_SYMLINK, "a  # b", "", False),
+        ("link", KIND_SYMLINK, " # x", "", False),
+        ("link", KIND_SYMLINK, "  # ", "", True),  # its trailing space is escaped
+        ("link", KIND_SYMLINK, "t  #", "note", False),
+        ("link", KIND_SYMLINK, " #", "note", False),
+        ("link", KIND_SYMLINK, "", "note", True),
+        ("x ->", KIND_SYMLINK, "t", "", False),
+        ("x  #", KIND_SYMLINK, "t", "", False),
+        ("x -", KIND_SYMLINK, "t", "", True),
+        ("x ->", KIND_GITLINK, None, "", False),
+        ("x  #", KIND_GITLINK, None, "", False),
+        ("a -> b", KIND_GITLINK, None, "", True),  # registered special name
+        ("a  # b", KIND_SYMLINK, "t", "note", True),  # registered special name
+        ("a  #", KIND_FILE, None, "note", False),
+        ("a  #", KIND_FILE, None, "", True),
+        ("a #", KIND_FILE, None, "note", True),
+        ("x ->", KIND_FILE, None, "note", True),
+    ],
+)
+def test_documented_representability_cases(
+    name: str, kind: str, target: str | None, annotation: str, representable: bool
+) -> None:
+    """Each rule in docs/adr/0003, for both the predicate and the renderer."""
+    assert is_unrepresentable_row(name, kind, target, annotation) is not representable
+    entry = Node(name, name, kind, target=target, annotation=annotation)
+    document = Document(Node(".", "", KIND_DIR, (entry,)))
+    if representable:
+        parsed = parse_document(render_region(document).encode())
+        assert document_facts(parsed) == document_facts(document)
+    else:
+        with pytest.raises(MarkerError, match="cannot represent tree"):
+            render_region(document)
 
 
 def test_depth_beyond_the_limit_is_rejected() -> None:

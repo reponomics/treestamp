@@ -85,8 +85,15 @@ def _valid_name(name: str) -> bool:
     return name not in ("", ".", "..") and "/" not in name and "\x00" not in name
 
 
+# Row syntax at the end of a name or target is where the printed format is
+# ambiguous, so it is drawn deliberately rather than left to chance.
+ROW_SYNTAX_ENDINGS = (" ->", " -> ", "  #", "  # ", " #", " # ", " [gitlink]")
+_simple = st.text("abcdefghij0123456789._-", min_size=1, max_size=6)
+_syntax_ending = st.tuples(_simple, st.sampled_from(ROW_SYNTAX_ENDINGS)).map("".join)
+
 names = st.one_of(
-    st.text("abcdefghij0123456789._-", min_size=1, max_size=6),
+    _simple,
+    _syntax_ending,
     st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(canonical),
 ).filter(_valid_name)
 
@@ -94,6 +101,8 @@ names = st.one_of(
 symlink_targets = st.one_of(
     st.none(),
     st.sampled_from(("null", "a  # b", "  # ", " # x", " #", "../x", "")),
+    _syntax_ending,
+    st.tuples(st.sampled_from(ROW_SYNTAX_ENDINGS), _simple).map("".join),
     st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(canonical),
     st.binary(max_size=8).map(_from_bytes),
 )
