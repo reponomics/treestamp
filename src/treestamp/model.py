@@ -135,9 +135,13 @@ def validate_path(path: str) -> None:
     if path.count("/") >= MAX_DEPTH:
         raise MarkerError(f"path exceeds the {MAX_DEPTH}-level depth limit")
     try:
-        path.encode("utf-8", "surrogateescape")
+        encoded = path.encode("utf-8", "surrogateescape")
     except UnicodeEncodeError as exc:
         raise MarkerError(f"invalid path encoding: {path!r}") from exc
+    # Escaped bytes that form valid UTF-8 name a different text identity for the
+    # same Git path; only the canonical decoding identifies it.
+    if encoded.decode("utf-8", "surrogateescape") != path:
+        raise MarkerError(f"invalid path encoding: {path!r}")
 
 
 def validate_paths(paths: Iterable[str]) -> None:
