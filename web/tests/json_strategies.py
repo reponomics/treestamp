@@ -42,16 +42,16 @@ json_values = _json(st.floats())
 strict_json_values = _json(st.floats(allow_nan=False, allow_infinity=False))
 
 
-def _pointers(
+def pointers(
     value: object, prefix: tuple[object, ...] = ()
 ) -> Iterator[tuple[object, ...]]:
     yield prefix
     if isinstance(value, dict):
         for key, child in value.items():
-            yield from _pointers(child, (*prefix, key))
+            yield from pointers(child, (*prefix, key))
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            yield from _pointers(child, (*prefix, index))
+            yield from pointers(child, (*prefix, index))
 
 
 @dataclass(frozen=True)
@@ -79,12 +79,24 @@ class Mutation:
         return result
 
 
+# One value of each JSON type, to swap a member's type outright.
+TYPE_CONFUSION = (None, True, -1, 1.5, "", "x", [], {})
+
+
 def mutations(
     body: dict[str, Any], values: st.SearchStrategy[object] = json_values
 ) -> st.SearchStrategy[Mutation]:
+    # Choosing a depth first keeps the few top-level and envelope fields from
+    # being outnumbered by repeated list items.
+    by_depth: dict[int, list[tuple[object, ...]]] = {}
+    for pointer in pointers(body):
+        by_depth.setdefault(len(pointer), []).append(pointer)
+    chosen = st.sampled_from(sorted(by_depth)).flatmap(
+        lambda depth: st.sampled_from(by_depth[depth])
+    )
     return st.builds(
         Mutation,
-        st.sampled_from(list(_pointers(body))),
-        st.sampled_from(("replace", "delete", "add")),
-        values,
+        chosen,
+        st.sampled_from(("replace", "replace", "delete", "add")),
+        st.one_of(st.sampled_from(TYPE_CONFUSION), values),
     )

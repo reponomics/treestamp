@@ -41,7 +41,13 @@ from treestamp_web.preview import (
 )
 
 from .conftest import Clock, Repo, make_config
-from .json_strategies import json_values, mutations
+from .json_strategies import (
+    TYPE_CONFUSION,
+    Mutation,
+    json_values,
+    mutations,
+    pointers,
+)
 
 Key = tuple[str, str, tuple[tuple[str, str], ...], str]
 Recorded = tuple[int, dict[str, str], bytes]
@@ -250,9 +256,7 @@ def _post(client: TestClient, endpoint: str, body: object) -> httpx.Response:
     )
 
 
-def _check_accepted(
-    upstream: Upstream, request: dict[str, Any], data: dict[str, Any]
-) -> None:
+def _check_accepted(upstream: Upstream, request: Any, data: dict[str, Any]) -> None:
     state = data["state"]
     assert data["ref"]["commit"] == upstream.commit
     assert state["source"] == request["state"]["source"]
@@ -274,6 +278,31 @@ def _check_accepted(
 ENDPOINTS = {"/api/op": operation_body, "/api/placement": placement_body}
 
 
+def _exercise(
+    client: TestClient,
+    upstream: Upstream,
+    calls: list[str],
+    endpoint: str,
+    valid: dict[str, Any],
+    mutated: object,
+    accepted: dict[str, Any],
+) -> int:
+    """Post one mutated request after its valid original was accepted."""
+    cache, fetched = _cache(client), len(calls)
+    response = _post(client, endpoint, mutated)
+    assert len(calls) == fetched, "an edit request reached GitHub"
+    if response.status_code == 200:
+        _check_accepted(upstream, mutated, response.json())
+        return response.status_code
+    # The fixture's entries are all representable, so 422 would be an
+    # unexpected failure mapped to a curation error.
+    assert response.status_code in (400, 409, 410), response.text
+    assert set(response.json()["error"]) >= {"code", "message"}
+    assert _cache(client) == cache
+    assert _post(client, endpoint, valid).json() == accepted
+    return response.status_code
+
+
 @given(st.data())
 def test_mutated_requests_are_rejected_without_changing_service_state(
     upstream: Upstream, opening: dict[str, Any], data: st.DataObject
@@ -281,26 +310,38 @@ def test_mutated_requests_are_rejected_without_changing_service_state(
     endpoint = data.draw(st.sampled_from(sorted(ENDPOINTS)))
     choices = VALID_OPERATIONS if endpoint == "/api/op" else VALID_DECISIONS
     valid = ENDPOINTS[endpoint](opening, data.draw(st.sampled_from(choices)))
-    mutated = data.draw(mutations(valid)).apply(valid)
+    # Several independent single-field mutations share one fresh application.
+    variants = data.draw(st.lists(mutations(valid), min_size=1, max_size=6))
     calls: list[str] = []
     with fresh_client(upstream, calls) as client:
         opened(client)
-        cache = _cache(client)
         accepted = _post(client, endpoint, valid)
         assert accepted.status_code == 200, accepted.text
-        fetched = len(calls)
-        response = _post(client, endpoint, mutated)
-        event(f"{endpoint} {response.status_code}")
-        assert len(calls) == fetched, "an edit request reached GitHub"
-        if response.status_code == 200:
-            _check_accepted(upstream, mutated, response.json())
-            return
-        # The fixture's entries are all representable, so 422 would be an
-        # unexpected failure mapped to a curation error.
-        assert response.status_code in (400, 409, 410), response.text
-        assert set(response.json()["error"]) >= {"code", "message"}
-        assert _cache(client) == cache
-        assert _post(client, endpoint, valid).json() == accepted.json()
+        for variant in variants:
+            mutated = variant.apply(valid)
+            status = _exercise(
+                client, upstream, calls, endpoint, valid, mutated, accepted.json()
+            )
+            event(f"{endpoint} {status}")
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "choice"),
+    [("/api/op", {"type": "toggle", "path": "sub"}), ("/api/placement", [])],
+)
+def test_every_member_rejects_each_json_type(
+    upstream: Upstream, opening: dict[str, Any], endpoint: str, choice: object
+) -> None:
+    """A complete sweep of type swaps, which random mutation reaches slowly."""
+    valid = ENDPOINTS[endpoint](opening, choice)
+    calls: list[str] = []
+    with fresh_client(upstream, calls) as client:
+        opened(client)
+        accepted = _post(client, endpoint, valid).json()
+        for pointer in pointers(valid):
+            for value in TYPE_CONFUSION:
+                mutated = Mutation(pointer, "replace", value).apply(valid)
+                _exercise(client, upstream, calls, endpoint, valid, mutated, accepted)
 
 
 def pinned_commits(upstream: Upstream) -> st.SearchStrategy[str]:
