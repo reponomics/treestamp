@@ -12,12 +12,25 @@ from hypothesis import settings
 
 # Generated tests: ordinary runs and `make test-properties-extended`. Explicit
 # randomization overrides Hypothesis's derandomized profile for CI, so CI runs
-# do not depend on one fixed seed. Deadlines would be wall-clock assertions.
+# do not depend on one fixed seed; deriving from the default profile keeps
+# local and CI settings otherwise identical. Deadlines would be wall-clock
+# assertions.
+_BASE = settings.get_profile("default")
 settings.register_profile(
-    "ordinary", max_examples=100, deadline=None, derandomize=False, print_blob=True
+    "ordinary",
+    _BASE,
+    max_examples=100,
+    deadline=None,
+    derandomize=False,
+    print_blob=True,
 )
 settings.register_profile(
-    "extended", max_examples=1000, deadline=None, derandomize=False, print_blob=True
+    "extended",
+    _BASE,
+    max_examples=1000,
+    deadline=None,
+    derandomize=False,
+    print_blob=True,
 )
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ordinary"))
 
