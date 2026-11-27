@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import json
+
 import pytest
 
 pytest.importorskip("playwright.sync_api")
@@ -67,6 +70,33 @@ def test_invalid_fragment_is_reported_without_creating_another_draft(
     page.goto(f"{service}/fixture/repo#s=invalid!")
     expect(page.locator("#error")).to_contain_text("invalid editing state")
     assert requests == []
+
+
+def encode_state(state: object) -> str:
+    data = json.dumps(state).encode("utf-8")
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def decode_state(fragment: str) -> dict:
+    return json.loads(base64.urlsafe_b64decode(fragment + "=" * (-len(fragment) % 4)))
+
+
+@pytest.mark.parametrize("root", [None, {"git_bytes": 7}])
+def test_captured_link_with_undisplayable_settings_is_reported_not_thrown(
+    page: Page, service: str, root: object
+) -> None:
+    # Regression: the startup guard accepted this state, then filling the form threw.
+    page.goto(f"{service}/fixture/repo?root=.")
+    expect(page.locator("#rows .row")).to_have_count(9)
+    address, _, fragment = page.url.partition("#s=")
+    state = decode_state(fragment)
+    state["curation"]["settings"]["root"] = root
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto("about:blank")
+    page.goto(f"{address}#s={encode_state(state)}")
+    expect(page.locator("#error")).to_contain_text("valid captured editing session")
+    assert errors == []
 
 
 def test_byte_named_row_reveal_and_unhide_preserve_identity(

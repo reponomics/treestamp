@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 pytest.importorskip("playwright.sync_api")
 from playwright.sync_api import Page, expect  # noqa: E402
+
+from .test_open import decode_state, encode_state  # noqa: E402
 
 pytestmark = pytest.mark.browser
 
@@ -158,3 +162,27 @@ def test_failed_network_restore_can_be_replaced_by_a_fresh_load(
     page.locator("#source-create").click()
     expect(page.locator("#reload-settings")).to_be_hidden()
     expect(page.locator("#rows .row")).not_to_have_count(0)
+
+
+def test_draft_whose_settings_cannot_be_displayed_is_never_offered(
+    page: Page, service: str
+) -> None:
+    # Regression: such a draft was offered, and resuming it threw.
+    curate(page, service)
+    record = json.loads(
+        page.evaluate("localStorage.getItem('treestamp.current-draft')")
+    )
+    address, _, fragment = record["address"].partition("#s=")
+    state = decode_state(fragment)
+    state["curation"]["settings"]["root"] = None
+    record["address"] = f"{address}#s={encode_state(state)}"
+    page.evaluate(
+        "value => localStorage.setItem('treestamp.current-draft', value)",
+        json.dumps(record),
+    )
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(service + "/")
+    expect(page.locator("#entry")).to_be_visible()
+    expect(page.locator("#entry-return-welcome")).to_be_hidden()
+    assert errors == []
