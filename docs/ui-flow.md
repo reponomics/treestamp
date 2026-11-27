@@ -1,6 +1,6 @@
 # Web UI flow
 
-The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor exports Markdown for the user to copy into documentation; it does not write files or commit to GitHub.
+The web editor opens repository-root treestamps directly from the landing page. Source selection is available for other folders or documents. The web editor copies Markdown or downloads/copies a standalone SVG. It does not write repository files or commit to GitHub.
 
 ## Arrivals and navigation
 
@@ -10,9 +10,9 @@ The web editor opens repository-root treestamps directly from the landing page. 
 | Return to `/` with a cached draft | Repository entry with **Resume session** |
 | Bare `/owner/repo` | Source selection for that repository |
 | Explicit session, commit, or source settings in the URL | Attempt to open the specified session or source |
-| **Try example** | Open a curated, bundled snapshot of reponomics/treestamp |
+| **Open this example** | Open a curated, bundled snapshot of reponomics/treestamp, previewed on the landing page |
 
-The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session**. **Create treestamp** opens a fresh tree at the repository root without reading a document. **Load treestamp** reads an existing treestamp from root `README.md`. **Choose another folder or file…** opens source selection. Pressing Enter in the repository input defaults to Create. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or attempts to restore the cached draft after a short return visit.
+The treestamp wordmark returns to repository entry; the editor has no separate new-source controls. Returning to the landing page preserves current work for **Resume session** with an empty repository field, and changes the address to `/`, so reloading the landing page does not reopen the session; resuming restores the session's address. **Create**, inside the repository field, opens a fresh tree at the repository root without reading a document. **Pick a file or folder…** opens source selection, where a document such as `README.md` loads its existing treestamp. Pressing Enter in the repository input defaults to Create. Progress and failures appear in place of the field's label, so the controls do not move. **Back** returns from source selection to repository entry. **Resume session** is available only on repository entry and returns to the accepted editor state or attempts to restore the cached draft after a short return visit.
 
 Root README validation happens in the load request while the landing page remains visible. A missing README, absent or malformed treestamp, or service error appears inline and retains the entered repository and previous session. All entry actions are disabled while a request is pending.
 
@@ -20,7 +20,9 @@ Browsing candidates preserves the accepted treestamp, its cached record, and its
 
 ## Editing and export views
 
-**Tree** owns editing controls, including notes, hiding, reveal-hidden, Unhide all, and Settings. Leaving Tree closes an open Settings sheet and hides its desktop sidebar section. **Markdown** previews the exported plaintext, lets the user choose its text format, and provides Copy treestamp. Returning to Tree restores editing controls without resetting curation. **Info** also hides editing Settings.
+**Tree** contains editing controls and Settings. **Export** offers Markdown source or an SVG image independently of the loaded format. Markdown uses Unicode or ASCII branches; SVG can be downloaded or copied as complete, editable source. Export starts with Markdown selected. Selecting SVG prepares its preview; leaving Export resets the view and cancels pending preparation while preserving edits.
+
+New SVG exports use **Adaptive** appearance, adapting one transparent image to light and dark color schemes. **Light** and **Dark** provide fixed overrides; loaded SVGs retain their saved appearance. One request prepares all three appearances, so switching between them is immediate. Temporary server contention keeps preparation pending for up to 30 seconds, then offers Try again. Users save the SVG in their repository and reference it from their README. Loading that file reopens its embedded treestamp for editing. See [Document format](design.md#svg-artifacts) for the metadata and regeneration contract.
 
 ## Source selection
 
@@ -30,7 +32,7 @@ Browsing does not inspect every file for treestamp markers. If a selected docume
 
 ## Returning to recent work
 
-The browser caches one accepted draft after successful opening or editing. **Resume session** is a best-effort convenience for short return visits, not a save or backup feature. Storage failures do not prevent editing, and returning later is not guaranteed to recover the draft. Users obtain their treestamp through Copy treestamp and keep it in their own document.
+The browser caches one accepted draft after successful opening or editing. **Resume session** is a best-effort convenience for short return visits, not a save or backup feature. Storage failures do not prevent editing, and returning later is not guaranteed to recover the draft. Users keep their work by copying Markdown or downloading an SVG.
 
 Repository draft restoration requires the captured server snapshot. If that snapshot is unavailable, the entry screen retains the cached draft and offers repository browsing to start fresh; it does not silently substitute another commit. Unmodified bundled examples can be restored from their included data without the server snapshot; edited examples require the captured server snapshot. Snapshot retention and cache behavior are documented in [Design](design.md#hosted-editor).
 

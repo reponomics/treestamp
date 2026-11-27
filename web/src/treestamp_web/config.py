@@ -41,6 +41,7 @@ class Config:
     cache_max_blob_bytes: int = 64 * 1024 * 1024
     rate_limit_per_minute: int = 20
     op_rate_limit_per_minute: int = 240
+    svg_export_rate_limit_per_minute: int = 30
     max_state_bytes: int = 262_144
     trust_proxy: bool = False
     client_ip_header: str = "X-Forwarded-For"
@@ -120,6 +121,7 @@ class Config:
             "cache_max_blob_bytes",
             "rate_limit_per_minute",
             "op_rate_limit_per_minute",
+            "svg_export_rate_limit_per_minute",
             "max_state_bytes",
         ):
             if getattr(self, name) < 0:

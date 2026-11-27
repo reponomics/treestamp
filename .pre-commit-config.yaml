@@ -9,15 +9,19 @@ repos:
         exclude: ^assets/TREESTAMP_BANNER\.png$
       - id: check-merge-conflict
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.7
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
+  # Ruff runs from venv so the hooks use the version locked in uv.lock.
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff (locked version)
+        entry: venv/bin/ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format (locked version)
+        entry: venv/bin/ruff format
+        language: system
+        types_or: [python, pyi]
       - id: mypy
         name: mypy (project environment)
         entry: make typecheck

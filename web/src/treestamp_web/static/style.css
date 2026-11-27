@@ -209,7 +209,6 @@ p { margin: 0; }
 .entry-selection .source-tree { flex: 1; min-height: 0; border: 0; border-radius: 0; max-height: none; }
 .entry-selection .source-browser-status { padding: var(--s3); }
 .entry-error { color: var(--error-ink); overflow-wrap: anywhere; }
-#entry-error { margin-top: var(--s4); }
 .entry-browser-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); }
 #source-progress { color: var(--ink-secondary); }
 @media (max-width: 47.999rem) {
@@ -337,7 +336,21 @@ input[type="text"], input[type="number"], select {
   min-width: 0;
   width: 100%;
 }
-input:disabled, select:disabled { background: var(--well); border-style: dashed; }
+input:disabled, select:disabled { background-color: var(--well); border-style: dashed; }
+/* Native select arrows sit flush with the border; draw the caret inside the padding instead.
+   Gradients follow the text colour in both themes and need no image source. */
+select {
+  appearance: none;
+  padding-right: calc(var(--s3) * 2 + 0.5rem);
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right calc(var(--s3) + 0.3125rem) center,
+    right var(--s3) center;
+  background-size: 0.3125rem 0.3125rem;
+  background-repeat: no-repeat;
+}
 input::placeholder { color: var(--ink-secondary); opacity: 1; }
 input[type="text"]:focus, input[type="number"]:focus, select:focus,
 button:focus-visible, summary:focus-visible, a:focus-visible, .info-sheet:focus-visible {
@@ -666,7 +679,7 @@ pre {
   left: 0.5ch;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--tree-guide-ink, var(--ink));
+  border-left: var(--tree-guide-width, 1px) solid var(--tree-guide-ink, var(--ink));
 }
 .indent.branch.last::before { bottom: 50%; }
 .indent.branch::after {
@@ -675,7 +688,7 @@ pre {
   left: 0.5ch;
   right: calc(1ch - var(--s1));
   top: 50%;
-  border-top: 1px solid var(--tree-guide-ink, var(--ink));
+  border-top: var(--tree-guide-width, 1px) solid var(--tree-guide-ink, var(--ink));
 }
 .fold {
   min-height: 0;

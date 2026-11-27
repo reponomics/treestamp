@@ -1,5 +1,6 @@
 """Document codecs and transactional boundaries with byte-level assertions."""
 
+import sys
 import tomllib
 from dataclasses import replace
 from itertools import product
@@ -28,9 +29,25 @@ START = b"<!-- treestamp:start -->"
 END = b"<!-- treestamp:end -->"
 
 
+def test_deeply_nested_metadata_is_a_document_error() -> None:
+    depth = sys.getrecursionlimit() * 2
+    metadata = b"hidden = " + b"[" * depth + b"]" * depth
+    content = (
+        START
+        + b"\n<!-- treestamp:config\n"
+        + metadata
+        + b"\n-->\n```text\n./\n```\n"
+        + END
+        + b"\n"
+    )
+    with pytest.raises(MarkerError, match="metadata is nested too deeply"):
+        parse_document(content)
+
+
 @pytest.mark.parametrize("metadata", ["", '<!-- treestamp:config\nroot = "."\n-->\n'])
 @pytest.mark.parametrize(
-    "tree", [".  # note  \n", ".\n└── file  # note  \n", ".  #    \n"]
+    "tree",
+    [".  # note  \n└── file\n", ".\n└── file  # note  \n", ".  #    \n└── file\n"],
 )
 def test_unfenced_document_preserves_final_annotation_spaces(
     tmp_path: Path, metadata: str, tree: str
@@ -51,7 +68,7 @@ def document() -> Document:
     return Document(build_tree([Entry("src/main.py"), Entry("README.md")]), Settings())
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_create_load_and_update_round_trip(
     document: Document, tmp_path: Path, style: str
 ) -> None:
@@ -83,7 +100,7 @@ def test_unicode_and_escaped_metadata_round_trip(
     assert prepare_write(loaded, path, expected=snapshot).content == snapshot.content
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_annotation_normalization_survives_document_save_and_load(
     document: Document, tmp_path: Path, style: str
 ) -> None:
@@ -277,17 +294,16 @@ def test_deep_input_fails_explicitly_before_rendering() -> None:
         parse_tree(text)
 
 
-def test_list_inline_root_is_not_mistaken_for_fence(
+def test_root_inline_backticks_are_preserved_inside_the_fence(
     document: Document, tmp_path: Path
 ) -> None:
-    tree = replace(document.tree, annotation="``literal``")
-    source = replace(document, tree=tree, settings=Settings(style="list"))
+    source = replace(document, tree=replace(document.tree, annotation="``literal``"))
     path = tmp_path / "README.md"
     write_document(source, path, create=True)
     assert load_document(path)[0] == source
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_render_region_matches_created_file_bytes(
     document: Document, tmp_path: Path, style: str
 ) -> None:
@@ -299,7 +315,7 @@ def test_render_region_matches_created_file_bytes(
     assert render_region(document).encode() == nested.content
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_region_defaults_to_blank_lines_between_blocks(
     document: Document, style: str
 ) -> None:
@@ -313,7 +329,7 @@ def test_region_defaults_to_blank_lines_between_blocks(
 
 @pytest.mark.parametrize("gaps", list(product((False, True), repeat=3)))
 @pytest.mark.parametrize("eol", ["\n", "\r\n"])
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("attribution", [False, True])
 def test_write_preserves_each_optional_blank_line(
     document: Document,
@@ -466,7 +482,12 @@ def test_render_interior_accepts_normalized_root(document: Document, root: str) 
 
 
 def test_parse_document_matches_file_based_errors(tmp_path: Path) -> None:
-    assert parse_document(START + b"\r\n.\r\n" + END + b"\r\n").tree.children == ()
+    assert (
+        parse_document(
+            START + b"\r\n```sh\r\n.\r\n```\r\n" + END + b"\r\n"
+        ).tree.children
+        == ()
+    )
     cases = [
         (b"no markers", "no treestamp marker pair"),
         (START + b"\n.\n", "missing end marker"),
@@ -513,7 +534,7 @@ def test_default_document_has_no_config_noise(document: Document) -> None:
     assert parse_document(region.encode()) == document
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("eol", ["\n", "\r\n"])
 def test_attribution_round_trip_and_removal(
     document: Document, tmp_path: Path, style: str, eol: str
@@ -525,8 +546,7 @@ def test_attribution_round_trip_and_removal(
     )
     region = render_region(source)
     assert region.endswith(f"\n\n{ATTRIBUTION}\n\n{END.decode()}\n")
-    if style != "list":
-        assert f"```\n\n{ATTRIBUTION}" in region
+    assert f"```\n\n{ATTRIBUTION}" in region
     path = tmp_path / "README.md"
     original = ("Before\n" + region + "After\n").replace("\n", eol).encode()
     path.write_bytes(original)
@@ -542,7 +562,7 @@ def test_attribution_round_trip_and_removal(
     assert load_document(path)[0] == disabled
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_attribution_in_annotation_does_not_enable_trailer(
     document: Document, style: str
 ) -> None:
@@ -580,7 +600,7 @@ def test_unrepresentable_output_preserves_the_entire_existing_document(
         [b"\xef\xbb\xbf# Intro  ", START, b"./", END, b"unrelated\xff bytes", b""]
     )
     path.write_bytes(before)
-    document = Document(build_tree([Entry("odd -> name")]))
+    document = Document(build_tree([Entry("link", "symlink", "null")]))
     with pytest.raises(MarkerError, match="cannot represent"):
         write_document(document, path)
     assert path.read_bytes() == before
@@ -594,7 +614,7 @@ def test_optional_parse_rejects_malformed_content_instead_of_treating_it_as_abse
         parse_document(START + b"\ninvalid tree\n" + END, allow_absent=True)
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_config_is_only_curation_and_minimal_special_identities(style: str) -> None:
     source = Document(
         build_tree(
@@ -615,17 +635,17 @@ def test_config_is_only_curation_and_minimal_special_identities(style: str) -> N
     assert parse_document(region.encode()) == source
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_root_only_style_and_count_inference(style: str) -> None:
     from treestamp.model import Node
 
     document = Document(Node(".", "", "dir"), Settings(style=style, show_counts=False))
     loaded = parse_document(render_region(document).encode())
-    assert loaded.settings.style == ("list" if style == "list" else "unicode")
+    assert loaded.settings.style == "unicode"
     assert loaded.settings.show_counts is True
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 def test_more_than_100_special_entries_roundtrip(style: str) -> None:
     names = [f"file{i:03d}  # suffix" for i in range(120)]
     document = Document(
@@ -642,7 +662,7 @@ def test_count_visibility_inferred_without_config() -> None:
         loaded = parse_document(render_region(Document(tree)).encode())
         assert loaded.settings.show_counts is shown
     with pytest.raises(MarkerError, match="consistent count visibility"):
-        parse_document(START + b"\n./\n- a/ (2 files)\n- b/\n" + END)
+        parse_document(START + "\n./\n└── a/ (2 files)\n└── b/\n".encode() + END)
 
 
 @pytest.mark.parametrize(
@@ -711,7 +731,7 @@ def test_legacy_special_metadata_requires_regeneration(records: str) -> None:
         parse_document(content)
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("eol", ["\n", "\r\n"])
 def test_manual_annotations_preserve_registered_row_identities(
     style: str, eol: str
@@ -753,7 +773,7 @@ def test_region_extraction_preserves_original_framing_and_endings() -> None:
         extract_region(b"ordinary document")
 
 
-@pytest.mark.parametrize("style", ["unicode", "ascii", "list"])
+@pytest.mark.parametrize("style", ["unicode", "ascii"])
 @pytest.mark.parametrize("root", [".", "src  # root"])
 def test_byte_special_paths_roundtrip_without_redundant_descendants(
     style: str, root: str
@@ -810,3 +830,15 @@ def test_same_content_compares_annotations_and_normalizes_tabs(
     spaced = replace(document, tree=replace(document.tree, annotation="two  columns"))
     assert same_content(tabbed, spaced, ".")
     assert not same_content(document, tabbed, ".")
+
+
+@pytest.mark.parametrize(
+    "body", ["./", "./  # root note", "./\n- file", "./\n- dir/\n  - file"]
+)
+@pytest.mark.parametrize("allow_absent", [False, True])
+def test_legacy_list_documents_are_rejected_explicitly(
+    body: str, allow_absent: bool
+) -> None:
+    content = START + b"\n" + body.encode() + b"\n" + END
+    with pytest.raises(MarkerError, match="list style is no longer supported"):
+        parse_document(content, allow_absent=allow_absent)

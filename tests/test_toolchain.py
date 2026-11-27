@@ -1,7 +1,9 @@
-"""The repository guard rejects uv pin drift and incomplete pin updates."""
+"""The Docker image is the only uv pin, and the guard rejects ambiguous pins."""
 
 from __future__ import annotations
 
+import os
+import random
 import subprocess
 import sys
 from pathlib import Path
@@ -10,75 +12,83 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/check_toolchain.py"
 DIGEST = "a" * 64
-IMAGE = f"FROM ghcr.io/astral-sh/uv:0.13.7@sha256:{DIGEST} AS uv\n"
 
 
-def run_check(root: Path) -> subprocess.CompletedProcess[str]:
+def version() -> str:
+    return ".".join(str(random.randrange(100)) for _ in range(3))
+
+
+def image(pin: str) -> str:
+    return f"FROM ghcr.io/astral-sh/uv:{pin}@sha256:{DIGEST} AS uv\n"
+
+
+def run_check(
+    root: Path, *args: str, output: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    # The suite itself may run in GitHub Actions, so never inherit its output file.
+    env = {key: value for key, value in os.environ.items() if key != "GITHUB_OUTPUT"}
+    if output is not None:
+        env["GITHUB_OUTPUT"] = str(output)
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--root", str(root)],
+        [sys.executable, str(SCRIPT), "--root", str(root), *args],
         capture_output=True,
         text=True,
         encoding="utf-8",
         check=False,
+        env=env,
     )
 
 
 @pytest.fixture
-def checkout(tmp_path: Path) -> Path:
-    (tmp_path / ".tool-versions").write_text("uv 0.13.7\n", encoding="utf-8")
+def pin() -> str:
+    return version()
+
+
+@pytest.fixture
+def checkout(tmp_path: Path, pin: str) -> Path:
     (tmp_path / "web").mkdir()
-    (tmp_path / "web/Dockerfile").write_text(IMAGE, encoding="utf-8")
+    (tmp_path / "web/Dockerfile").write_text(image(pin), encoding="utf-8")
     return tmp_path
 
 
-def test_matching_pins_with_comments_whitespace_and_other_tools(checkout: Path) -> None:
-    (checkout / ".tool-versions").write_bytes(
-        b"# tools\r\nnodejs 24.22.1\r\n  uv\t0.13.7  # pinned\r\n"
-    )
+def test_version_comes_from_the_image_despite_comments_and_platform(
+    checkout: Path, pin: str
+) -> None:
     (checkout / "web/Dockerfile").write_text(
-        "# FROM ghcr.io/astral-sh/uv:old AS uv\n"
-        + IMAGE.replace("FROM ", "  FROM --platform=linux/arm64 ").rstrip()
+        f"# FROM ghcr.io/astral-sh/uv:{version()} AS uv\n"
+        + image(pin).replace("FROM ", "  FROM --platform=linux/arm64 ").rstrip()
         + " # pinned\nFROM python:3.11-slim AS base\n",
         encoding="utf-8",
     )
-    result = run_check(checkout)
+    result = run_check(checkout, "--print-version")
     assert result.returncode == 0, result.stderr
-    assert "both pin 0.13.7" in result.stdout
+    assert result.stdout.strip() == pin
 
 
-@pytest.mark.parametrize("changed_file", [".tool-versions", "web/Dockerfile"])
-def test_updating_only_one_pin_fails_with_both_versions(
-    checkout: Path, changed_file: str
+def test_check_publishes_the_version_as_a_step_output(
+    checkout: Path, pin: str, tmp_path: Path
 ) -> None:
-    path = checkout / changed_file
-    path.write_text(
-        path.read_text(encoding="utf-8").replace("0.13.7", "0.13.8"), encoding="utf-8"
+    output = tmp_path / "github-output"
+    output.write_text("earlier=value\n", encoding="utf-8")
+    result = run_check(checkout, output=output)
+    assert result.returncode == 0, result.stderr
+    assert output.read_text(encoding="utf-8").splitlines() == [
+        "earlier=value",
+        f"version={pin}",
+    ]
+
+
+def test_other_tool_pins_may_remain(checkout: Path, pin: str) -> None:
+    (checkout / ".tool-versions").write_bytes(b"# tools\r\nactionlint 1.0.0\r\n")
+    result = run_check(checkout, "--print-version")
+    assert result.stdout.strip() == pin
+
+
+@pytest.mark.parametrize("entry", ["uv {pin}", "  uv\t{pin}  # pinned", "UV {pin}"])
+def test_a_second_uv_pin_is_rejected(checkout: Path, pin: str, entry: str) -> None:
+    (checkout / ".tool-versions").write_text(
+        f"actionlint 1.0.0\n{entry.format(pin=pin)}\n", encoding="utf-8"
     )
-    result = run_check(checkout)
-    assert result.returncode == 1
-    assert "uv pins differ" in result.stderr
-    assert "0.13.7" in result.stderr and "0.13.8" in result.stderr
-    assert "together" in result.stderr
-
-
-@pytest.mark.parametrize(
-    "tools",
-    [
-        "",
-        "python 3.11\n",
-        "uv\n",
-        "uv latest\n",
-        "UV 0.13.7\n",
-        "uv >=0.13.7\n",
-        "uv 0.13.7rc1\n",
-        "uv 0.13.7 0.13.8\n",
-        "uv 0.13.7\nuv latest\n",
-    ],
-)
-def test_missing_ambiguous_or_floating_tool_pin_fails(
-    checkout: Path, tools: str
-) -> None:
-    (checkout / ".tool-versions").write_text(tools, encoding="utf-8")
     result = run_check(checkout)
     assert result.returncode == 1
     assert ".tool-versions" in result.stderr
@@ -88,28 +98,28 @@ def test_missing_ambiguous_or_floating_tool_pin_fails(
     "dockerfile",
     [
         "FROM python:3.11 AS base\n",
-        IMAGE + IMAGE.replace("0.13.7", "latest"),
-        IMAGE.replace("0.13.7", "latest"),
-        IMAGE.replace("0.13.7", "0.13.8rc1"),
-        IMAGE.replace(f"@sha256:{DIGEST}", ""),
-        IMAGE.replace(DIGEST, "a" * 63),
-        IMAGE.replace(DIGEST, "g" * 64),
-        IMAGE.replace(" AS uv", " AS another_stage"),
+        image("1.2.3") + image("latest"),
+        image("latest"),
+        image("1.2.3rc1"),
+        image("1.2.3").replace(f"@sha256:{DIGEST}", ""),
+        image("1.2.3").replace(DIGEST, "a" * 63),
+        image("1.2.3").replace(DIGEST, "g" * 64),
+        image("1.2.3").replace(" AS uv", " AS another_stage"),
     ],
 )
 def test_missing_ambiguous_or_unpinned_image_fails(
     checkout: Path, dockerfile: str
 ) -> None:
     (checkout / "web/Dockerfile").write_text(dockerfile, encoding="utf-8")
-    result = run_check(checkout)
+    result = run_check(checkout, "--print-version")
     assert result.returncode == 1
+    assert result.stdout == ""
     assert "Dockerfile" in result.stderr
 
 
-@pytest.mark.parametrize("missing", [".tool-versions", "web/Dockerfile"])
-def test_missing_input_is_an_error(checkout: Path, missing: str) -> None:
-    (checkout / missing).unlink()
+def test_missing_dockerfile_is_an_error(checkout: Path) -> None:
+    (checkout / "web/Dockerfile").unlink()
     result = run_check(checkout)
     assert result.returncode == 1
-    assert Path(missing).name in result.stderr
+    assert "Dockerfile" in result.stderr
     assert "Traceback" not in result.stderr

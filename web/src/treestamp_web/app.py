@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from treestamp.errors import MarkerError
 from treestamp_web import __version__
 from treestamp_web.config import Config
+from treestamp_web.export import EXPORT_BODY_CAP, EXPORT_RESPONSE_CAP, export_svg
 from treestamp_web.github import (
     GitHubClient,
     GitHubError,
@@ -38,6 +40,7 @@ from treestamp_web.preview import (
 )
 from treestamp_web.proxy import cloudflare_identity
 from treestamp_web.routing import bind_session, replay_response
+from treestamp_web.svg_work import SvgBusyError, SvgWorkPool
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -49,7 +52,7 @@ RESERVED_PREFIXES = frozenset(("api", "static", "healthz"))
 DEFAULT_RETRY_AFTER = 60
 STATE_TOO_LARGE = (413, "state_too_large", "request body exceeds the state limit")
 SECURITY_HEADERS = {
-    "Content-Security-Policy": "default-src 'self'",
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' blob:",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-cache",
@@ -125,11 +128,13 @@ def create_app(
         client = GitHubClient(settings, transport=transport, clock=clock)
         await client.seed_budget()
         app.state.client = client
+        app.state.svg_work = SvgWorkPool()
         app.state.service = PreviewService(client, settings, clock)
         try:
             yield
         finally:
             app.state.service.close()
+            await app.state.svg_work.aclose()
             await client.aclose()
 
     app = FastAPI(
@@ -142,6 +147,9 @@ def create_app(
     app.state.config = settings
     app.state.limiter = RateLimiter(settings.rate_limit_per_minute, clock)
     app.state.op_limiter = RateLimiter(settings.op_rate_limit_per_minute, clock)
+    app.state.export_limiter = RateLimiter(
+        settings.svg_export_rate_limit_per_minute, clock
+    )
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.middleware("http")
@@ -182,6 +190,10 @@ def create_app(
             **_context(request),
         )
         return _error(status, code, str(exc), retry_after)
+
+    @app.exception_handler(SvgBusyError)
+    async def svg_busy(request: Request, exc: SvgBusyError) -> JSONResponse:
+        return _error(503, "svg_busy", str(exc), exc.retry_after)
 
     @app.exception_handler(MarkerError)
     async def marker_error(request: Request, exc: MarkerError) -> JSONResponse:
@@ -308,6 +320,8 @@ def create_app(
         )
         return JSONResponse(result.to_dict(settings.public_base_url))
 
+    app.add_api_route("/api/export/svg", svg_export, methods=["POST"])
+
     @app.post("/api/placement")
     async def placement(request: Request) -> JSONResponse:
         identity = _client_identity(request, settings)
@@ -348,6 +362,42 @@ def create_app(
         return FileResponse(STATIC / "index.html", media_type="text/html")
 
     return app
+
+
+async def svg_export(request: Request) -> JSONResponse:
+    """Convert without a repository snapshot or session affinity."""
+    settings: Config = request.app.state.config
+    wait = request.app.state.export_limiter.acquire(_client_identity(request, settings))
+    if wait is not None:
+        raise PreviewError(
+            429,
+            "rate_limited",
+            "too many exports from this client",
+            retry_after=wait,
+        )
+    try:
+        data = await _json_body(request, EXPORT_BODY_CAP, "invalid_export")
+    except PreviewError as exc:
+        if exc.status == 413:
+            raise PreviewError(
+                413, "export_too_large", "SVG export request exceeds the size limit"
+            ) from None
+        raise
+    try:
+        pool: SvgWorkPool = request.app.state.svg_work
+        return await pool.run(partial(_svg_export_response, data))
+    except MarkerError as exc:
+        raise PreviewError(422, "invalid_export", str(exc)) from None
+
+
+def _svg_export_response(data: object) -> JSONResponse:
+    """Serialize the bounded bundle on the renderer thread as part of its budget."""
+    response = JSONResponse(
+        {"variants": export_svg(data)}, headers={"Cache-Control": "no-store"}
+    )
+    if len(response.body) > EXPORT_RESPONSE_CAP:
+        raise MarkerError("SVG export response exceeds the size limit")
+    return response
 
 
 async def _routing_response(

@@ -17,11 +17,19 @@ spec.loader.exec_module(changed_tests)
 @pytest.mark.parametrize(
     ("project", "changed", "expected"),
     [
-        ("package", ["src/treestamp/codec.py"], [Path("tests/test_codec.py")]),
+        (
+            "package",
+            ["src/treestamp/codec.py"],
+            [Path("tests/test_codec.py"), Path("tests/test_codec_reserved_names.py")],
+        ),
         (
             "package",
             ["tests/test_cli.py", "src/treestamp/codec.py"],
-            [Path("tests/test_cli.py"), Path("tests/test_codec.py")],
+            [
+                Path("tests/test_cli.py"),
+                Path("tests/test_codec.py"),
+                Path("tests/test_codec_reserved_names.py"),
+            ],
         ),
         ("package", ["src/treestamp/model.py"], None),
         ("package", ["tests/conftest.py"], None),

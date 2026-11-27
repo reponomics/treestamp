@@ -120,6 +120,7 @@ def test_tui_annotation_uses_dialog_and_preserves_native_text_input(
     expect(docs).to_be_focused()
 
     page.locator(".wordmark").click()
+    page.locator("#entry-url").fill("fixture/repo")
     page.locator("#entry-browse").click()
     page.locator("#entry-change-repo").click()
     repository = page.locator("#entry-url")

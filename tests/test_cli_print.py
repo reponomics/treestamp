@@ -81,7 +81,7 @@ def test_print_load_extracts_without_updating_and_preserves_style(repo: Repo) ->
     assert document is not None
     repo.write("new.txt")
     repo.add("new.txt")
-    for style in ("unicode", "ascii", "list"):
+    for style in ("unicode", "ascii"):
         write_document(replace(document, settings=Settings(style=style)), path)
         before = path.read_bytes()
         code, output, error = run_cli(

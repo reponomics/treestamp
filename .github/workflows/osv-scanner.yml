@@ -33,15 +33,21 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version-file: .python-version
+      - name: Read the uv version pinned by the Docker image
+        id: uv
+        run: python scripts/check_toolchain.py
       - name: Set up the pinned uv version
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          version-file: .tool-versions
+          version: ${{ steps.uv.outputs.version }}
       - name: Validate the workspace lock and prepare pinned tools
+        env:
+          UV_VERSION: ${{ steps.uv.outputs.version }}
         run: |
           uv lock --check
           python - <<'PY'
           import json
+          import os
           import re
           import tomllib
           from pathlib import Path
@@ -55,10 +61,10 @@ jobs:
           print(f'Scanning {len(registry)} locked third-party package versions across platforms.')
 
           tools = {'actionlint': ('Go', 'github.com/rhysd/actionlint', 'v'), 'uv': ('PyPI', 'uv', '')}
-          pins = {}
+          pins = {'uv': os.environ['UV_VERSION']}
           for line in Path('.tool-versions').read_text().splitlines():
               fields = line.split('#', 1)[0].split()
-              if fields and fields[0] in tools:
+              if fields and fields[0] in tools.keys() - {'uv'}:
                   assert len(fields) == 2 and fields[0] not in pins, f'Invalid or duplicate tool pin: {line}'
                   pins[fields[0]] = fields[1]
           entries = []

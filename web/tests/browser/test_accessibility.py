@@ -51,7 +51,7 @@ def test_accessibility_view_tabs_leave_modified_keys_to_the_browser(
         expect(tab).to_have_attribute("aria-selected", "true")
         expect(tab).to_be_focused()
     tab.press("ArrowRight")
-    expect(page.get_by_role("tab", name="Markdown", exact=True)).to_be_focused()
+    expect(page.get_by_role("tab", name="Export", exact=True)).to_be_focused()
 
 
 def test_hiding_last_child_selects_root_and_focuses_enabled_note_action(
