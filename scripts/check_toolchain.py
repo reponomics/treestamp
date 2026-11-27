@@ -1,45 +1,49 @@
-"""Reject drift between the development/CI and Docker uv pins."""
+"""Read the uv version pinned by the Docker image, the single uv pin.
+
+Dependabot maintains the image reference, so local checks and CI read the
+version from it instead of keeping a second copy in .tool-versions.
+"""
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
 
 VERSION = r"[0-9]+\.[0-9]+\.[0-9]+"
+DOCKERFILE = "web/Dockerfile"
+IMAGE = r"FROM\s+(?:--platform=\S+\s+)?ghcr\.io/astral-sh/uv"
 
 
-def read_pin(path: Path, entry_pattern: str, pin_pattern: str, flags: int = 0) -> str:
-    """Require one entry before validating its exact version and syntax."""
+def _entries(path: Path, pattern: str) -> list[str]:
     lines = [
         line.split("#", 1)[0].strip()
         for line in path.read_text(encoding="utf-8").splitlines()
     ]
-    entries = [line for line in lines if re.match(entry_pattern, line, re.IGNORECASE)]
+    return [line for line in lines if re.match(pattern, line, re.IGNORECASE)]
+
+
+def read_version(root: Path) -> str:
+    """Require exactly one digest-pinned uv stage and no competing pin."""
+    path = root / DOCKERFILE
+    entries = _entries(path, rf"{IMAGE}\b")
     if len(entries) != 1:
-        raise ValueError(f"{path}: expected exactly one uv pin; found {len(entries)}")
-    match = re.fullmatch(pin_pattern, entries[0], flags)
-    if match is None:
-        raise ValueError(f"{path}: invalid uv pin: {entries[0]!r}")
-    return match.group(1)
-
-
-def check(root: Path) -> str:
-    development = read_pin(root / ".tool-versions", r"uv\b", rf"uv\s+({VERSION})")
-    docker = read_pin(
-        root / "web/Dockerfile",
-        r"FROM\s+(?:--platform=\S+\s+)?ghcr\.io/astral-sh/uv\b",
-        rf"FROM\s+(?:--platform=\S+\s+)?ghcr\.io/astral-sh/uv:({VERSION})"
-        r"@sha256:[0-9a-f]{64}\s+AS\s+uv",
-        flags=re.IGNORECASE,
+        raise ValueError(f"{path}: expected exactly one uv image; found {len(entries)}")
+    match = re.fullmatch(
+        rf"{IMAGE}:({VERSION})@sha256:[0-9a-f]{{64}}\s+AS\s+uv",
+        entries[0],
+        re.IGNORECASE,
     )
-    if development != docker:
+    if match is None:
+        raise ValueError(f"{path}: invalid uv image pin: {entries[0]!r}")
+    tools = root / ".tool-versions"
+    if tools.exists() and _entries(tools, r"uv\b"):
         raise ValueError(
-            f"uv pins differ: .tool-versions={development}, web/Dockerfile={docker}. "
-            "Update .tool-versions and the Docker image version/digest together."
+            f"{tools}: remove the uv entry; {DOCKERFILE} is the only uv pin"
         )
-    return development
+    return match.group(1)
 
 
 def main() -> int:
@@ -47,13 +51,23 @@ def main() -> int:
     parser.add_argument(
         "--root", type=Path, default=Path(__file__).resolve().parents[1]
     )
+    parser.add_argument(
+        "--print-version", action="store_true", help="print only the version"
+    )
     args = parser.parse_args()
     try:
-        version = check(args.root)
+        version = read_version(args.root)
     except (OSError, ValueError) as exc:
         print(f"FAIL uv toolchain: {exc}", file=sys.stderr)
         return 1
-    print(f"PASS uv toolchain: .tool-versions and web/Dockerfile both pin {version}")
+    if args.print_version:
+        print(version)
+        return 0
+    # In GitHub Actions, expose the version to setup-uv as steps.<id>.outputs.version.
+    if output := os.environ.get("GITHUB_OUTPUT"):
+        with open(output, "a", encoding="utf-8") as stream:
+            stream.write(f"version={version}\n")
+    print(f"PASS uv toolchain: {DOCKERFILE} pins {version}")
     return 0
 
 
