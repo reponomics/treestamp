@@ -236,7 +236,7 @@ hidden = [
 ```sh
 ./
 ├── .github/  # GitHub Actions workflows and community docs
-│   └── workflows/ (10 files)
+│   └── workflows/ (11 files)
 ├── assets/ (2 files, 1 folder)
 ├── docs/  # Project documentation
 │   ├── adr/ (9 files)
@@ -266,7 +266,7 @@ The alternate styles below are generated from the same tree and checked for fres
 ```sh
 ./
 |-- .github/  # GitHub Actions workflows and community docs
-|   `-- workflows/ (10 files)
+|   `-- workflows/ (11 files)
 |-- assets/ (2 files, 1 folder)
 |-- docs/  # Project documentation
 |   |-- adr/ (9 files)

@@ -38,7 +38,11 @@ Expected results come from the generated model or from an independent oracle, no
 
 Each property directory's `conftest.py` registers two profiles derived from Hypothesis's default: `ordinary` (100 examples per property, used by ordinary runs) and `extended` (1,000 examples). Both disable per-example deadlines and use a fresh random seed; the explicit profile overrides the derandomized profile Hypothesis selects automatically under CI. `make test-properties` runs only the property suites, and `make test-properties-extended` runs them with the extended budget.
 
-A failure prints the minimized example and a `@reproduce_failure` decorator. Hypothesis also replays recent failures from its local `.hypothesis/` database, which is not committed and which CI does not rely on. For confirmed defects, retain a focused regression for the intended behavior in the relevant suite; a minimized counterexample alone does not decide product policy.
+Once present on the default branch, the [Extended Hypothesis tests workflow](../.github/workflows/properties.yml) runs the extended suites daily at 07:23 UTC and is available through **Actions → Extended Hypothesis tests → Run workflow**, selecting the desired branch. GitHub may delay scheduled runs. Ordinary properties remain part of normal PR checks. Daily runs explore additional generated combinations without requiring periodic runs on a maintainer's machine.
+
+The extended job uses read-only repository permissions, no production credentials, and a ten-minute timeout. Dependency installation accesses package sources; the property tests operate on synthetic inputs inside the runner and do not contact the deployed editor, GitHub APIs, or external test repositories. No Hypothesis database is retained between workflow runs.
+
+A failure prints the minimized example and a `@reproduce_failure` decorator. The maintainer or contributor investigating a failed run uses that information with the tested revision and locked dependencies. Hypothesis also replays recent failures from its local `.hypothesis/` database, which is not committed and which CI does not rely on. For confirmed defects, retain a focused regression for the intended behavior in the relevant suite; a minimized counterexample alone does not decide product policy.
 
 ## Coverage policy
 
