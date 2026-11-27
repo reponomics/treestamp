@@ -37,7 +37,6 @@ def _json(floats: st.SearchStrategy[float]) -> st.SearchStrategy[object]:
 
 
 lenient_json_values = _json(st.floats())
-strict_json_values = _json(st.floats(allow_nan=False, allow_infinity=False))
 
 
 def pointers(

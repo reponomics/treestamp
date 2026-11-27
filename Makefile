@@ -87,9 +87,9 @@ typecheck: ## Check strict Python types
 test: ## Run the regression suite, including headless TUI journeys
 	$(PY) -m pytest
 .PHONY: test-properties test-properties-extended
-test-properties: ## Run only the generated (Hypothesis) tests, core and hosted; needs Node 24
-	$(PY) -m pytest tests/test_properties_*.py
-	cd web && $(WEB_VENV)/bin/python -m pytest tests/test_properties_*.py
+test-properties: ## Run only the generated (Hypothesis) tests, core and hosted
+	$(PY) -m pytest tests/properties
+	cd web && $(WEB_VENV)/bin/python -m pytest tests/properties
 test-properties-extended: ## Run the generated tests with the extended example budget
 	$(MAKE) test-properties HYPOTHESIS_PROFILE=extended
 cov: ## Measure core Python statement and branch coverage (95% minimum)

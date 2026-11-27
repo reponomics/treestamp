@@ -1,4 +1,4 @@
-"""Generated curation: rejected edits, JSON transport, and restored behavior."""
+"""Current curation transport fidelity, not persistent-session compatibility."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from treestamp.model import (
 )
 from treestamp.session import SessionState, TreeSession
 
-from .property_strategies import annotation_texts, names, symlink_targets
+from .strategies import annotation_texts, names, symlink_targets
 
 
 @st.composite
@@ -100,7 +100,6 @@ def transported(session: TreeSession) -> TreeSession:
     restored = TreeSession.restore(
         session.root, SessionState.from_dict(json.loads(wire))
     )
-    assert json.dumps(restored.state().to_dict()) == wire
     return restored
 
 

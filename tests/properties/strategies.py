@@ -126,7 +126,10 @@ def _printed_spacing(text: str) -> str:
 def is_unrepresentable_row(
     name: str, kind: str, target: str | None, annotation: str
 ) -> bool:
-    """Rows split at the first delimiter and symlinks at the first arrow.
+    """Describe current printed-format limitations, not permanent exclusions.
+
+    Update this independent oracle and its examples when the format expands.
+    Rows split at the first delimiter and symlinks at the first arrow.
 
     Registered special names are consumed before either split.
     """

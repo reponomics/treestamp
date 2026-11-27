@@ -31,7 +31,7 @@ from treestamp.model import (
     repo_path,
 )
 
-from .property_strategies import (
+from .strategies import (
     annotation_texts,
     is_unrepresentable_row,
     names,
@@ -409,7 +409,7 @@ def test_unsupported_entries_are_rejected_as_document_errors(
         ("x ->", KIND_FILE, None, "note", True),
     ],
 )
-def test_documented_representability_cases(
+def test_current_representability_oracle_examples(
     name: str, kind: str, target: str | None, annotation: str, representable: bool
 ) -> None:
     assert is_unrepresentable_row(name, kind, target, annotation) is not representable

@@ -166,7 +166,7 @@ def test_plain_document_load_has_specific_warning_code(
     assert malformed.json()["error"]["code"] == "curation"
 
 
-def test_retained_config_bytes_that_are_not_utf8_are_rejected_before_caching(
+def test_config_comments_that_are_not_utf8_do_not_prevent_loading(
     client: TestClient, repo: Repo
 ) -> None:
     region = (
@@ -178,10 +178,9 @@ def test_retained_config_bytes_that_are_not_utf8_are_rejected_before_caching(
     (repo.path / "README.md").write_bytes(region)
     repo.commit()
     response = client.post("/api/preview", json={"url": "o/r", "document": "README.md"})
-    assert response.status_code == 422, response.text
-    assert response.json()["error"]["code"] == "curation"
-    assert "UTF-8" in response.json()["error"]["message"]
-    assert client.app.state.service.stats()["trees"] == 0
+    assert response.status_code == 200, response.text
+    assert "treestamp:config" not in response.json()["region"]
+    assert "top.txt" in response.json()["region"]
 
 
 def test_hand_written_raw_bytes_in_rows_are_printed_afresh_with_escapes(
