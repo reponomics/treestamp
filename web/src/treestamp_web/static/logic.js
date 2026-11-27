@@ -147,6 +147,11 @@ export function capturedSession(saved) {
   return Boolean(source && validPath(source.root) && validPath(source.document) && validSettings(saved.curation?.settings));
 }
 
+// The form values startup shows for a captured session, or null if it cannot be shown.
+export function capturedValues(saved) {
+  return capturedSession(saved) ? valuesFromSettings(saved.curation.settings) : null;
+}
+
 function validRow(row) {
   return row && validPath(row.path) && typeof row.name === "string"
     && ["dir", "file", "symlink", "gitlink"].includes(row.kind)

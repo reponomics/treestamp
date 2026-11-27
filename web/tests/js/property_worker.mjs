@@ -3,8 +3,8 @@
 // Not a *.test.mjs file, so `node --test` does not collect it.
 import { createInterface } from "node:readline";
 import {
-  capturedSession, decodeState, displayPath, encodeState, parseRoute, pathKey,
-  preparePreview, valuesFromQuery, valuesFromSettings,
+  capturedValues, decodeState, displayPath, encodeState, parseRoute, pathKey,
+  preparePreview, valuesFromQuery,
 } from "../../src/treestamp_web/static/logic.js";
 import { draftForLocation, readDraft, saveDraft } from "../../src/treestamp_web/static/draft.js";
 import { EXAMPLES } from "../../src/treestamp_web/static/example.js";
@@ -14,14 +14,11 @@ function memoryStorage(value = null) {
   return { getItem: key => entries.get(key) ?? null, setItem: (key, item) => entries.set(key, item) };
 }
 
-// What the page reads from an accepted captured session before the service sees it.
+// The page's own startup conversion, plus display of the source paths it later shows.
 function display(saved) {
-  if (!capturedSession(saved)) return null;
-  return {
-    values: valuesFromSettings(saved.curation.settings),
-    root: displayPath(saved.source.root),
-    document: displayPath(saved.source.document),
-  };
+  const values = capturedValues(saved);
+  if (!values) return null;
+  return { values, root: displayPath(saved.source.root), document: displayPath(saved.source.document) };
 }
 
 const CALLS = {
@@ -31,7 +28,7 @@ const CALLS = {
   valuesFromQuery: query => valuesFromQuery(new URLSearchParams(query)),
   pathKey: value => pathKey(value),
   displayPath: value => displayPath(value),
-  // The fragment journey: a link's saved state, as startup reads it.
+  // The fragment journey: a link's saved state, as boot() in app.js reads it.
   startup: (pathname, hash) => {
     const route = parseRoute(pathname, hash);
     return { route: route !== null, shown: route?.saved && route.sha ? display(route.saved) : null };

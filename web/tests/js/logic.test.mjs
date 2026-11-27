@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  MAX_STATE_DEPTH, addressFor, capturedSession, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
+  MAX_STATE_DEPTH, addressFor, capturedSession, capturedValues, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -332,7 +332,9 @@ test("captured sessions need displayable source paths and settings", async () =>
     const saved = structuredClone(state);
     saved.curation.settings.root = root;
     assert.equal(capturedSession(saved), false, JSON.stringify(root));
+    assert.equal(capturedValues(saved), null, JSON.stringify(root));
   }
+  assert.deepEqual(capturedValues(state), valuesFromSettings(state.curation.settings));
 });
 
 test("preview byte paths retain identity while rows receive DOM keys", async () => {
