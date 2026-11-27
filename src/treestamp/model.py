@@ -135,9 +135,14 @@ def validate_path(path: str) -> None:
     if path.count("/") >= MAX_DEPTH:
         raise MarkerError(f"path exceeds the {MAX_DEPTH}-level depth limit")
     try:
-        path.encode("utf-8", "surrogateescape")
+        encoded = path.encode("utf-8", "surrogateescape")
     except UnicodeEncodeError as exc:
         raise MarkerError(f"invalid path encoding: {path!r}") from exc
+    canonical = encoded.decode("utf-8", "surrogateescape")
+    if canonical != path:
+        raise MarkerError(
+            f"invalid path encoding: escaped bytes spell UTF-8 text; use {canonical!r}"
+        )
 
 
 def validate_paths(paths: Iterable[str]) -> None:

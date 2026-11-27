@@ -7,6 +7,12 @@ Treestamp produces a curated directory tree of a Git repository and maintains it
 
 This document describes system boundaries, data flow, and interface contracts. The [CLI reference](cli-reference.md) describes terminal usage, [UI flow](ui-flow.md) describes browser interactions, and [UI patterns](ui-patterns.md) defines shared web controls. The [security assessment](security-assessment.md) builds on the boundaries described here.
 
+## Product and editor boundaries
+
+Treestamp's primary workflow is maintaining repository documentation for storage and rendering on GitHub. The local and hosted editors share document semantics: path identities, annotations, curation, and supported formatting. Given equivalent source snapshots and supported inputs, documents produced by either editor must remain usable by the other without losing those semantics. An editor's display capabilities do not define document validity; for example, SVG processing uses embedded document metadata independently of displaying the drawing.
+
+The local interface acquires the staged index and can write files; the hosted interface acquires public GitHub content and provides exports. Acquisition and resource limits belong to those interfaces and can prevent an operation, but do not redefine the shared format. Neither interface may reject an otherwise valid document solely because preserved configuration text cannot be displayed or serialized directly; shared preparation handles the normalization described below. Checkout filters that change document bytes and GitHub API representation limits remain acquisition concerns, not evidence that different document semantics are supported.
+
 ## Actors
 
 | Actor | Description |
@@ -91,7 +97,7 @@ In production, the service authenticates to GitHub as a GitHub App, using the Ap
 
 Hosted change detection compares decoded document semantics for both source formats. Editing, reconciliation, and Discard operate independently of export rendering; source appearance initializes export preferences.
 
-The browser's **Resume session** action is an ephemeral convenience for brief return visits, with no recovery guarantee. State-bearing URLs and local records do not constitute durable saved sessions. See [Web UI flow](ui-flow.md#returning-to-recent-work). Exported document formats are independent of this convenience.
+The browser's **Resume session** action is an ephemeral convenience for brief return visits, with no recovery guarantee. State-bearing URLs and local records do not constitute durable saved sessions or a supported session-sharing workflow. Cache layout, retention, and reacquisition rules are implementation details, not public persistence promises. Requests must preserve the validated source identity and must not silently substitute another commit when source data is unavailable. See [Web UI flow](ui-flow.md#returning-to-recent-work). Exported document formats are independent of this convenience.
 
 ## Build and release
 
@@ -111,9 +117,9 @@ The [README](../README.md#3-add-it-to-your-readme) shows a complete region and d
 
 The optional config comment holds TOML with three keys, each generated only when needed: `root`, the repository-relative subtree the tree displays (default `.`); `hidden`, the repository-relative paths of hidden entries; and `special_paths`, records pairing a printed row number with the full path of an entry whose own name contains reserved annotation or symlink syntax, or ends in the Git-link marker. Equivalent authored configuration may include explicit defaults. Other keys are rejected. Annotations follow a fixed `  # ` delimiter.
 
-New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged, regardless of wrapping, comments, or quoting. Changed configuration is regenerated, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. Individual entries are never split; the target is not a validation limit.
+New regions have one blank line after the start marker, between configuration and tree, and before the end marker. Existing regions retain zero or one blank line independently at each applicable boundary. Configuration text is retained while its validated TOML values are unchanged and its text is UTF-8, regardless of wrapping, comments, or quoting. Changed configuration, or configuration whose retained text contains non-UTF-8 bytes, is regenerated from validated values, dropping its comments, with short arrays inline and longer arrays compactly wrapped at an 80-character target. This shared normalization keeps configuration semantics and surrounding Markdown bytes intact, and applies to both editors. Individual entries are never split; the target is not a validation limit.
 
-`prepare_content` applies these preservation rules before the complete byte comparison used by local `check` and terminal-editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference. [ADR 0002](adr/0002-formatter-compatible-documents.md) records the formatting rationale and alternatives.
+`prepare_content` applies these preservation rules before the complete byte comparison used by local `check` and terminal-editor dirty-state detection. It does not ignore arbitrary tree whitespace or bypass schema and identity validation. Loaded exports and existing-file writes preserve the document's LF or CRLF convention; new documents use LF. Both editors use the same preparation path for loaded exports; the terminal editor writes back only to the loaded document. Session state carries no separate formatting preference.
 
 The optional attribution footer is disabled by default. When present, the exact line `Maintained with [treestamp](https://github.com/reponomics/treestamp)` follows the closing code fence, separated by a blank line, before the end marker. The parser infers the attribution setting from this line, so it survives loading and maintenance without an additional config key. Session state carries the boolean `attribution` setting; older states that omit it default to false.
 

@@ -246,13 +246,16 @@ def refuse_export(route: Route) -> None:
     route.fulfill(response=response, json=body)
 
 
-@pytest.mark.parametrize("malformed", ["output", "settings", "rows"])
+@pytest.mark.parametrize(
+    "malformed", ["output", "settings", "rows", "repository_link", "permalink"]
+)
 def test_invalid_candidate_keeps_the_accepted_draft(
     page: Page, service: str, malformed: str
 ) -> None:
     open_editor(page, service)
     original_region = page.locator("#region").text_content()
     original_address = page.url
+    original_repository_link = page.locator("#visit-repo").get_attribute("href")
 
     def invalid_candidate(route: Route) -> None:
         response = route.fetch()
@@ -261,8 +264,12 @@ def test_invalid_candidate_keeps_the_accepted_draft(
             body["region"] = None
         elif malformed == "settings":
             body["state"]["curation"]["settings"] = None
-        else:
+        elif malformed == "rows":
             body["rows"][0]["path"] = None
+        elif malformed == "repository_link":
+            body["repository"]["url"] = "javascript:window.__unexpected_link=1"
+        else:
+            body["permalink"] = "//unexpected.invalid/path"
         route.fulfill(response=response, json=body)
 
     page.route("**/api/preview*", invalid_candidate)
@@ -271,6 +278,7 @@ def test_invalid_candidate_keeps_the_accepted_draft(
     expect(page.locator("#reload-error")).to_contain_text("previous tree is unchanged")
     expect(page.locator("#rows .row")).to_have_count(9)
     expect(page.locator("#region")).to_have_text(original_region)
+    assert page.locator("#visit-repo").get_attribute("href") == original_repository_link
     assert page.url == urljoin(original_address, "/")
     page.locator("#entry-change-repo").click()
     page.locator("#entry-return-welcome").click()

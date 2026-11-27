@@ -166,6 +166,47 @@ def test_plain_document_load_has_specific_warning_code(
     assert malformed.json()["error"]["code"] == "curation"
 
 
+def test_config_comments_that_are_not_utf8_do_not_prevent_loading(
+    client: TestClient, repo: Repo
+) -> None:
+    region = (
+        b"<!-- treestamp:start -->\n<!-- treestamp:config\n# note \x80\n-->\n\n"
+        b"```sh\n./\n\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 top.txt\n```\n"
+        b"<!-- treestamp:end -->\n"
+    )
+    repo.write("top.txt")
+    (repo.path / "README.md").write_bytes(region)
+    repo.commit()
+    response = client.post("/api/preview", json={"url": "o/r", "document": "README.md"})
+    assert response.status_code == 200, response.text
+    assert "treestamp:config" not in response.json()["region"]
+    assert "top.txt" in response.json()["region"]
+
+
+def test_hand_written_raw_bytes_in_rows_are_printed_afresh_with_escapes(
+    client: TestClient, repo: Repo
+) -> None:
+    region = (
+        b"<!-- treestamp:start -->\n```sh\n./\n"
+        b"\xe2\x94\x94\xe2\x94\x80\xe2\x94\x80 byte\xff.txt\n```\n"
+        b"<!-- treestamp:end -->\n"
+    )
+    (repo.path / "README.md").write_bytes(region)
+    oid = repo.git("hash-object", "-w", "--stdin", input_bytes=b"x").strip()
+    repo.git(
+        "update-index",
+        "-z",
+        "--add",
+        "--index-info",
+        input_bytes=f"100644 {oid}\t".encode() + b"byte\xff.txt\0",
+    )
+    repo.git("add", "README.md")
+    repo.commit(stage=False)
+    response = client.post("/api/preview", json={"url": "o/r", "document": "README.md"})
+    assert response.status_code == 200, response.text
+    assert "byte\\xff.txt" in response.json()["region"]
+
+
 @pytest.mark.parametrize("content", [b"image\x00bytes", b"not UTF-8\xff"])
 def test_plain_binary_file_is_not_a_treestamp_document(
     client: TestClient, repo: Repo, content: bytes

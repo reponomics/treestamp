@@ -384,7 +384,7 @@ def _settings_text(document: Document, registered: dict[int, str]) -> str:
 
 
 def _config_text(payload: str, previous: bytes | None) -> str:
-    """Retain equivalent TOML verbatim; changed config uses generated formatting."""
+    """Retain equivalent UTF-8 TOML; otherwise generate portable configuration."""
     generated = f"{CONFIG_START}\n{payload}-->" if payload else ""
     if previous is None:
         return generated
@@ -395,9 +395,11 @@ def _config_text(payload: str, previous: bytes | None) -> str:
     try:
         old_payload, _ = _split_metadata(text)
         if _metadata(old_payload) == _metadata(payload):
-            return text.partition("\n-->")[0] + "\n-->"
-    except MarkerError:
-        # Writing into another document may discard invalid destination config.
+            retained = text.partition("\n-->")[0] + "\n-->"
+            retained.encode("utf-8")
+            return retained
+    except (MarkerError, UnicodeEncodeError):
+        # Regenerate invalid destination config or non-UTF-8 retained comments.
         pass
     return generated
 

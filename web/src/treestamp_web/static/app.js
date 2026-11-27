@@ -10,6 +10,7 @@ import { saveDraft, draftForLocation } from "./draft.js";
 import {
   DEFAULT_DOCUMENT,
   addressFor,
+  capturedValues,
   displayPath,
   pathKey,
   hintFor,
@@ -843,9 +844,10 @@ async function resumeSession() {
   const example = exampleAt(pendingDraft.address);
   if (example) { loadExample(example[0]); return; }
   const { owner, repo, sha, saved } = parseRoute(address.pathname, address.hash);
+  const values = capturedValues(saved);
   editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };
   fields.url.value = `${owner}/${repo}`;
-  setValues(valuesFromSettings(saved.curation.settings));
+  setValues(values);
   entryFlow.clearError();
   entryFlow.setBusy(true);
   try {
@@ -1058,12 +1060,13 @@ function exampleAt(address) {
     return preview(params);
   };
   if (saved) {
-    if (!sha || !saved.source || !saved.curation?.settings) {
+    const values = sha ? capturedValues(saved) : null;
+    if (!values) {
       showError("This link does not contain a valid captured editing session.", "Open the repository to create a new treestamp.", null);
       return;
     }
     editor = { owner, repo, ref: sha, root: saved.source.root, document: saved.source.document, state: saved, rows: [], loaded: false };
-    setValues(valuesFromSettings(saved.curation.settings));
+    setValues(values);
     operate("restore");
     return;
   }

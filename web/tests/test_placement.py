@@ -370,3 +370,43 @@ def test_placement_conflict_response_carries_its_question(repo: Repo) -> None:
     error = response.json()["error"]
     assert response.status_code == 409 and error["code"] == "placement_conflict"
     assert error["question"] == error["message"]
+
+
+def test_conflict_question_on_a_byte_path_is_a_conflict_not_server_error(
+    repo: Repo,
+) -> None:
+    tree = tree_from_records([TreeRecord("before.txt", "100644", "blob", "a" * 40)])
+    session = TreeSession(tree, Settings())
+    session.set_annotation("before.txt", "Moved note")
+    repo.write("README.md", render_region(Document(session.printed_tree(), Settings())))
+    repo.commit("original document")
+    oid = repo.git("hash-object", "-w", "--stdin", input_bytes=b"raw").strip()
+    repo.git(
+        "update-index",
+        "-z",
+        "--index-info",
+        input_bytes=b"100644 " + oid.encode() + b"\tafter\xfe\0",
+    )
+    repo.commit("byte destination", stage=False)
+    app = create_app(
+        make_config(), transport=transport_for(FakeGitHub(LocalRepository(repo.path)))
+    )
+    with TestClient(app) as client:
+        opened = client.get("/api/preview", params={"url": "o/r"}).json()
+        destination = {"git_bytes": b"after\xfe".hex()}
+        opened["state"]["curation"]["annotations"].append(
+            {"path": destination, "text": "Existing"}
+        )
+        response = client.post(
+            "/api/placement",
+            json={
+                "owner": "o",
+                "repo": "r",
+                "ref": opened["ref"]["commit"],
+                "state": opened["state"],
+                "decisions": [{"type": "place", "path": destination}],
+            },
+        )
+    assert response.status_code == 409, response.text
+    error = response.json()["error"]
+    assert "after\\udcfe" in error["question"] and error["question"] == error["message"]
