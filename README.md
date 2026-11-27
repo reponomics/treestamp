@@ -244,12 +244,12 @@ hidden = [
 ├── scripts/ (10 files, 1 folder)  # Installed-package acceptance
 ├── src/
 │   └── treestamp/ (25 files)  # Shared model and terminal editor
-├── tests/ (39 files)  # Contract and integration tests
+├── tests/ (42 files)  # Contract and integration tests
 ├── web/  # Hosted editor: a FastAPI adapter over the same package
 │   ├── scripts/ (4 files)
 │   ├── src/
 │   │   └── treestamp_web/ (15 files, 2 folders)
-│   └── tests/ (22 files, 2 folders)
+│   └── tests/ (25 files, 2 folders)
 └── README.md
 ```
 
@@ -273,12 +273,12 @@ The alternate styles below are generated from the same tree and checked for fres
 |-- scripts/ (10 files, 1 folder)  # Installed-package acceptance
 |-- src/
 |   `-- treestamp/ (25 files)  # Shared model and terminal editor
-|-- tests/ (39 files)  # Contract and integration tests
+|-- tests/ (42 files)  # Contract and integration tests
 |-- web/  # Hosted editor: a FastAPI adapter over the same package
 |   |-- scripts/ (4 files)
 |   |-- src/
 |   |   `-- treestamp_web/ (15 files, 2 folders)
-|   `-- tests/ (22 files, 2 folders)
+|   `-- tests/ (25 files, 2 folders)
 `-- README.md
 ```
 
