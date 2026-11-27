@@ -11,13 +11,18 @@ function memoryStorage() {
   };
 }
 
-function address(owner = "pallets", repo = "flask", root = ".") {
-  const commit = "a".repeat(40);
-  const state = {
-    source: { owner, repo, commit, root, document: "" },
-    curation: { settings: { root }, annotations: [{ path: "", text: "Remember this ✓" }] },
+function capturedState(owner = "pallets", repo = "flask", root = ".") {
+  return {
+    source: { owner, repo, commit: "a".repeat(40), root, document: "" },
+    curation: {
+      settings: { root, style: "unicode", show_counts: true, attribution: false },
+      annotations: [{ path: "", text: "Remember this ✓" }],
+    },
   };
-  return `/${owner}/${repo}@${commit}?root=${encodeURIComponent(root)}&document=#s=${encodeState(state)}`;
+}
+
+function address(owner = "pallets", repo = "flask", root = ".", state = capturedState(owner, repo, root)) {
+  return `/${owner}/${repo}@${"a".repeat(40)}?root=${encodeURIComponent(root)}&document=#s=${encodeState(state)}`;
 }
 
 const landing = { pathname: "/", search: "", hash: "" };
@@ -82,6 +87,30 @@ test("saved addresses must be local captured sessions with matching source ident
   for (const candidate of bad) {
     assert.equal(saveDraft(candidate, storage), false, candidate);
     assert.equal(readDraft(storage).address, valid, "rejected input preserves the accepted record");
+  }
+});
+
+test("drafts whose settings or source paths cannot be displayed are never offered", () => {
+  // The browser would throw converting these for display before the service saw them.
+  const storage = memoryStorage();
+  const variants = [
+    state => { state.curation.settings.root = null; },
+    state => { delete state.curation.settings.root; },
+    state => { state.curation.settings.root = { git_bytes: 7 }; },
+    state => { state.curation.settings.root = { git_bytes: "zz" }; },
+    state => { state.curation.settings = []; },
+    state => { state.curation.settings.style = "list"; },
+    state => { state.curation.settings.show_counts = "yes"; },
+    state => { state.source.root = null; },
+    state => { state.source.document = {}; },
+  ];
+  for (const change of variants) {
+    const state = capturedState();
+    change(state);
+    const record = { version: 1, address: address("pallets", "flask", ".", state), savedAt: 10 };
+    storage.setItem(DRAFT_KEY, JSON.stringify(record));
+    assert.equal(readDraft(storage), null, String(change));
+    assert.equal(draftForLocation(landing, storage), null, String(change));
   }
 });
 

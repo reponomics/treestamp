@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addressFor, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
+  addressFor, capturedSession, decodeState, encodeState, entryErrorText, hintFor, pathKey, displayPath,
   opBody, parseRoute, previewParams, preparePreview, regionSegments,
   rowName, rowSuffix, settingsFromValues, sourceSelection, treeNavigation, valuesFromQuery, valuesFromSettings,
 } from "../../src/treestamp_web/static/logic.js";
@@ -278,6 +278,45 @@ test("incomplete preview responses cannot replace the accepted draft", async () 
     const result = invalidate(data);
     const candidate = result === null ? null : data;
     assert.throws(() => preparePreview(candidate, "https://example.org"), /previous tree is unchanged/);
+  }
+});
+
+test("synthetic responses cannot point the repository link or history elsewhere", async () => {
+  // Synthetic: the service builds both from validated identifiers, so these
+  // responses are forged inputs, not demonstrated reachable server behavior.
+  const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
+  const original = Object.values(EXAMPLES)[0];
+  const forgeries = [
+    data => { data.repository.url = "javascript:alert(1)"; },
+    data => { data.repository.url = "https://github.com.example/x"; },
+    data => { data.repository.url = `https://github.com/${data.repository.owner}/other`; },
+    data => { data.permalink = `https://elsewhere.example//evil.example/${data.repository.owner}`; },
+    data => { data.permalink = "//evil.example/path"; },
+    data => { data.permalink = "javascript:alert(1)"; },
+    data => { data.permalink = "http://["; },
+    data => { data.permalink = `/${data.repository.owner}/other@${data.ref.commit}`; },
+  ];
+  for (const forge of forgeries) {
+    const data = structuredClone(original);
+    forge(data);
+    assert.throws(() => preparePreview(data, "https://example.org"), (error) => error.constructor === Error && /previous tree is unchanged/.test(error.message), String(forge));
+  }
+  const absolute = structuredClone(original);
+  absolute.permalink = `https://treestamp.reponomics.org${original.permalink}`;
+  assert.ok(preparePreview(absolute, "https://preview.example").address.startsWith(original.permalink));
+});
+
+test("captured sessions need displayable source paths and settings", async () => {
+  const { EXAMPLES } = await import("../../src/treestamp_web/static/example.js");
+  const state = Object.values(EXAMPLES)[0].state;
+  assert.equal(capturedSession(state), true);
+  for (const value of [null, {}, [], "x", { source: {} }, { source: state.source, curation: {} }]) {
+    assert.equal(capturedSession(value), false);
+  }
+  for (const root of [null, undefined, 1, {}, { git_bytes: 7 }, { git_bytes: "f" }]) {
+    const saved = structuredClone(state);
+    saved.curation.settings.root = root;
+    assert.equal(capturedSession(saved), false, JSON.stringify(root));
   }
 });
 

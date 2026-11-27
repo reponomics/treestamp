@@ -10,6 +10,7 @@ import { saveDraft, draftForLocation } from "./draft.js";
 import {
   DEFAULT_DOCUMENT,
   addressFor,
+  capturedSession,
   displayPath,
   pathKey,
   hintFor,
@@ -1058,7 +1059,7 @@ function exampleAt(address) {
     return preview(params);
   };
   if (saved) {
-    if (!sha || !saved.source || !saved.curation?.settings) {
+    if (!sha || !capturedSession(saved)) {
       showError("This link does not contain a valid captured editing session.", "Open the repository to create a new treestamp.", null);
       return;
     }

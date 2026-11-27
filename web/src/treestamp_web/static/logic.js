@@ -120,6 +120,18 @@ function validPath(value) {
   return typeof value === "string" || Boolean(value && typeof value.git_bytes === "string" && /^(?:[0-9a-f]{2})+$/.test(value.git_bytes));
 }
 
+function validSettings(settings) {
+  return Boolean(settings) && ["unicode", "ascii"].includes(settings.style) && typeof settings.show_counts === "boolean"
+    && (settings.attribution === undefined || typeof settings.attribution === "boolean") && validPath(settings.root);
+}
+
+// A captured session from a link or a saved draft, before any of it is displayed
+// or adopted. The service validates the rest when the session is restored.
+export function capturedSession(saved) {
+  const source = saved?.source;
+  return Boolean(source && validPath(source.root) && validPath(source.document) && validSettings(saved.curation?.settings));
+}
+
 function validRow(row) {
   return row && validPath(row.path) && typeof row.name === "string"
     && ["dir", "file", "symlink", "gitlink"].includes(row.kind)
@@ -134,20 +146,32 @@ function validatePreviewOutput(data) {
 
 function validatePreviewSettings(data) {
   const paths = data?.state?.curation;
-  const settings = paths?.settings;
-  if (!settings || !["unicode", "ascii"].includes(settings.style) || typeof settings.show_counts !== "boolean"
-      || (settings.attribution !== undefined && typeof settings.attribution !== "boolean")
-      || !validPath(settings.root) || !validPath(data.root) || !validPath(data.document)
+  if (!validSettings(paths?.settings) || !validPath(data.root) || !validPath(data.document)
       || ![paths.expanded, paths.hidden, paths.annotations].every(Array.isArray)) {
     throw new Error("The replacement tree has invalid editing settings. Your previous tree is unchanged.");
   }
 }
 
+const INCOMPLETE = "The replacement tree is incomplete. Your previous tree is unchanged.";
+
 function validatePreviewSource(data) {
   if (!data.repository || ![data.repository.owner, data.repository.name, data.repository.url, data.ref?.commit, data.permalink].every(value => typeof value === "string")
       || !Array.isArray(data.rows) || !data.rows.length || !data.rows.every(validRow)) {
-    throw new Error("The replacement tree is incomplete. Your previous tree is unchanged.");
+    throw new Error(INCOMPLETE);
   }
+}
+
+// The repository link and the history address are derived from the response's
+// own identity, so a malformed response cannot point either somewhere else.
+// The permalink's origin is ignored: a public base URL makes it absolute.
+function sessionAddress(data, origin) {
+  const { owner, name, url } = data.repository;
+  let target;
+  try { target = new URL(data.permalink, origin); } catch (_) { throw new Error(INCOMPLETE); }
+  if (url !== `https://github.com/${owner}/${name}` || target.pathname !== `/${owner}/${name}@${data.ref.commit}`) {
+    throw new Error(INCOMPLETE);
+  }
+  return addressFor(data.permalink, data.state, origin);
 }
 
 export function preparePreview(data, origin) {
@@ -156,7 +180,7 @@ export function preparePreview(data, origin) {
   validatePreviewSource(data);
   return {
     rows: data.rows.map(row => ({ ...row, identity: row.path, path: pathKey(row.path) })),
-    address: addressFor(data.permalink, data.state, origin),
+    address: sessionAddress(data, origin),
   };
 }
 
