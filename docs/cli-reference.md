@@ -102,7 +102,7 @@ Both commands read an existing, valid treestamp from disk and compare it with th
 
 `update` retains notes at matching paths with the same entry kind; it does not infer renames. If any notes would be omitted, it exits nonzero without writing. Use `treestamp load DOCUMENT` to transfer those notes interactively, or `--skip-notes-transfer` to omit them while retaining matched notes. A successful update replaces only the managed region in Markdown, preserving surrounding bytes and line endings, or regenerates the complete SVG using its retained appearance and line endings. It prints `Updated: …` or `Current: …`.
 
-`check` accepts the [supported blank-line and TOML formatting variations](design.md#document-format). If configuration values change, the configuration is regenerated and its comments are lost.
+`check` accepts the [supported blank-line and TOML formatting variations](design.md#document-format). If configuration values change or retained configuration text contains non-UTF-8 bytes, preparation regenerates the configuration and its comments are lost.
 
 ## Output and exit status
 

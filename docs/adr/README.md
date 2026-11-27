@@ -6,6 +6,6 @@ For future records, copy [MADR's minimal template](adr-template-minimal.md), cho
 
 When a decision changes, write a new record and mark the previous one superseded with a link. Keep its historical reasoning rather than rewriting it into current guidance. ADRs may refer to other ADRs. Durable documentation should usually stand on its own; an occasional ADR link is appropriate only for useful historical context, never as the authority for current behavior.
 
-The included template is copied from [MADR](https://github.com/adr/madr/blob/develop/template/adr-template-minimal.md), available under [MIT or CC0-1.0](https://github.com/adr/madr/blob/develop/LICENSE); this copy uses CC0-1.0. Its upstream formatting is retained.
+The included template is copied from [MADR](https://github.com/adr/madr/blob/develop/template/adr-template-minimal.md). Its upstream formatting is retained; see [THIRD_PARTY_NOTICES](../../THIRD_PARTY_NOTICES) for attribution and licensing.
 
 Optional reading, when available: Martin Fowler's [Architecture Decision Record](https://martinfowler.com/bliki/ArchitectureDecisionRecord.html). Access to this article is not a prerequisite for contributing or authoring an ADR.

@@ -10,6 +10,8 @@ Changes that leave behavior unchanged, such as documentation edits or refactorin
 
 Prefer deterministic fixtures and controlled clocks or transports. Avoid assertions on incidental wording, elaborate mocks for unreachable states, and tests that only mirror the implementation. Integration tests should exercise public interfaces and real component boundaries where practical.
 
+Tests verify current requirements in the [design reference](design.md) and user documentation, together with explicitly identified implementation assumptions. A failure identifies a discrepancy; it does not establish which behavior the product should retain. When intended behavior changes, update the relevant documentation, generators, expectations, and regression cases together. Cache-specific tests describe the current mechanism; they do not establish retention, persistence, or session-sharing guarantees.
+
 Text I/O must specify its encoding; Python validation treats `EncodingWarning` as an error. Fixtures for byte-sensitive document behavior must control line endings explicitly. Git-index fixtures must use paths valid on supported platforms; unusual path encodings can be exercised through Git objects without checking those paths out.
 
 Focused tests provide feedback during development. Relevant complete suites are required before review. Automated browser and headless terminal tests do not establish that real terminals, native clipboards, or responsive layouts work correctly in every environment.
@@ -19,8 +21,8 @@ Focused tests provide feedback during development. Relevant complete suites are 
 | Suite | Responsibility |
 | --- | --- |
 | Core Python | CLI behavior, document parsing and transactional writes, Git snapshots, tree maintenance, and headless terminal editor journeys |
-| Hosted Python | HTTP contracts, GitHub acquisition, snapshot and state validation, caching, request budgets, and resource limits; generated browser-decoding cases, which drive the page's JavaScript modules through Node |
-| Browser | End-to-end browser interactions against a local service and fake GitHub API, including recovery from rejected requests and a fixed corpus of markup payloads |
+| Hosted Python | HTTP behavior, GitHub acquisition, snapshot and state validation, caching, request budgets, and resource limits; generated request-parser checks |
+| Browser | End-to-end browser interactions against a local service and fake GitHub API, including recovery from rejected requests and focused regressions |
 | JavaScript logic | Pure browser-side logic without DOM or network dependencies |
 | Installed-package acceptance | Wheel and source-distribution contents, clean installations, CLI commands, terminal editor workflows, and installed repository hooks |
 
@@ -30,15 +32,13 @@ The CI matrix checks supported Python versions on Linux and Windows. Local valid
 
 ## Generated tests
 
-Generated (property-based) tests use [Hypothesis](https://hypothesis.readthedocs.io/) within the core and hosted suites; [ADR 0003](adr/0003-dynamic-testing-plan.md) records their scope and contracts. They cover document serialization and parsing, session transport, hosted request validation, and browser-side decoding of fragments, routes, queries, and saved drafts. Files are named `test_properties_*.py`; shared strategies live beside them.
+Generated (property-based) tests use [Hypothesis](https://hypothesis.readthedocs.io/) within the core and hosted suites. The initial scope is document serialization and parsing, core session transport, and hosted request parsing. Tests and shared strategies live in `tests/properties/` and `web/tests/properties/`, and run in the ordinary test and coverage suites. Core session transport checks fidelity within the current implementation, not persisted sessions or cross-version compatibility. Browser logic uses ordinary JavaScript tests and focused browser regressions; the Python suites do not require Node.
 
-Expected results come from the generated model or from an independent oracle, not from the transformation under test. Generators include known unsupported or unrepresentable inputs; the corresponding properties require the documented rejection for exactly those inputs, so narrowing a generator is not a substitute for a contract decision.
+Expected results come from the generated model or from an independent oracle, not from the transformation under test. The representability predicate describes limitations of the current printed format, not a prohibition on supporting more inputs. It checks rejection for those cases and faithful round trips otherwise. When the format changes, update this predicate and its examples along with the implementation. Narrowing generators merely to hide unexpected failures is not a substitute for deciding the intended behavior.
 
-Each suite's `conftest.py` registers two profiles derived from Hypothesis's default: `ordinary` (100 examples per property, used by ordinary runs) and `extended` (1,000 examples). Both disable per-example deadlines and use a fresh random seed; the explicit profile overrides the derandomized profile Hypothesis selects automatically under CI. `make test-properties` runs only the generated tests, and `make test-properties-extended` runs them with the extended budget.
+Each property directory's `conftest.py` registers two profiles derived from Hypothesis's default: `ordinary` (100 examples per property, used by ordinary runs) and `extended` (1,000 examples). Both disable per-example deadlines and use a fresh random seed; the explicit profile overrides the derandomized profile Hypothesis selects automatically under CI. `make test-properties` runs only the property suites, and `make test-properties-extended` runs them with the extended budget.
 
-A failure prints the minimized example and a `@reproduce_failure` decorator. Hypothesis also replays recent failures from its local `.hypothesis/` database, which is not committed and which CI does not rely on. Turn each minimized discovery into an explicit regression test in the relevant suite.
-
-The browser-decoding cases need Node 24 or later (the version in `.nvmrc`). Without it they are skipped locally and fail when `CI` is set. A persistent worker, `web/tests/js/property_worker.mjs`, evaluates the cases with the page's own modules; it is not collected by `node --test`.
+A failure prints the minimized example and a `@reproduce_failure` decorator. Hypothesis also replays recent failures from its local `.hypothesis/` database, which is not committed and which CI does not rely on. For confirmed defects, retain a focused regression for the intended behavior in the relevant suite; a minimized counterexample alone does not decide product policy.
 
 ## Coverage policy
 
@@ -69,6 +69,6 @@ Coverage measures execution, not assertion quality or correctness. Excluded comp
 | Browser layout | Inspection at relevant viewport sizes, alongside functional browser tests |
 | Filesystem failures and concurrent writes | Deterministic failure tests and prepared-write interleavings, with platform-specific checks where needed |
 | Defensive validation | Reachable boundary failures; synthetic internal corruption should be identified as such |
-| Generated tests | Small bounded inputs and a fixed browser corpus; neither establishes resistance to resource exhaustion nor replaces a security review |
+| Generated tests | Small bounded inputs; these do not establish resistance to resource exhaustion or replace a security review |
 
 The [optional UI review protocol](ui-review.md) describes a bounded visual inspection process. Successful screenshot capture alone is not evidence that the captured views were inspected.
