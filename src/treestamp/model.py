@@ -140,8 +140,11 @@ def validate_path(path: str) -> None:
         raise MarkerError(f"invalid path encoding: {path!r}") from exc
     # Escaped bytes that form valid UTF-8 name a different text identity for the
     # same Git path; only the canonical decoding identifies it.
-    if encoded.decode("utf-8", "surrogateescape") != path:
-        raise MarkerError(f"invalid path encoding: {path!r}")
+    canonical = encoded.decode("utf-8", "surrogateescape")
+    if canonical != path:
+        raise MarkerError(
+            f"invalid path encoding: escaped bytes spell UTF-8 text; use {canonical!r}"
+        )
 
 
 def validate_paths(paths: Iterable[str]) -> None:
