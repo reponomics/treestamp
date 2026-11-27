@@ -18,7 +18,7 @@ By contributing to this project, you must agree to the [Developer Certificate of
 
 ## Set up
 
-Use Python 3.11+ and the uv version pinned in `.tool-versions` to manage a virtual environment named `venv`. Install uv through its official standalone installer or your system package manager; do not bootstrap it through an outdated pip. JavaScript checks use the Node version in `.nvmrc`, selected through nvm. The frontend has no npm installation or bundling step.
+Use Python 3.11+ and the uv version pinned by the `ghcr.io/astral-sh/uv` image in `web/Dockerfile` (`make uv-check` reports a mismatch) to manage a virtual environment named `venv`. Install uv through its official standalone installer or your system package manager; do not bootstrap it through an outdated pip. JavaScript checks use the Node version in `.nvmrc`, selected through nvm. The frontend has no npm installation or bundling step.
 
 ```bash
 make venv

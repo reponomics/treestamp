@@ -2,7 +2,7 @@
 VENV ?= venv
 PYTHON ?= python3
 UV ?= uv
-UV_VERSION := $(shell awk '$$1 == "uv" {print $$2}' .tool-versions)
+UV_VERSION := $(shell $(PYTHON) scripts/check_toolchain.py --print-version)
 NODE ?= node
 VHS ?= vhs
 DEMO_DIR ?= output/reconcile-demo
@@ -58,11 +58,11 @@ _check-pr-core:
 	  $(MAKE) build DIST_DIR="$$check_dist"; \
 	  $(MAKE) ci docs-check integration-check metadata-check distribution-check hook-check DIST_DIR="$$check_dist"
 _check-pr-web: web-ci web-browser-test web-image
-toolchain-check: ## Verify that development/CI and Docker uv pins agree
+toolchain-check: ## Verify the uv pin in web/Dockerfile, the only uv pin
 	$(PYTHON) scripts/check_toolchain.py
 uv-check: ## Check that uv matches the pinned development tool version
 	@test "$$($(UV) --version | awk '{print $$2}')" = "$(UV_VERSION)" || \
-	  { echo "Install uv $(UV_VERSION), as pinned in .tool-versions."; exit 1; }
+	  { echo "Install uv $(UV_VERSION), as pinned in web/Dockerfile."; exit 1; }
 venv: uv-check ## Create the virtual environment
 	@test -d "$(VENV)" || $(UV) venv --python $(PYTHON) $(VENV)
 lock-check: uv-check ## Reject dependency declarations that differ from the lock
