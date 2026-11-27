@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/reponomics/treestamp/compare/v1.1.0...v2.0.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* Markdown list treestamps are no longer supported. Recreate them as fenced Unicode or ASCII treestamps before upgrading; no automatic list migration is provided.
+
+### Features
+
+* add notes transfer UI ([#59](https://github.com/reponomics/treestamp/issues/59)) ([c33f062](https://github.com/reponomics/treestamp/commit/c33f062348cfb0c8664a094dd745598930c97a9a))
+* add svg output format ([#61](https://github.com/reponomics/treestamp/issues/61)) ([8b7d822](https://github.com/reponomics/treestamp/commit/8b7d82270bbd14eed3f3ee9b0d72ddf0769e56a5))
+
 ## [1.1.0](https://github.com/reponomics/treestamp/compare/v1.0.1...v1.1.0) (2026-11-14)
 
 
