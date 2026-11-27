@@ -10,12 +10,24 @@ from __future__ import annotations
 
 from hypothesis import strategies as st
 
-from treestamp.model import ANNOTATION_DELIMITER
+from treestamp.model import (
+    ANNOTATION_DELIMITER,
+    KIND_DIR,
+    KIND_GITLINK,
+    KIND_SYMLINK,
+)
+
+ARROW = " -> "
+GITLINK_SUFFIX = " [gitlink]"
 
 # Row syntax, quoting, markup, and escapes that random text seldom reaches.
 NAME_FRAGMENTS = (
     ANNOTATION_DELIMITER,
     " -> ",
+    " ->",
+    "  #",
+    " # ",
+    " #",
     " [gitlink]",
     " (1 file)",
     " (2 files, 3 folders)",
@@ -81,7 +93,7 @@ names = st.one_of(
 # Targets are blob contents, so any surrogateescape-decoded bytes are possible.
 symlink_targets = st.one_of(
     st.none(),
-    st.sampled_from(("null", "a  # b", "../x", "")),
+    st.sampled_from(("null", "a  # b", "  # ", " # x", " #", "../x", "")),
     st.lists(_text_piece, min_size=1, max_size=3).map("".join).map(canonical),
     st.binary(max_size=8).map(_from_bytes),
 )
@@ -106,10 +118,41 @@ repository_roots = st.one_of(
 )
 
 
-def is_unrepresentable_target(target: str | None) -> bool:
-    """Symlink targets the current printed format cannot distinguish.
+def _shown(text: str) -> str:
+    """Spacing of a printed name or target: trailing whitespace is escaped.
 
-    ``null`` prints identically to an absent target, and an annotation delimiter
-    in a target splits the row. See docs/adr/0003-dynamic-testing-plan.md.
+    Other escapes replace control characters and backslashes with backslash
+    sequences, which can neither form nor break an arrow or a delimiter.
     """
-    return target is not None and (target == "null" or ANNOTATION_DELIMITER in target)
+    body = text.rstrip()
+    return body + "\\" * (len(text) - len(body))
+
+
+def is_unrepresentable_row(
+    name: str, kind: str, target: str | None, annotation: str
+) -> bool:
+    """A test-owned reading of the printed row grammar (docs/adr/0003).
+
+    Rows split at the first annotation delimiter, and symlinks at the first
+    arrow. Registered special names are consumed before either split.
+    """
+    registered = (
+        ANNOTATION_DELIMITER in name or ARROW in name or name.endswith(GITLINK_SUFFIX)
+    )
+    printed_name = "entry" if registered else _shown(name)
+    suffix = {KIND_DIR: "/", KIND_GITLINK: GITLINK_SUFFIX}.get(kind, "")
+    if kind == KIND_SYMLINK:
+        printed_target = "null" if target is None else _shown(target)
+        if target is not None and printed_target == "null":
+            return True
+        suffix = ARROW + printed_target
+    head = printed_name + suffix
+    arrow = head.find(ARROW)
+    note = annotation.replace("\t", "  ")
+    return (
+        ANNOTATION_DELIMITER in head
+        or (kind == KIND_SYMLINK and arrow != len(printed_name))
+        or (kind == KIND_GITLINK and arrow != -1)
+        or bool(note)
+        and (head + ANNOTATION_DELIMITER).find(ANNOTATION_DELIMITER) != len(head)
+    )

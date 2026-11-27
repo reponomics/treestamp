@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, event, given
 from hypothesis import strategies as st
 
 from treestamp.document import (
@@ -36,7 +36,7 @@ from treestamp.model import (
 
 from .property_strategies import (
     annotation_texts,
-    is_unrepresentable_target,
+    is_unrepresentable_row,
     names,
     repository_roots,
     symlink_targets,
@@ -82,7 +82,7 @@ class Model:
     @property
     def unrepresentable(self) -> bool:
         return any(
-            spec.kind == KIND_SYMLINK and is_unrepresentable_target(spec.target)
+            is_unrepresentable_row(spec.name, spec.kind, spec.target, spec.annotation)
             for _, spec in self.nodes
         )
 
@@ -281,11 +281,14 @@ framings = st.builds(
 @given(models())
 def test_generated_documents_render_and_parse_to_their_model(model: Model) -> None:
     document = model.document()
-    if model.unrepresentable:
-        with pytest.raises(MarkerError, match="cannot represent tree"):
-            render_region(document)
+    event("unrepresentable" if model.unrepresentable else "representable")
+    try:
+        region = render_region(document)
+    except MarkerError as exc:
+        assert model.unrepresentable, f"unexpected rejection: {exc}"
+        assert "cannot represent tree" in str(exc)
         return
-    region = render_region(document)
+    assert not model.unrepresentable, "the predicate rejects a representable row"
     _assert_matches(parse_document(region.encode("utf-8", "surrogateescape")), model)
 
 
